@@ -80,24 +80,10 @@ func runForgeCheck(cmd *cobra.Command, path, rulesRef string, isDefault bool) er
 		return exitCodeError{code: 2}
 	}
 
-	if stamp.SHA == res.SHA {
-		fmt.Fprintf(cmd.OutOrStdout(),
-			"up to date (rules: %s, generated: %s)\n",
-			shortSHA(stamp.SHA), stamp.Date)
+	upToDate, msg := forge.CheckStamp(stamp, res.SHA, forge.TemplateVersion, path)
+	fmt.Fprint(cmd.OutOrStdout(), msg)
+	if upToDate {
 		return nil
 	}
-
-	fmt.Fprintf(cmd.OutOrStdout(),
-		"outdated: generated from %s, current rules are %s\nregenerate: trustabl forge --output %s\n",
-		shortSHA(stamp.SHA), shortSHA(res.SHA), path)
 	return exitCodeError{code: 1}
-}
-
-// shortSHA returns the first 7 characters of a SHA for display, or the full
-// string when it is shorter than 7 characters.
-func shortSHA(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
 }

@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/trustabl/trustabl/internal/forge"
 )
 
 func TestForgeCommand_NoPolicyFlag_NoArgs_OK(t *testing.T) {
@@ -155,6 +157,21 @@ func TestForgeCheckCommand_FileNotFound_DefaultPath(t *testing.T) {
 	}
 	if !strings.Contains(errBuf.String(), "SKILL.md") {
 		t.Errorf("stderr should mention SKILL.md, got: %s", errBuf.String())
+	}
+}
+
+func TestForgeCheck_UsesSharedComparison(t *testing.T) {
+	// Guards the wiring: the command must delegate to forge.CheckStamp and
+	// must not keep a private SHA-only comparison. A stamp that matches on
+	// SHA but predates the current template is stale.
+	s := forge.Stamp{Date: "2026-01-01", SHA: "abc1234def", Schema: 13, Template: 1}
+	ok, msg := forge.CheckStamp(s, "abc1234def", forge.TemplateVersion, "SKILL.md")
+	if forge.TemplateVersion > 1 && ok {
+		t.Fatalf("expected stale for template 1 against current %d; msg=%s",
+			forge.TemplateVersion, msg)
+	}
+	if forge.TemplateVersion > 1 && !strings.Contains(msg, "older forge") {
+		t.Errorf("expected the template-stale message, got: %s", msg)
 	}
 }
 
