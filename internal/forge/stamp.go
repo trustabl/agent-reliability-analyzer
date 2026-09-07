@@ -8,22 +8,31 @@ import (
 
 // Stamp holds provenance metadata embedded in a forge-generated SKILL.md.
 type Stamp struct {
-	Date   string   // YYYY-MM-DD
-	SHA    string   // resolved rules commit SHA
-	Schema int      // pack manifest schema_version
-	SDKs   []string // sorted detected SDK IDs
+	Date     string   // YYYY-MM-DD
+	SHA      string   // resolved rules commit SHA
+	Schema   int      // pack manifest schema_version
+	SDKs     []string // sorted detected SDK IDs
+	Template int      // emitted layout version; >= 1 on a successful parse
+}
+
+// stampLine renders the stamp comment. It is the single definition of the
+// stamp format — both Stamp.Line and PolicyStamp.Line delegate here so the
+// format cannot drift between the two generators. Returns empty string when
+// sha is empty so a zero-value stamp silently omits the comment.
+func stampLine(date, sha string, schema int, sdks []string, template int) string {
+	if sha == "" {
+		return ""
+	}
+	return fmt.Sprintf(
+		"<!-- generated: %s | rules: %s | schema: %d | sdks: %s | template: %d -->",
+		date, sha, schema, strings.Join(sdks, ", "), template,
+	)
 }
 
 // Line renders the stamp as an HTML comment. Returns empty string when SHA is
 // empty so a zero-value Stamp silently omits the comment.
 func (s Stamp) Line() string {
-	if s.SHA == "" {
-		return ""
-	}
-	return fmt.Sprintf(
-		"<!-- generated: %s | rules: %s | schema: %d | sdks: %s -->",
-		s.Date, s.SHA, s.Schema, strings.Join(s.SDKs, ", "),
-	)
+	return stampLine(s.Date, s.SHA, s.Schema, s.SDKs, s.Template)
 }
 
 // ParseStamp scans content for a forge stamp HTML comment and parses its
@@ -45,8 +54,11 @@ func ParseStamp(content string) (Stamp, bool) {
 	body := rest[:end]
 
 	// body: "2026-08-11 | rules: abc123 | schema: 13 | sdks: claude_sdk, mcp"
-	parts := strings.SplitN(body, " | ", 4)
-	if len(parts) != 4 {
+	// SplitN with 5 so a 5-field stamp yields 5 parts. Indices 0..3 are
+	// unchanged in both arities — the template field is appended last —
+	// so `sdks` stays parts[3] and is never absorbed by the extra field.
+	parts := strings.SplitN(body, " | ", 5)
+	if len(parts) < 4 || len(parts) > 5 {
 		return Stamp{}, false
 	}
 
@@ -74,5 +86,20 @@ func ParseStamp(content string) (Stamp, bool) {
 		}
 	}
 
-	return Stamp{Date: date, SHA: rulesVal, Schema: schema, SDKs: sdks}, true
+	// A stamp with no template field predates the field; that layout is
+	// version 1. A successful parse therefore always yields Template >= 1.
+	template := 1
+	if len(parts) == 5 {
+		tmplStr := strings.TrimPrefix(parts[4], "template: ")
+		if tmplStr == parts[4] {
+			return Stamp{}, false
+		}
+		parsed, err := strconv.Atoi(tmplStr)
+		if err != nil {
+			return Stamp{}, false
+		}
+		template = parsed
+	}
+
+	return Stamp{Date: date, SHA: rulesVal, Schema: schema, SDKs: sdks, Template: template}, true
 }
