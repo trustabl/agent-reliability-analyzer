@@ -442,14 +442,21 @@ func ResolveEdges(inv *models.RepoInventory, parsed []ParsedFile) {
 		// → SDKOpenAIAgents, TSADKHostedToolClasses → SDKGoogleADK,
 		// IsVercelHostedTool → SDKVercelAI. Python
 		// hosted-tool refs (handled by the classify block above) carry a
-		// valid DefIndex already and are skipped by the first guard. The
-		// Location is approximated to the agent's call site — the precise
-		// factory-call line is not currently carried on HostedToolRef.
+		// valid DefIndex already and are skipped by the first guard.
+		// TS OpenAI refs carry a fully-formed def on ref.Pending (precise
+		// factory-call Location + captured kwargs) — materialized verbatim.
+		// TS ADK / Vercel refs have no Pending yet, so their Location is still
+		// approximated to the agent's call site and they carry no kwargs.
 		// DefIndex set here is the pre-sort index; the post-sort remap
 		// below re-points .Resolved via the sort permutation.
 		for j := range a.HostedToolRefs {
 			ref := &a.HostedToolRefs[j]
 			if ref.DefIndex >= 0 {
+				continue
+			}
+			if ref.Pending != nil {
+				inv.HostedTools = append(inv.HostedTools, *ref.Pending)
+				ref.DefIndex = len(inv.HostedTools) - 1
 				continue
 			}
 			// Recognize either TS OpenAI factories or TS ADK hosted classes.

@@ -859,6 +859,16 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   and the TS HostedTool-materialization step stamps `SDKGoogleADK` for
   classes in `TSADKHostedToolClasses`. HandoffRefs are resolved by a
   language-agnostic pass (mirrors the existing ToolRefs/MCP/guards passes).
+  TS OpenAI hosted-tool refs are the one TS SDK where the materialization step
+  does not synthesize a bare def: `classifyTSOpenAIHostedFactoryCall`
+  (`ts_openai_hosted_tools.go`) captures the factory call's options-object
+  argument into `Kwargs` (via `TSObjectKwargs`) and its own precise call-site
+  `Location` at discovery time, carries it on `HostedToolRef.Pending`, and
+  `ResolveEdges` appends that def to `inv.HostedTools` verbatim instead of
+  building a new one from `Class` + the agent's `Location`. TS ADK and Vercel
+  AI hosted-tool refs still go through the synthesized-def path (agent-line
+  Location, no kwargs) — `Pending` is currently populated only by the OpenAI
+  factory-call discoverer.
 
 **Discovered agent components** (`Components []AgentComponent`).
 

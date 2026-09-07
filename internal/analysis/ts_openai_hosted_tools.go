@@ -53,7 +53,7 @@ func classifyTSOpenAIHostedFactoryCall(
 	if !IsTSOpenAIHostedToolFactory(canonical) {
 		return models.HostedToolDef{}, false
 	}
-	return models.HostedToolDef{
+	def := models.HostedToolDef{
 		Class: canonical,
 		SDK:   models.SDKOpenAIAgents,
 		Location: models.Location{
@@ -61,5 +61,14 @@ func classifyTSOpenAIHostedFactoryCall(
 			Line:     int(call.StartPoint().Row) + 1,
 			EndLine:  int(call.EndPoint().Row) + 1,
 		},
-	}, true
+	}
+	// Capture kwargs only when arg 0 is an object literal — a no-arg factory
+	// call (fileSearchTool()) has nothing to extract, so Kwargs stays nil,
+	// matching the Python side's hostedKwargTree nil-when-empty behavior.
+	if args := call.ChildByFieldName("arguments"); args != nil && args.NamedChildCount() > 0 {
+		if arg0 := args.NamedChild(0); arg0.Type() == "object" {
+			def.Kwargs = astutil.TSObjectKwargs(arg0, src)
+		}
+	}
+	return def, true
 }

@@ -163,11 +163,11 @@ func populateTSOpenAIToolRefs(a *models.AgentDef, opts *sitter.Node, pf ParsedFi
 		item := tools.NamedChild(i)
 		switch item.Type() {
 		case "call_expression":
-			if _, ok := classifyTSOpenAIHostedFactoryCall(item, aliases, pf.Source, pf.RelPath); ok {
-				canon := astutil.TSCalleeText(item, pf.Source, aliases)
+			if hd, ok := classifyTSOpenAIHostedFactoryCall(item, aliases, pf.Source, pf.RelPath); ok {
 				a.HostedToolRefs = append(a.HostedToolRefs, models.HostedToolRef{
-					Class:    canon,
+					Class:    hd.Class,
 					DefIndex: -1,
+					Pending:  &hd,
 				})
 			} else {
 				// An inline user-tool factory (tools: [tool({...})]) or any other
