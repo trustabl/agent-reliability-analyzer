@@ -485,6 +485,13 @@ func TestGenerateCombined_SkillCompliant(t *testing.T) {
 	}
 	got := GenerateCombined(stamp.Categories, policies, stamp)
 
+	// Anchor: this test guards the hand-authored loop prose. If that prose is
+	// absent the negative assertions below would pass vacuously, so fail loudly
+	// rather than silently guarding nothing.
+	if !strings.Contains(got, "## How to Apply These Constraints") {
+		t.Fatal("apply-loop section absent — the compliance assertions below would pass vacuously")
+	}
+
 	if strings.Contains(got, "allowed-tools: Bash") {
 		t.Error("generated skill must not grant Bash in allowed-tools (CSKILL-001/050)")
 	}
