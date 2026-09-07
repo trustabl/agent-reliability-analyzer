@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -435,4 +436,69 @@ func lineDiff(want, got string) string {
 		fmt.Fprintf(&sb, "(content differs but all compared lines match — likely trailing newline or length difference)")
 	}
 	return sb.String()
+}
+
+func TestGenerateCombined_EmitsApplyLoop(t *testing.T) {
+	inputDir := filepath.Join("..", "..", "testdata", "forge", "multi_sdk", "input")
+	policies, err := rules.Load(os.DirFS(inputDir))
+	if err != nil {
+		t.Fatalf("load fixture rules: %v", err)
+	}
+	stamp := PolicyStamp{
+		Date:          "2026-01-01",
+		RulesSHA:      "abc1234",
+		SchemaVersion: 13,
+		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
+		Template:      TemplateVersion,
+	}
+	got := GenerateCombined(stamp.Categories, policies, stamp)
+
+	if !strings.Contains(got, "## How to Apply These Constraints") {
+		t.Fatal("generated skill is missing the apply-loop section")
+	}
+	// The loop is the method; the rule blocks are the material it operates on.
+	loopIdx := strings.Index(got, "## How to Apply These Constraints")
+	sdkIdx := strings.Index(got, "### Tool Rules")
+	if sdkIdx >= 0 && loopIdx > sdkIdx {
+		t.Error("apply loop must be emitted before the per-SDK rule sections")
+	}
+	// The scope guardrail keeps the section from drifting into general advice.
+	if !strings.Contains(got, "It is not a general code-review") {
+		t.Error("apply loop must carry its scope-limiting closing line")
+	}
+}
+
+func TestGenerateCombined_SkillCompliant(t *testing.T) {
+	// GenerateCombined is the only production path, and it now emits
+	// hand-authored prose. It must not self-flag under trustabl scan.
+	inputDir := filepath.Join("..", "..", "testdata", "forge", "multi_sdk", "input")
+	policies, err := rules.Load(os.DirFS(inputDir))
+	if err != nil {
+		t.Fatalf("load fixture rules: %v", err)
+	}
+	stamp := PolicyStamp{
+		Date:          "2026-01-01",
+		RulesSHA:      "abc1234",
+		SchemaVersion: 13,
+		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
+		Template:      TemplateVersion,
+	}
+	got := GenerateCombined(stamp.Categories, policies, stamp)
+
+	if strings.Contains(got, "allowed-tools: Bash") {
+		t.Error("generated skill must not grant Bash in allowed-tools (CSKILL-001/050)")
+	}
+	if strings.Contains(got, "!`") {
+		t.Error("generated skill must not contain !` (inline-exec pattern, CSKILL-002)")
+	}
+	// Body only; the frontmatter is delimited by the first two "---".
+	parts := strings.SplitN(got, "---", 3)
+	if len(parts) >= 3 && (strings.Contains(parts[2], "http://") || strings.Contains(parts[2], "https://")) {
+		t.Error("generated skill body must not reference external URLs (CSKILL-020)")
+	}
+	// Mirrors skillInjectionPhraseRe at internal/analysis/skills.go:99.
+	injection := regexp.MustCompile(`(?i)(?:ignore|disregard|forget)\s+(?:all\s+|any\s+)?(?:the\s+)?(?:previous|prior|earlier|above)\s+(?:instructions?|prompts?|context|messages?)`)
+	if injection.MatchString(got) {
+		t.Error("generated skill must not contain instruction-override phrasing (CSKILL-040)")
+	}
 }

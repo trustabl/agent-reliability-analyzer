@@ -18,4 +18,5 @@ package forge
 // History:
 //
 //	1 — original layout: header + per-SDK rule blocks.
-const TemplateVersion = 1
+//	2 — added the "How to Apply These Constraints" apply-loop section.
+const TemplateVersion = 2
