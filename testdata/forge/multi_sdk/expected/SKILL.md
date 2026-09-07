@@ -8,7 +8,7 @@ disable-model-invocation: false
 
 # Trustabl Pre-Coding Reliability Constraints
 
-<!-- generated: 2026-01-01 | rules: abc1234 | schema: 13 | sdks: claude_sdk, openai_sdk -->
+<!-- generated: 2026-01-01 | rules: abc1234 | schema: 13 | sdks: claude_sdk, openai_sdk | template: 1 -->
 
 Before writing any agent code, apply every constraint below. Rules are
 ordered by severity. A violation here will fire the corresponding finding

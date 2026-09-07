@@ -141,6 +141,7 @@ func runForge(cmd *cobra.Command, target string, explicit []models.DetectorCateg
 		RulesSHA:      res.SHA,
 		SchemaVersion: res.SchemaVersion,
 		Categories:    categories,
+		Template:      forge.TemplateVersion,
 	}
 
 	// Step 5: generate and emit

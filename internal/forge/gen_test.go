@@ -141,10 +141,11 @@ func TestGenerate_GoldenFile(t *testing.T) {
 	}
 
 	got := Generate(pf.Policy, skillRules, Stamp{
-		Date:   "2026-01-01",
-		SHA:    "0000000000000000000000000000000000000000",
-		Schema: 1,
-		SDKs:   []string{"claude_skill"},
+		Date:     "2026-01-01",
+		SHA:      "0000000000000000000000000000000000000000",
+		Schema:   1,
+		SDKs:     []string{"claude_skill"},
+		Template: TemplateVersion,
 	})
 
 	goldenPath := filepath.Join("..", "..", "testdata", "forge", "claude_skill", "expected", "SKILL.md")
@@ -311,6 +312,7 @@ func TestGenerateCombined_GoldenFile(t *testing.T) {
 		RulesSHA:      "abc1234",
 		SchemaVersion: 13,
 		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
+		Template:      TemplateVersion,
 	}
 	got := GenerateCombined(stamp.Categories, policies, stamp)
 
@@ -348,6 +350,7 @@ func TestGenerateCombined_Deterministic(t *testing.T) {
 		RulesSHA:      "abc1234",
 		SchemaVersion: 13,
 		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
+		Template:      TemplateVersion,
 	}
 	a := GenerateCombined(stamp.Categories, policies, stamp)
 	b := GenerateCombined(stamp.Categories, policies, stamp)
@@ -368,6 +371,7 @@ func TestGenerateCombined_UnknownCategorySkipped(t *testing.T) {
 		RulesSHA:      "abc1234",
 		SchemaVersion: 13,
 		Categories:    []models.DetectorCategory{models.CategoryMCP}, // not in fixture
+		Template:      TemplateVersion,
 	}
 	got := GenerateCombined(stamp.Categories, policies, stamp)
 	// should produce valid frontmatter + header but no rule sections
@@ -376,6 +380,31 @@ func TestGenerateCombined_UnknownCategorySkipped(t *testing.T) {
 	}
 	if strings.Contains(got, "#### [") {
 		t.Error("expected no rule blocks when category has no rules in fixture")
+	}
+}
+
+func TestPolicyStamp_Line_MatchesStampFormat(t *testing.T) {
+	// Both generators must emit an identical stamp format for the same data,
+	// because a single ParseStamp reads both.
+	ps := PolicyStamp{
+		Date:          "2026-01-01",
+		RulesSHA:      "abc1234",
+		SchemaVersion: 13,
+		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
+		Template:      TemplateVersion,
+	}
+	s := Stamp{
+		Date:     "2026-01-01",
+		SHA:      "abc1234",
+		Schema:   13,
+		SDKs:     []string{"claude_sdk", "openai_sdk"},
+		Template: TemplateVersion,
+	}
+	if ps.Line() != s.Line() {
+		t.Errorf("PolicyStamp.Line() = %q\n            Stamp.Line() = %q\nformats must be identical", ps.Line(), s.Line())
+	}
+	if _, ok := ParseStamp(ps.Line()); !ok {
+		t.Error("ParseStamp rejected PolicyStamp.Line() output")
 	}
 }
 

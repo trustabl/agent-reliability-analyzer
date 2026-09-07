@@ -103,6 +103,17 @@ type PolicyStamp struct {
 	RulesSHA      string                    // short (7-char) or full SHA
 	SchemaVersion int
 	Categories    []models.DetectorCategory // sorted, controls section order
+	Template      int                       // emitted layout version; >= 1 on a successful parse
+}
+
+// Line renders the stamp comment, delegating to the shared renderer in
+// stamp.go so the multi-SDK generator cannot drift from Stamp.Line().
+func (p PolicyStamp) Line() string {
+	sdks := make([]string, len(p.Categories))
+	for i, c := range p.Categories {
+		sdks[i] = string(c)
+	}
+	return stampLine(p.Date, p.RulesSHA, p.SchemaVersion, sdks, p.Template)
 }
 
 // sortRules sorts a rule slice by severity rank (critical first) then rule ID ascending.
@@ -232,8 +243,9 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 
 	// --- Header ---
 	fmt.Fprintf(&b, "# Trustabl Pre-Coding Reliability Constraints\n\n")
-	fmt.Fprintf(&b, "<!-- generated: %s | rules: %s | schema: %d | sdks: %s -->\n\n",
-		stamp.Date, stamp.RulesSHA, stamp.SchemaVersion, sdkList)
+	if line := stamp.Line(); line != "" {
+		fmt.Fprintf(&b, "%s\n\n", line)
+	}
 	fmt.Fprintf(&b, "Before writing any agent code, apply every constraint below. Rules are\n")
 	fmt.Fprintf(&b, "ordered by severity. A violation here will fire the corresponding finding\n")
 	fmt.Fprintf(&b, "in post-build scan — prevent it now.\n\n")

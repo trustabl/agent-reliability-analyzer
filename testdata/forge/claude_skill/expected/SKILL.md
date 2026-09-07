@@ -8,7 +8,7 @@ disable-model-invocation: false
 
 # Trustabl Pre-Coding: Claude Agent Skill safety
 
-<!-- generated: 2026-01-01 | rules: 0000000000000000000000000000000000000000 | schema: 1 | sdks: claude_skill -->
+<!-- generated: 2026-01-01 | rules: 0000000000000000000000000000000000000000 | schema: 1 | sdks: claude_skill | template: 1 -->
 
 Before writing any SKILL.md, you MUST apply every constraint below. Rules are
 ordered by severity. A violation here will fire the corresponding finding
