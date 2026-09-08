@@ -73,7 +73,7 @@ func TestParseStamp_NoStamp(t *testing.T) {
 
 func TestParseStamp_MidFile(t *testing.T) {
 	// Stamp can appear anywhere in the content, not just the first line.
-	s := Stamp{Date: "2026-01-01", SHA: "deadbeef", Schema: 1, SDKs: []string{"openai_sdk"}}
+	s := Stamp{Date: "2026-01-01", SHA: "deadbeef", Schema: 1, SDKs: []string{"openai_sdk"}, Template: 1}
 	content := "lots of content before\n\n" + s.Line() + "\n\nlots of content after"
 	got, ok := ParseStamp(content)
 	if !ok {
@@ -124,6 +124,8 @@ func TestParseStamp_MalformedTemplate(t *testing.T) {
 		"<!-- generated: 2026-08-11 | rules: abc1234 | schema: 13 | sdks: mcp | template: x -->",
 		"<!-- generated: 2026-08-11 | rules: abc1234 | schema: 13 | sdks: mcp | tmpl: 2 -->",
 		"<!-- generated: 2026-08-11 | rules: abc1234 | schema: 13 | sdks: mcp | template: 2 | extra: 1 -->",
+		"<!-- generated: 2026-08-11 | rules: abc1234 | schema: 13 | sdks: mcp | template: 0 -->",
+		"<!-- generated: 2026-08-11 | rules: abc1234 | schema: 13 | sdks: mcp | template: -3 -->",
 	}
 	for _, c := range cases {
 		if _, ok := ParseStamp(c); ok {

@@ -33,8 +33,9 @@ packs to include.
 Use --policy to add categories on top of auto-detected ones — useful when a
 new SDK is being introduced to a repo before its first dependency declaration.
 
-The output is a SKILL.md written to stdout (or --output) containing one
-section per detected SDK, with rules ordered by severity.`,
+The output is a SKILL.md written to stdout (or --output) that opens with a
+"How to Apply These Constraints" section describing the apply loop, followed
+by one section per detected SDK, with rules ordered by severity.`,
 		Example: `  # Auto-detect SDKs from current directory
   trustabl forge
 
@@ -136,13 +137,7 @@ func runForge(cmd *cobra.Command, target string, explicit []models.DetectorCateg
 	}
 
 	// Step 4: build stamp (passive watermark)
-	stamp := forge.PolicyStamp{
-		Date:          time.Now().Format("2006-01-02"),
-		RulesSHA:      res.SHA,
-		SchemaVersion: res.SchemaVersion,
-		Categories:    categories,
-		Template:      forge.TemplateVersion,
-	}
+	stamp := buildForgeStamp(time.Now().Format("2006-01-02"), res.SHA, res.SchemaVersion, categories)
 
 	// Step 5: generate and emit
 	content := forge.GenerateCombined(categories, policies, stamp)
@@ -151,4 +146,18 @@ func runForge(cmd *cobra.Command, target string, explicit []models.DetectorCateg
 		return nil
 	}
 	return os.WriteFile(output, []byte(content), 0o644)
+}
+
+// buildForgeStamp assembles the passive watermark stamped into a generated
+// SKILL.md. It is a pure function so runForge's stamp assembly — including
+// the always-current forge.TemplateVersion — can be tested without a rules
+// resolution or filesystem write.
+func buildForgeStamp(date, sha string, schema int, cats []models.DetectorCategory) forge.PolicyStamp {
+	return forge.PolicyStamp{
+		Date:          date,
+		RulesSHA:      sha,
+		SchemaVersion: schema,
+		Categories:    cats,
+		Template:      forge.TemplateVersion,
+	}
 }

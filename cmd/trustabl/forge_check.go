@@ -17,15 +17,18 @@ func newForgeCheckCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "check [file]",
-		Short: "Check whether a forge-generated SKILL.md is current with the latest rules",
-		Long: `Check whether a forge-generated SKILL.md is current with the latest rules.
+		Short: "Check whether a forge-generated SKILL.md is current with the latest rules and template",
+		Long: `Check whether a forge-generated SKILL.md is current with the latest rules and
+template layout.
 
 Reads the provenance stamp embedded in the file by "trustabl forge", resolves
-the current rules SHA, and reports whether they match.
+the current rules SHA, and compares both the stamp's rules SHA against the
+resolved rules SHA and its template field against the engine's
+TemplateVersion. Either mismatch is reported as stale.
 
 Exit codes:
-  0  — stamp found and SHA matches current rules (file is current)
-  1  — stale (SHA mismatch), unstamped, or file not found (user action needed)
+  0  — stamp found and both the rules SHA and template version match current (file is current)
+  1  — stale (rules SHA mismatch, template mismatch, or both), unstamped, or file not found (user action needed)
   2  — error resolving rules or reading the file (operator/environment fault)`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,

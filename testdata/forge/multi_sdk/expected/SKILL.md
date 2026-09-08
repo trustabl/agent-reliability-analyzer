@@ -1,7 +1,7 @@
 ---
 name: trustabl-pre-coding
 description: >-
-  Pre-coding reliability constraints for: claude_sdk, openai_sdk
+  Pre-coding reliability constraints, used for writing and reviewing agent definitions with: claude_sdk, openai_sdk
 allowed-tools: Read
 disable-model-invocation: false
 ---
@@ -45,8 +45,8 @@ definition, run this loop before moving on.
    constraint here, or the fix is outside the file you are editing — stop and
    say so rather than approximating it.
 
-4. LOG THE REPAIR
-   Record the rule ID and the change that cleared it. Do not reintroduce a
+4. KEEP A TRAIL
+   Note the rule ID and the change that cleared it. Do not reintroduce a
    pattern you already repaired in this session, and do not re-apply a repair
    that did not clear the violation — report it instead.
 

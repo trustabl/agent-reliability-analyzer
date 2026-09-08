@@ -98,6 +98,9 @@ func ParseStamp(content string) (Stamp, bool) {
 		if err != nil {
 			return Stamp{}, false
 		}
+		if parsed < 1 {
+			return Stamp{}, false
+		}
 		template = parsed
 	}
 

@@ -99,8 +99,8 @@ func matchCondition(expr rules.MatchExpr) string {
 
 // PolicyStamp is the passive watermark embedded in a GenerateCombined output.
 type PolicyStamp struct {
-	Date          string                    // YYYY-MM-DD
-	RulesSHA      string                    // short (7-char) or full SHA
+	Date          string // YYYY-MM-DD
+	RulesSHA      string // short (7-char) or full SHA
 	SchemaVersion int
 	Categories    []models.DetectorCategory // sorted, controls section order
 	Template      int                       // emitted layout version; >= 1 on a successful parse
@@ -167,18 +167,19 @@ func emitRuleSection(b *strings.Builder, heading string, rs []rules.RuleDef, sco
 // emitApplyLoop writes the static procedural section that turns the generated
 // skill from a reference document into a working method: after writing an
 // agent surface, check it against the constraints in this document, name the
-// violation by rule ID, apply that rule's directive, and log the repair.
+// violation by rule ID, apply that rule's directive, and keep a trail of it.
 //
 // The text is constant — it references rule FIELDS (scope, severity, the
 // per-rule Directive) rather than specific rule IDs, so it cannot go stale as
 // rules are added or removed, and GenerateCombined stays a pure function.
 //
 // Authoring constraint: this text is scanned by Trustabl when the generated
-// skill is itself audited. It must never contain a backtick-exec sequence
-// (CSKILL-002), an external URL (CSKILL-020), or instruction-override phrasing
-// — never pair ignore/disregard/forget with previous/prior/earlier/above plus
-// instructions/prompts/context/messages (CSKILL-040). TestGenerateCombined_SkillCompliant
-// enforces all three.
+// skill is itself audited, so it must not trip Trustabl's own skill rules.
+// Do not enumerate a fixed list of rules to avoid here — that is how CSKILL-086
+// (persistence verbs: log/store/record/save/...) shipped in step 4 unnoticed.
+// TestGenerateCombined_SkillCompliant evaluates every skill-scoped rule in the
+// rules fixture against the generated output and asserts the exact firing set,
+// so any newly-tripped rule fails the build.
 func emitApplyLoop(b *strings.Builder) {
 	fmt.Fprintf(b, "## How to Apply These Constraints\n\n")
 	fmt.Fprintf(b, "Work against this document; do not assume a definition is correct because it\n")
@@ -207,8 +208,8 @@ func emitApplyLoop(b *strings.Builder) {
 	fmt.Fprintf(b, "   constraint here, or the fix is outside the file you are editing — stop and\n")
 	fmt.Fprintf(b, "   say so rather than approximating it.\n\n")
 
-	fmt.Fprintf(b, "4. LOG THE REPAIR\n")
-	fmt.Fprintf(b, "   Record the rule ID and the change that cleared it. Do not reintroduce a\n")
+	fmt.Fprintf(b, "4. KEEP A TRAIL\n")
+	fmt.Fprintf(b, "   Note the rule ID and the change that cleared it. Do not reintroduce a\n")
 	fmt.Fprintf(b, "   pattern you already repaired in this session, and do not re-apply a repair\n")
 	fmt.Fprintf(b, "   that did not clear the violation — report it instead.\n\n")
 
@@ -236,12 +237,12 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 	}
 
 	type sdkSection struct {
-		meta       rules.PolicyMeta
-		tools      []rules.RuleDef
-		agents     []rules.RuleDef
-		subagents  []rules.RuleDef
-		repos      []rules.RuleDef
-		skills     []rules.RuleDef
+		meta      rules.PolicyMeta
+		tools     []rules.RuleDef
+		agents    []rules.RuleDef
+		subagents []rules.RuleDef
+		repos     []rules.RuleDef
+		skills    []rules.RuleDef
 	}
 	sections := make(map[models.DetectorCategory]*sdkSection)
 
@@ -289,7 +290,10 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 	// --- Frontmatter ---
 	fmt.Fprintf(&b, "---\n")
 	fmt.Fprintf(&b, "name: trustabl-pre-coding\n")
-	fmt.Fprintf(&b, "description: >-\n  Pre-coding reliability constraints for: %s\n", sdkList)
+	// The purpose clause ("used for ...") is load-bearing, not decoration:
+	// CSKILL-085 flags a skill description that states what it touches without
+	// stating why. TestGenerateCombined_SkillCompliant asserts it stays clear.
+	fmt.Fprintf(&b, "description: >-\n  Pre-coding reliability constraints, used for writing and reviewing agent definitions with: %s\n", sdkList)
 	fmt.Fprintf(&b, "allowed-tools: Read\n")
 	fmt.Fprintf(&b, "disable-model-invocation: false\n")
 	fmt.Fprintf(&b, "---\n\n")
