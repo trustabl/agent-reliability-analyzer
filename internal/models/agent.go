@@ -121,6 +121,12 @@ type HostedToolRef struct {
 	Class    string         `json:"class"`
 	Resolved *HostedToolDef `json:"-"`
 	DefIndex int            `json:"-"` // pre-sort index into inv.HostedTools; remapped after sort. -1 = not resolvable via inventory remap.
+	// Pending is a fully-formed HostedToolDef captured at TS discovery time —
+	// precise call-site Location and captured factory kwargs. ResolveEdges
+	// materializes it into inv.HostedTools verbatim instead of synthesizing a
+	// bare def from Class alone. nil for Python refs (which already carry a
+	// valid DefIndex) and for TS SDKs that do not yet capture factory kwargs.
+	Pending *HostedToolDef `json:"-"`
 }
 
 // MCPServerDef is one discovered MCP server. Source of truth for class
