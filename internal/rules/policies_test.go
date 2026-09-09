@@ -4001,6 +4001,33 @@ var policyAgentRuleCases = []policyAgentCase{
 		models.RepoInventory{},
 		false},
 
+	// ─── OAI-116 TS agent hostedMcpTool without allowedTools ──────────────────
+	{"OAI-116 fires when hostedMcpTool has no allowedTools", "OAI-116",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", serverUrl: \"https://mcp.deepwiki.com/mcp\" })] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-116 fires when hostedMcpTool has no options at all", "OAI-116",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool()] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-116 silent when allowedTools is a flat array", "OAI-116",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", allowedTools: [\"ask_question\"] })] });\n"),
+		models.RepoInventory{},
+		false},
+	{"OAI-116 silent when allowedTools is a toolNames filter object", "OAI-116",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", allowedTools: { toolNames: [\"ask_question\"] } })] });\n"),
+		models.RepoInventory{},
+		false},
+	{"OAI-116 silent when no hostedMcpTool", "OAI-116",
+		parseTSOpenAIAgentInlineResolved("import { Agent, webSearchTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [webSearchTool()] });\n"),
+		models.RepoInventory{},
+		false},
+
 	// ─── ADK-109 TS LlmAgent has no description ───────────────────────────────
 	{"ADK-109 fires on TS LlmAgent with no description", "ADK-109",
 		parseTSADKAgentInline("import { LlmAgent } from \"@google/adk\";\n" +
