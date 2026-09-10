@@ -73,9 +73,14 @@ checksum:
   algorithm: sha256
 
 release:
-  github:
-    owner: trustabl
-    name: trustabl
+  # No `github:` target here on purpose. GoReleaser infers the repository
+  # from the git remote, which actions/checkout sets to the repository the
+  # workflow is running in, so this follows a rename automatically.
+  #
+  # A hardcoded owner/name is a POST to api.github.com/repos/OWNER/REPO/
+  # releases. GitHub answers a renamed repository with a 301, and Go's HTTP
+  # client does not replay a POST body across a redirect — so the failure
+  # would land AFTER the tag was already public.
   draft: false
   prerelease: auto
   mode: replace
