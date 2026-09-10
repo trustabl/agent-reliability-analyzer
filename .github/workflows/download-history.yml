@@ -23,7 +23,9 @@ jobs:
       - name: Record cumulative downloads
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TARGET_REPO: trustabl/trustabl
+          # Resolve at run time so a rename cannot point the counter at a
+          # repository that no longer exists.
+          TARGET_REPO: ${{ github.repository }}
           HISTORY_FILE: .github/stats/download-history.json
         run: |
           python - <<'PY'
