@@ -16,8 +16,8 @@ present themselves.
 
 | | Open source (Apache-2.0) | Trustabl Console (commercial) |
 |---|---|---|
-| Scanner CLI + local MCP server | ✅ `trustabl/trustabl` | |
-| Detection rule packs | ✅ `trustabl/trustabl-rules` | |
+| Scanner CLI + local MCP server | ✅ `trustabl/agent-reliability-analyzer` | |
+| Detection rule packs | ✅ `trustabl/agent-reliability-rules` | |
 | Autofix (`enrich --apply`) | ✅ | |
 | Findings, readiness score, SARIF, deterministic scan ID | ✅ | |
 | GitHub Action | ✅ | |

@@ -6,8 +6,8 @@
     "name": "Trustabl",
     "url": "https://github.com/trustabl"
   },
-  "homepage": "https://github.com/trustabl/trustabl",
-  "repository": "https://github.com/trustabl/trustabl",
+  "homepage": "https://github.com/trustabl/agent-reliability-analyzer",
+  "repository": "https://github.com/trustabl/agent-reliability-analyzer",
   "license": "Apache-2.0",
   "keywords": [
     "security",
@@ -30,6 +30,6 @@
       "analyze",
       "fix"
     ],
-    "websiteURL": "https://github.com/trustabl/trustabl"
+    "websiteURL": "https://github.com/trustabl/agent-reliability-analyzer"
   }
 }

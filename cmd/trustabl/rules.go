@@ -19,7 +19,7 @@ func newRulesCommand(tel *telemetry.Client) *cobra.Command {
 		Short: "Manage Trustabl's detection rules",
 		Long: `Manage Trustabl's detection rules.
 
-Rules live in the external trustabl-rules repository and are resolved
+Rules live in the external agent-reliability-rules repository and are resolved
 automatically the first time you scan, then cached under your user cache
 directory (keyed by commit, with an offline fallback). You normally never run
 these commands — a scan fetches what it needs — but "rules pull" lets you
@@ -33,7 +33,7 @@ pre-fetch the packs so a later scan can run offline.`,
 		Use:   "pull",
 		Short: "Download the detection rule packs into the local cache",
 		Long: `Download the detection rule packs into the local cache so later scans can run
-offline. By default this fetches the official trustabl-rules repository's default
+offline. By default this fetches the official agent-reliability-rules repository's default
 branch; override the source with --rules-repo / --rules-ref, or set the
 TRUSTABL_RULES_REPO environment variable. Pass --rules-source <channel> to instead
 pre-warm a signed channel's bundle cache, so a later signed scan can run offline.`,
@@ -91,7 +91,7 @@ pre-warm a signed channel's bundle cache, so a later signed scan can run offline
 		},
 	}
 	pull.Flags().StringVar(&repo, "rules-repo", "",
-		"rules repository URL (default: official trustabl-rules; or TRUSTABL_RULES_REPO)")
+		"rules repository URL (default: official agent-reliability-rules; or TRUSTABL_RULES_REPO)")
 	pull.Flags().StringVar(&ref, "rules-ref", "",
 		"rules branch or tag to pull (default: the repo's default branch)")
 	pull.Flags().StringVar(&rulesSource, "rules-source", "",
@@ -107,7 +107,7 @@ schema, parse, duplicate-ID, missing-field, out-of-range-confidence, or
 unknown-predicate error. Unlike a scan it fetches nothing — it validates the
 rules already on disk against this Trustabl build's rule schema.
 
-This is the CI gate for the trustabl-rules repository: build the engine at a
+This is the CI gate for the agent-reliability-rules repository: build the engine at a
 known ref and run "trustabl rules validate ." against a checkout of the rules.
 Strict loading means a rule that targets a newer schema than this build (a new
 predicate not yet in the engine) fails here, which enforces the right ordering —

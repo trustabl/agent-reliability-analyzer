@@ -13,7 +13,7 @@ import (
 // newCapabilitiesCommand emits this build's capability descriptor — the
 // machine-readable vocabulary (schema version, scopes, languages, categories,
 // applies_to values, predicates) that a rule pack is checked against. A release
-// publishes this as an asset; the trustabl-rules CI gate compares proposed rules
+// publishes this as an asset; the agent-reliability-rules CI gate compares proposed rules
 // against each supported release's descriptor so a rules change can't silently
 // break a deployed binary.
 func newCapabilitiesCommand(tel *telemetry.Client) *cobra.Command {
@@ -25,7 +25,7 @@ rule-schema version, whether it loads rules forward-compatibly, and every scope,
 language, detector category, applies_to value, and match predicate it can
 evaluate.
 
-This is the contract a rule pack is checked against. The trustabl-rules CI gate
+This is the contract a rule pack is checked against. The agent-reliability-rules CI gate
 uses each supported release's descriptor to decide, before a rule change merges,
 whether a proposed rule would run, be skipped (forward-compatible), or hard-break
 that release — so a rules change can never silently break a deployed binary.

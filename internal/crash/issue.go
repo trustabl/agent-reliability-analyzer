@@ -66,5 +66,5 @@ func buildIssueURL(title string, r Report, stack []string, truncated bool, path 
 	q.Set("title", title)
 	q.Set("body", b.String())
 	q.Set("labels", "crash")
-	return "https://github.com/trustabl/trustabl/issues/new?" + q.Encode()
+	return "https://github.com/trustabl/agent-reliability-analyzer/issues/new?" + q.Encode()
 }

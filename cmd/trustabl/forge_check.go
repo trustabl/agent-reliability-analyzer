@@ -40,7 +40,7 @@ Exit codes:
 	}
 
 	cmd.Flags().StringVar(&rulesRef, "rules-ref", "",
-		"pin the trustabl-rules branch or tag (default: latest cached)")
+		"pin the agent-reliability-rules branch or tag (default: latest cached)")
 
 	return cmd
 }

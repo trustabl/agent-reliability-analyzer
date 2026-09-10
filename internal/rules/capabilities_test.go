@@ -20,7 +20,7 @@ func capContains(xs []string, want string) bool {
 // TestDescribe_MatchesEngineVocabulary locks the capability descriptor to what
 // the loader actually enforces: every advertised value must pass the matching
 // validator, and the predicate list must equal KnownPredicateKeys. This is what
-// lets the trustabl-rules CI gate trust the descriptor — if Describe drifted from
+// lets the agent-reliability-rules CI gate trust the descriptor — if Describe drifted from
 // the real vocabulary, the gate's verdicts would be wrong.
 func TestDescribe_MatchesEngineVocabulary(t *testing.T) {
 	c := rules.Describe()

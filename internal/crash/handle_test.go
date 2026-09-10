@@ -102,7 +102,7 @@ func TestActGitHubOpensURL(t *testing.T) {
 	opened := ""
 	act(&out, strings.NewReader("2\n"), true, Report{PanicValue: "boom"}, "/tmp/c.log", tel,
 		func(u string) error { opened = u; return nil })
-	if !strings.Contains(opened, "github.com/trustabl/trustabl/issues/new") {
+	if !strings.Contains(opened, "github.com/trustabl/agent-reliability-analyzer/issues/new") {
 		t.Fatalf("GitHub choice did not open issue URL: %q", opened)
 	}
 }

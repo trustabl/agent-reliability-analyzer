@@ -120,7 +120,7 @@ Adding a new tool-discovery language requires:
    `ts_mcp_servers.go`).
 3. Per-language predicate implementations in `internal/rules/predicates.go`
    (since AST node types differ across languages).
-4. New rule files under `<category>/` in the external `trustabl-rules`
+4. New rule files under `<category>/` in the external `agent-reliability-rules`
    repository declaring `language: <new>`.
 
 ---
@@ -132,7 +132,7 @@ Adding a new tool-discovery language requires:
 Before the pipeline runs, `cmd/trustabl` resolves the detection rules. The
 binary embeds none; `rulesource.Resolve` fetches them from the rules git
 repository (`DefaultRepoURL`, currently
-`https://github.com/trustabl/trustabl-rules`; overridable with
+`https://github.com/trustabl/agent-reliability-rules`; overridable with
 `--rules-repo` / `TRUSTABL_RULES_REPO`) via go-git and caches the clone under
 `os.UserCacheDir()/trustabl/rules/<sha>/`, with a `current` pointer file
 naming the active commit. The clone lands via a temp dir + atomic rename, and
@@ -190,7 +190,7 @@ engine verifies against — so the digest and signature can never drift. Signing
 code (private-key handling) lives only in `cmd/rulesctl`/`internal/rulepub` and
 never links into the scanner binary, preserving `rulesign`'s verify-only
 guarantee. The CI publish/promote workflow lives in the rules repo
-(`trustabl-rules/.github/workflows/publish.yml`).
+(`agent-reliability-rules/.github/workflows/publish.yml`).
 
 **Bundle path contract.** A rule pack's file paths must be portable so the
 on-disk install always equals the verified digest. `rulesign.ValidateBundlePath`
@@ -1685,7 +1685,7 @@ Discipline rules:
 cmd/trustabl/                    CLI entry point (cobra).
 │                                main.go (scan/rules/version) + mcp.go (mcp).
 cmd/rulesctl/                    Rules PUBLISHER tool (keygen/bundle/sign/verify). NOT shipped to users
-│                                (goreleaser builds only cmd/trustabl); used by trustabl-rules CI.
+│                                (goreleaser builds only cmd/trustabl); used by agent-reliability-rules CI.
 internal/
 ├── models/                      Cross-boundary types. JSON-tagged. Zero deps.
 ├── ingestion/                   Importer + Normalizer.
@@ -1787,8 +1787,8 @@ internal/
 ├── review/                      Human renderer (read-only; no file writes).
 └── inference/                   BYOK inference router (interface + cache).
 
-The YAML rule packs themselves live in the **separate** `trustabl-rules`
-repository (`https://github.com/trustabl/trustabl-rules`), not in this
+The YAML rule packs themselves live in the **separate** `agent-reliability-rules`
+repository (`https://github.com/trustabl/agent-reliability-rules`), not in this
 tree — that is what `trustabl scan` pulls and runs. `testdata/rules-fixture/`
 (with a `manifest.yaml` declaring `schema_version`) is an in-engine **test
 mirror** of those packs, injected via `os.DirFS` so `go test` validates rules
@@ -1829,7 +1829,7 @@ presence flag, so callers can distinguish absent from present-but-`None`.
 
 ## 5. The rules engine: schema, evaluator, loader
 
-YAML rule files live in the external `trustabl-rules` repository (and, for
+YAML rule files live in the external `agent-reliability-rules` repository (and, for
 tests, the interim `testdata/rules-fixture/` copy), grouped first by detector
 category and then by topic. Each file is a single `policy:` block with one or
 more rules:
@@ -1942,7 +1942,7 @@ negation.
 
 ### Rule source ([internal/rulesource/](internal/rulesource/))
 
-The engine embeds no rules. `cmd/trustabl` resolves the `trustabl-rules`
+The engine embeds no rules. `cmd/trustabl` resolves the `agent-reliability-rules`
 repository into an `fs.FS` (see §2 — Rule resolution) and passes it to
 `scanner.Run` via `Config.RulesFS`; the loader walks that FS, skipping the
 top-level `manifest.yaml`. Tests inject `testdata/rules-fixture/` via
@@ -1969,7 +1969,7 @@ From YAML source in the rules repository to a `Finding` emitted at scan time:
 
 ```mermaid
 flowchart LR
-    yaml["trustabl-rules<br/>&lt;sdk&gt;/&lt;topic&gt;.yaml"]
+    yaml["agent-reliability-rules<br/>&lt;sdk&gt;/&lt;topic&gt;.yaml"]
     resolve["rulesource.Resolve<br/>· go-git clone/fetch<br/>· cache fallback<br/>· schema_version gate"]
     fs[("Config.RulesFS<br/>(fs.FS)")]
     loader["rules.Load<br/>· KnownFields(true)<br/>· required-field validation<br/>· severity/category/scope enums<br/>· applies_to-vs-scope check<br/>· match-vs-scope check<br/>· cross-file ID uniqueness"]
@@ -2119,7 +2119,7 @@ build's rule-evaluation vocabulary (the scopes, predicates, and `applies_to`
 kinds it understands) as JSON — consumed by the rules-CI gate to detect a pack
 that targets a newer engine than this build supports. `trustabl rules validate
 [DIR]` strict-loads a local rule-pack directory against this build's schema (the
-`trustabl-rules` CI gate). `trustabl vulndb pull` pre-downloads the OSV snapshot
+`agent-reliability-rules` CI gate). `trustabl vulndb pull` pre-downloads the OSV snapshot
 for every ecosystem so a later `--vuln-scan` runs offline. `trustabl llm`
 manages the BYOK provider/key/model config consumed by `enrich` (§8.2).
 

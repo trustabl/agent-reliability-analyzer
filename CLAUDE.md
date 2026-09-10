@@ -4,8 +4,8 @@ This file captures durable architectural commitments that span the whole
 codebase. Per-area conventions live in nested CLAUDE.md files (see
 [`testdata/rules-fixture/CLAUDE.md`](testdata/rules-fixture/CLAUDE.md)
 for rule authoring). The detection rule packs do **not** live in this repo:
-they live in the external **`trustabl-rules`** repository
-(`https://github.com/trustabl/trustabl-rules`), which the engine pulls at
+they live in the external **`agent-reliability-rules`** repository
+(`https://github.com/trustabl/agent-reliability-rules`), which the engine pulls at
 scan time. `testdata/rules-fixture/` is an in-engine **test mirror** of those
 packs — see [Two-repo rule model](#two-repo-rule-model-rules-vs-engine) below,
 which is required reading before touching any rule.
@@ -102,8 +102,8 @@ steps build is what makes policy selection data-driven rather than
 statically configured.
 
 Before the pipeline runs, the CLI resolves detection rules from the
-external `trustabl-rules` git repository (`rulesource.DefaultRepoURL`,
-currently `https://github.com/trustabl/trustabl-rules`; the engine embeds
+external `agent-reliability-rules` git repository (`rulesource.DefaultRepoURL`,
+currently `https://github.com/trustabl/agent-reliability-rules`; the engine embeds
 none — see `internal/rulesource/`) and hands them to `scanner.Run` as an
 `fs.FS`. The
 resolution path fetches the configured ref, caches the clone under
@@ -214,7 +214,7 @@ location: tool file/line, agent constructor call site, or the manifest.
 - **Future SDKs slot in cleanly.** Adding a new SDK means: extend the
   recon dep-scan needles, extend the inventory-step discovery patterns for
   that SDK's tool/agent shapes, add a policy pack under `<sdk>/` in the
-  external `trustabl-rules` repository. No engine changes, no rebuild.
+  external `agent-reliability-rules` repository. No engine changes, no rebuild.
 
 ## Agent as the unit of analysis (not the repo)
 
@@ -267,11 +267,11 @@ touching rules — getting it wrong silently ships untested rules, test-passes
 rules users never receive, or ships rules with no defensible grounding behind
 them.
 
-- **Engine repo** (this one, `github.com/trustabl/trustabl`): the scanner
+- **Engine repo** (this one, `github.com/trustabl/agent-reliability-analyzer`): the scanner
   binary. Owns discovery, the rule **schema** (`internal/rules/schema.go` +
   `schema.yaml`), predicates, the evaluator, the loader, scoring, and the
   per-rule test harness. Ships with **no rules embedded**.
-- **Rules repo** (`https://github.com/trustabl/trustabl-rules`, set as
+- **Rules repo** (`https://github.com/trustabl/agent-reliability-rules`, set as
   `rulesource.DefaultRepoURL`): the `.yaml` rule packs + `manifest.yaml`.
   This is what `trustabl scan` clones and runs at scan time. It is the
   **production source of rules**.
@@ -324,7 +324,7 @@ untested (the engine's `TestPolicyRules_AllRulesCovered` guard only sees the
 fixture). Both are defects.
 
 This drift is now caught automatically: the `rules-sync` CI job
-(`.github/workflows/test.yml`) checks out `trustabl-rules` and runs
+(`.github/workflows/test.yml`) checks out `agent-reliability-rules` and runs
 [`scripts/check-rules-sync.sh`](scripts/check-rules-sync.sh), which fails the
 build on any fixture↔production divergence (a fixture-only file, a
 production-only file, or content drift — line endings ignored). Run it locally

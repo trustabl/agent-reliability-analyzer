@@ -94,7 +94,7 @@ brews:
       owner: trustabl
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/trustabl/trustabl"
+    homepage: "https://github.com/trustabl/agent-reliability-analyzer"
     description: "Find and fix agent reliability issues"
     license: "Apache-2.0"
     install: |
@@ -110,7 +110,7 @@ scoops:
       owner: trustabl
       name: scoop-bucket
       token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
-    homepage: "https://github.com/trustabl/trustabl"
+    homepage: "https://github.com/trustabl/agent-reliability-analyzer"
     description: "Find and fix agent reliability issues"
     license: Apache-2.0
 

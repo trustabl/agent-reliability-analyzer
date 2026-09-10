@@ -4,7 +4,7 @@
 
 Report privately through GitHub, not in a public issue:
 
-**[Open a private security advisory](https://github.com/trustabl/trustabl/security/advisories/new)**
+**[Open a private security advisory](https://github.com/trustabl/agent-reliability-analyzer/security/advisories/new)**
 
 That route is private between you and the maintainers until a fix ships. Please
 do not open a public issue, a pull request, or a discussion for a suspected

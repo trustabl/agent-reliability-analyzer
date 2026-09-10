@@ -8,7 +8,7 @@
 # To author a new rule:
 #   1. Read this file end-to-end.
 #   2. Copy fields from the annotated example below into a new entry under
-#      <category>/<topic>.yaml in the external trustabl-rules repository
+#      <category>/<topic>.yaml in the external agent-reliability-rules repository
 #      (Phase-1 interim copy: testdata/rules-fixture/<category>/<topic>.yaml).
 #   3. Use the predicate reference (bottom of this file) to express your
 #      match condition.

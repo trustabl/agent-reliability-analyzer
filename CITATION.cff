@@ -12,7 +12,7 @@ authors:
   - family-names: Hogan
     given-names: Mike
     affiliation: Trustabl
-repository-code: "https://github.com/trustabl/trustabl"
+repository-code: "https://github.com/trustabl/agent-reliability-analyzer"
 url: "https://www.trustabl.ai"
 license: Apache-2.0
 version: 0.1.7

@@ -13,7 +13,7 @@ import (
 //
 // It is the contract a rule pack is checked against. `trustabl capabilities
 // --json` emits it; a release publishes its descriptor as an asset; and the
-// trustabl-rules CI gate uses each supported release's descriptor to decide,
+// agent-reliability-rules CI gate uses each supported release's descriptor to decide,
 // before a rule change merges, whether a proposed rule would run, be skipped
 // (forward-compatible), or hard-break that release — so a rules change can never
 // silently break a deployed binary.

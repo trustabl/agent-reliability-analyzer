@@ -59,7 +59,7 @@ func TestLoader_ValidFile(t *testing.T) {
 	}
 }
 
-// TestLoader_MCPCategory verifies the mcp policy category loads. The trustabl-rules
+// TestLoader_MCPCategory verifies the mcp policy category loads. The agent-reliability-rules
 // repo ships an mcp/ pack; the engine must accept category: mcp (regression for the
 // drift where the rules repo shipped mcp rules no engine could load).
 func TestLoader_MCPCategory(t *testing.T) {

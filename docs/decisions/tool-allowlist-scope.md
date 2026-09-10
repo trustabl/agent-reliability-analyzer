@@ -82,8 +82,8 @@ item fell through classification and became an opaque External `ToolRef`
 
 **Known gap (per the three-repo model):** this change was initially
 scoped to the engine fixture only. It has since been mirrored into
-`trustabl-rules` (production) via
-[trustabl-rules#51](https://github.com/trustabl/trustabl-rules/pull/51)
+`agent-reliability-rules` (production) via
+[agent-reliability-rules#51](https://github.com/trustabl/agent-reliability-rules/pull/51)
 and given a rationale doc in `trustabl-rulebook`
 (`docs/Policy/google_adk/agent_safety.md`), so ADK-111 is fully
 shipped per `CLAUDE.md`'s sync obligation — engine, rules, and
@@ -116,7 +116,7 @@ Delivered:
   is the new reader built on the same helper.
 - The standard four-file schema change (`schema.go` + `predicates.go` +
   `evaluator.go` + `schema.yaml`), plus a `schema_version` bump (14 → 15) in
-  the fixture and `trustabl-rules` manifests.
+  the fixture and `agent-reliability-rules` manifests.
 - Rule **CSDK-205** in `claude_sdk/repo.yaml` (fixture and production, both
   synced), severity medium / confidence 0.7:
   `repo_claude_options_permission_mode_is: [acceptEdits]` combined (`all:`)
@@ -248,7 +248,7 @@ the agent's generic `mcp_servers` kwarg presence, never the resolved
 `MCPServerDef.Kwargs`, same move as ADK-111's `Expr.CallKwargs` → queryable
 struct) **and** a new MCP-server-scoped predicate family — the standard
 four-file schema change plus a `schema_version` bump in both the fixture
-and `trustabl-rules`. Not a rules-only change.
+and `agent-reliability-rules`. Not a rules-only change.
 
 **Real mechanism 2 — `HostedMCPTool.tool_config.allowed_tools`.**
 `HostedMCPTool` (`src/agents/tool.py`) wraps `tool_config: Mcp`, a raw
