@@ -206,6 +206,27 @@ func parseTSOpenAIAgentInline(src string) models.AgentDef {
 	return agents[0]
 }
 
+// parseTSOpenAIAgentInlineResolved parses a TS snippet, discovers its OpenAI
+// Agents SDK agent(s), and runs analysis.ResolveEdges over them before
+// returning the first agent. Unlike parseTSOpenAIAgentInline, this
+// materializes HostedToolRef.Resolved from HostedToolRef.Pending — required
+// for predicates like agent_hosted_tool_kwarg_present, which read
+// ref.Resolved.Kwargs and silently never match against an unresolved ref.
+// Panics (no *testing.T available in package-level case tables).
+func parseTSOpenAIAgentInlineResolved(src string) models.AgentDef {
+	tree, err := astutil.NewTSParser().ParseCtx(context.Background(), nil, []byte(src))
+	if err != nil {
+		panic("parseTSOpenAIAgentInlineResolved parse: " + err.Error())
+	}
+	pf := analysis.ParsedFile{RelPath: "src/a.ts", Tree: tree, Source: []byte(src)}
+	inv := models.RepoInventory{Agents: analysis.DiscoverTSOpenAIAgents([]analysis.ParsedFile{pf}, func(string) {})}
+	if len(inv.Agents) == 0 {
+		panic("parseTSOpenAIAgentInlineResolved: no agent discovered")
+	}
+	analysis.ResolveEdges(&inv, []analysis.ParsedFile{pf})
+	return inv.Agents[0]
+}
+
 // parseTSADKAgentInline parses a TS snippet and returns the first discovered
 // Google ADK agent. Panics (no *testing.T available in package-level case
 // tables).

@@ -325,8 +325,8 @@ Tool/agent AST discovery is wired for:
   superset — and is audited by the same `language: typescript` rule packs).
   TypeScript rule packs ship for the Claude Agent SDK
   (CSDK-010/011/012/013/014/016 tool rules; CSDK-120/130/131 agent rules),
-  OpenAI Agents SDK (OAI-016/017/019/022/024 tool rules; OAI-105 agent rule),
-  Google ADK (ADK-013/015/016 tool rules; ADK-109 agent rule), MCP
+  OpenAI Agents SDK (OAI-016/017/019/022/024 tool rules; OAI-105/116 agent
+  rules), Google ADK (ADK-013/015/016 tool rules; ADK-109 agent rule), MCP
   (MCP-011/012/013/014 tool rules), LangChain (LC-010/011/012/013/014 tool
   rules; LC-111 agent rule), and the Vercel AI SDK (VAI-001..008 tool/agent
   rules; VAI-012 repo rule). A TS repo for any of these no longer produces a

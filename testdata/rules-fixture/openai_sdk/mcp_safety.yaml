@@ -76,3 +76,42 @@ rules:
       "allowed_tools": ["ask_question"]}). Re-review the list whenever the
       agent's task changes, and keep require_approval at its default rather
       than "never" for anything side-effecting.
+
+  - id: OAI-116
+    title: TypeScript agent wires a hostedMcpTool with no allowedTools allow-list
+    severity: high
+    confidence: 0.75
+    language: typescript
+    applies_to:
+      - openai_agent
+    scope: agent
+    match:
+      all:
+        - agent_uses_hosted_tool_class: [hostedMcpTool]
+        - not:
+            agent_hosted_tool_kwarg_present:
+              class: hostedMcpTool
+              kwarg: allowedTools
+    explanation: >
+      This TypeScript OpenAI Agents SDK agent wires a hostedMcpTool() whose
+      options set no allowedTools. Unlike an explicit tools: [...] array,
+      hostedMcpTool hands the named server to OpenAI's Responses API, which
+      connects the agent to every tool that server currently exposes — a
+      surface that is not enumerable from the agent's source, can grow or
+      change behavior whenever the server is updated, and sits on the far
+      side of a trust boundary this codebase does not control. allowedTools
+      is the only static allow-list narrowing that catalog, and the risk is
+      sharper here than in the equivalent Python case: hostedMcpTool()
+      defaults requireApproval to 'never' when the option is omitted, so an
+      agent that sets neither allowedTools nor requireApproval has no static
+      boundary and no runtime approval gate either — a poisoned or
+      newly-added tool description reaches the model unfiltered and executes
+      without confirmation.
+    fix: >
+      Add allowedTools to the hostedMcpTool({...}) options, naming the
+      specific tools this agent is allowed to call, e.g. hostedMcpTool({
+      serverLabel: "deepwiki", serverUrl: "https://mcp.deepwiki.com/mcp",
+      allowedTools: ["ask_question"] }) (an { toolNames: [...] } filter
+      object also works). Re-review the list whenever the agent's task
+      changes, and set requireApproval explicitly for anything
+      side-effecting rather than leaving it at its 'never' default.

@@ -91,8 +91,9 @@ rulebook are all in sync.
 
 ## Class 1 — Claude SDK / OpenAI SDK
 
-Claude SDK repo-scope: **shipped as CSDK-205.** Claude SDK agent-scope and the
-OpenAI Agents SDK half remain not implemented — see below for each.
+Claude SDK repo-scope: **shipped as CSDK-205.** OpenAI Agents SDK: **shipped
+as OAI-115 (Python) and OAI-116 (TypeScript)** — see below. Claude SDK
+agent-scope remains not implemented.
 
 ### Claude SDK repo-scope: shipped (CSDK-205)
 
@@ -273,10 +274,56 @@ A rule of the ADK-111 shape — `agent_uses_hosted_tool_class:
 {class: HostedMCPTool, kwarg: tool_config.allowed_tools}` — is buildable
 today as a **rules-only change**, no schema/predicate/evaluator work, no
 `schema_version` bump. This is the cheapest available win of the three
-candidates here. TS caveat: `classifyTSOpenAIHostedFactoryCall`
-(`internal/analysis/ts_openai_hosted_tools.go:41-65`) never sets `Kwargs`
-at all, so `hostedMcpTool({...})`'s options are invisible on the TS path
-until that's added — such a rule would ship Python-only at first.
+candidates here. **Shipped as OAI-115** (Python, confidence 0.7 — see the
+absent-semantic nuance below for the discount's source).
+
+**TS follow-up shipped as OAI-116.** The caveat this section originally
+carried — that `classifyTSOpenAIHostedFactoryCall`
+(`internal/analysis/ts_openai_hosted_tools.go`) never set `Kwargs`, so
+`hostedMcpTool({...})`'s options were invisible on the TS path — was closed
+by a discovery-only change (commit `0c330b6`, PR #204): the factory's
+options-object argument is now captured into `HostedToolDef.Kwargs` via
+`astutil.TSObjectKwargs`, and `ResolveEdges` materializes the
+discovery-built def (precise call-site `Location` + `Kwargs`) through
+`HostedToolRef.Pending` rather than synthesizing a bare one at the agent's
+line. That unblocked the TS sibling rule as a second rules-only change, no
+further engine work: **OAI-116**, `agent_uses_hosted_tool_class:
+[hostedMcpTool]` combined with `not: agent_hosted_tool_kwarg_present:
+{class: hostedMcpTool, kwarg: allowedTools}`.
+
+**Verified: the TS `hostedMcpTool` options object is flat, not nested.**
+Read directly from `hostedMcpTool`'s signature in
+`openai-agents-js/packages/agents-core/src/tool.ts`:
+
+```ts
+export function hostedMcpTool<Context = UnknownContext>(
+  options: {
+    allowedTools?: string[] | { toolNames?: string[] };
+    allowedCallers?: ToolAllowedCallers;
+    deferLoading?: boolean;
+    serverDescription?: string;
+  } & (
+    | { serverLabel: string; serverUrl?: string; authorization?: string; headers?: Record<string, string> }
+    | { serverLabel: string; connectorId: string; authorization?: string; headers?: Record<string, string> }
+  ) & (
+    | { requireApproval?: never }
+    | { requireApproval: 'never' }
+    | { requireApproval: 'always' | { never?: {...}; always?: {...} }; onApproval?: ... }
+  ),
+): HostedMCPTool<Context>
+```
+
+`allowedTools`, `serverLabel`, and `requireApproval` sit directly on the
+options object — unlike Python, there is no `toolConfig` (or `tool_config`)
+wrapper key. `lookupKwargInTree` (`internal/rules/predicates.go`) splits its
+dotted-path argument on `.` and walks `KwargTree.Children`, so a one-segment
+path is simply a one-step walk — this required no predicate change, only the
+shorter path string in the YAML (`allowedTools` vs. Python's
+`tool_config.allowed_tools`). Both accepted `allowedTools` shapes —
+`["a", "b"]` (a `Value` leaf) and `{ toolNames: [...] }` (a `Children`
+subtree) — resolve to a non-nil lookup, so either correctly silences the
+rule; confirmed by
+`internal/analysis/ts_openai_hosted_tools_test.go`.
 
 **The absent-semantic nuance (OpenAI's version of Claude's
 auto-approve-vs-restrict trap):** `require_approval` on `HostedMCPTool`
@@ -307,9 +354,13 @@ diverges *by language* for an identical source-level omission:
 | `function_tool(needs_approval=)` | `False` | risky — already shipped as OAI-111 |
 | `function_tool(is_enabled=)` | `True` | not a security gate — dynamic enablement, ignore |
 
-**Not implemented this session** (research-only, per instruction). Next
-session can pick up directly, in cost order: (1) `HostedMCPTool`
-`allowed_tools` rule — rules-only; (2) TS hosted-tool kwarg capture, which
-unblocks both the TS `allowedTools` rule and the TS `require_approval:
-'never'` rule; (3) MCP `tool_filter` — discovery + new predicate family +
-schema bump.
+**Status of the three next steps originally listed here:** (1) `HostedMCPTool`
+`allowed_tools` rule — **shipped, OAI-115**; (2) TS hosted-tool kwarg
+capture, which unblocked both the TS `allowedTools` rule and (separately) a
+future TS `require_approval: 'never'` rule — **capture shipped** (commit
+`0c330b6`), and the `allowedTools` rule it unblocked **shipped as OAI-116**;
+the `require_approval: 'never'` rule remains a distinct, not-yet-built
+follow-up (see the "does not evaluate `require_approval`" gap in each rule's
+rulebook doc). (3) MCP `tool_filter` — discovery + new predicate family +
+schema bump — **still not implemented**, the next pickup point for this
+doc.

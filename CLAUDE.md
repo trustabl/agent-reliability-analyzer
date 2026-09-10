@@ -350,22 +350,25 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **Rulebook status (2026-09-01):** the fixture and production both carry
-> **208** rules across ten SDK categories (`autogen`, `claude_sdk`,
+> **Rulebook status (2026-09-09):** the fixture and production both carry
+> **210** rules across ten SDK categories (`autogen`, `claude_sdk`,
 > `claude_skill`, `crewai`, `google_adk`, `langchain`, `mcp`, `openai_sdk`,
-> `pydantic_ai`, `vercel_ai`) — in sync as of CSDK-205 (Claude SDK repo-scope:
-> `acceptEdits` with no `disallowed_tools` deny-list), which closes the Claude
-> SDK half of Class 1 in `docs/decisions/tool-allowlist-scope.md`. The
-> previously-noted CSKILL-080..086 rationale-doc gap has since been closed
-> (`trustabl-rulebook/docs/Policy/claude_skill/skill_quality_text.md` now
-> exists); `check_rulebook.py` reports 0 warnings against the current pack.
-> The count also grew by ADK-111 (`MCPToolset` with no `tool_filter`, Class 2
-> of the same tool-allowlist-scope decision) and the OpenAI/Pydantic AI
-> agent-run-call execution-limit rules landing since the 204 figure was last
-> recorded here — this note had drifted 3 rules behind actual production
-> before this update; re-derive the count from
-> `grep -rhoE '^\s*-\s*id:\s*\S+' testdata/rules-fixture/*/*.yaml | wc -l`
-> rather than trusting this note indefinitely.
+> `pydantic_ai`, `vercel_ai`) — in sync as of **OAI-116** (OpenAI Agents SDK,
+> TypeScript: `hostedMcpTool({...})` with no `allowedTools` allow-list, the TS
+> sibling of OAI-115), which closes the OpenAI Agents SDK half of Class 1 in
+> `docs/decisions/tool-allowlist-scope.md`. The count grew by one rule since
+> the 209 figure implied by the prior note (which itself undercounted —
+> re-derive, don't trust a cached figure) from `grep -rhoE
+> '^\s*-\s*id:\s*\S+' testdata/rules-fixture/*/*.yaml | wc -l`. **Known gap in
+> this note's own claim:** the prior version of this note said
+> `check_rulebook.py` reports 0 warnings against the pack; running it now
+> shows that has drifted — it currently reports 32 pre-existing *errors*
+> (mostly severity/confidence drift between shipped rules and their rationale
+> docs, e.g. `CSDK-103`, `CSDK-204/205`, `LC-101`, plus several
+> documented-but-removed rule IDs) across docs unrelated to OAI-116, none
+> introduced by this update (confirmed via a clean-tree run before this
+> change: 33 errors, one of which — OAI-116 undocumented — this update
+> closes). Fixing those 32 is a separate, not-yet-scoped cleanup.
 
 The rule-authoring contract (required fields, ID conventions, per-scope
 `applies_to` values, framing discipline) lives in
