@@ -69,7 +69,7 @@ cloned into a temporary directory for the scan and removed afterward.
 
 The scan discovers the tools, agents, subagents, and MCP servers in the repo,
 loads the rule packs for the SDKs it actually finds, and reports the findings.
-Detection rules are resolved from the trustabl-rules repository and cached
+Detection rules are resolved from the agent-reliability-rules repository and cached
 locally; pass --no-rules-update to run fully offline from that cache, or
 --rules-ref to pin a branch or tag.
 
@@ -128,7 +128,7 @@ Exit codes:
 	cmd.Flags().BoolVar(&f.noColor, "no-color", false,
 		"disable colored output")
 	cmd.Flags().StringVar(&f.rulesRepo, "rules-repo", "",
-		"rules repository URL (default: official trustabl-rules; or TRUSTABL_RULES_REPO)")
+		"rules repository URL (default: official agent-reliability-rules; or TRUSTABL_RULES_REPO)")
 	cmd.Flags().StringVar(&f.rulesRef, "rules-ref", "",
 		"rules branch or tag to use (default: the repo's default branch)")
 	cmd.Flags().StringVar(&f.rulesSource, "rules-source", "",

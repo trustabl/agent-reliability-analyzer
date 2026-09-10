@@ -27,7 +27,7 @@ func fixtureResult() models.ScanResult {
 			IsRemote:  true,
 			RemoteURL: "https://github.com/example/agent-repo",
 		},
-		RulesSource:    "https://github.com/trustabl/trustabl-rules",
+		RulesSource:    "https://github.com/trustabl/agent-reliability-rules",
 		RulesVersion:   "cb28dfbfixture",
 		RulesFromCache: false,
 		Findings: []models.Finding{

@@ -12,7 +12,7 @@ import (
 )
 
 func TestReleaseURLs(t *testing.T) {
-	const repo = "https://github.com/trustabl/trustabl-rules"
+	const repo = "https://github.com/trustabl/agent-reliability-rules"
 	if got, want := repoWebBase(repo+".git"), repo; got != want {
 		t.Errorf("repoWebBase trims .git: got %q want %q", got, want)
 	}

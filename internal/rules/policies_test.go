@@ -15,7 +15,7 @@ import (
 
 // fixtureFS returns the rule packs from the repo-root testdata/rules-fixture
 // directory — the Phase-1 interim home of the packs (they move to the
-// trustabl-rules repo in Phase 2).
+// agent-reliability-rules repo in Phase 2).
 func fixtureFS(t *testing.T) fs.FS {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
@@ -2299,7 +2299,6 @@ var policyRepoRuleCases = []policyRepoCase{
 		},
 		models.RepoInventory{SDKsDetected: []models.SDK{models.SDKOpenAIAgents}},
 		false},
-
 }
 
 // optionsWithPermissionMode builds a ClaudeAgentOptionsDef whose captured

@@ -52,7 +52,7 @@ func newKeygenCommand() *cobra.Command {
 		Short: "Generate an Ed25519 signing keypair",
 		Long: `Generate a fresh Ed25519 signing keypair.
 
-The 32-byte SEED is the signing secret: store it in the trustabl-rules CI signing
+The 32-byte SEED is the signing secret: store it in the agent-reliability-rules CI signing
 secret (RULES_SIGNING_KEY_ED25519). The PUBLIC KEY is non-secret: paste the
 emitted keyring entry into the engine's internal/rulesign/keyring.json.
 

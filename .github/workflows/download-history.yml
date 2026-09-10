@@ -1,6 +1,6 @@
 name: Download history
 
-# Weekly snapshot of trustabl/trustabl cumulative release-asset downloads.
+# Weekly snapshot of trustabl/agent-reliability-analyzer cumulative release-asset downloads.
 # GitHub exposes only the CURRENT total (download_count) with no history, so we
 # record one dated point per run and commit it -> a JSON time series to graph.
 # Same-day reruns overwrite that day's point (no duplicates).

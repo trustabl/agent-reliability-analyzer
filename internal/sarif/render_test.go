@@ -290,7 +290,7 @@ func TestRender_ShapesACompleteDocument(t *testing.T) {
 		ScanID:         "scan_abc123",
 		Repo:           "C:/work/myrepo",
 		Manifest:       models.ScanManifest{RepoRoot: "C:/work/myrepo", IsRemote: false},
-		RulesSource:    "https://github.com/trustabl/trustabl-rules",
+		RulesSource:    "https://github.com/trustabl/agent-reliability-rules",
 		RulesVersion:   "cb28dfb0",
 		RulesFromCache: false,
 		Findings: []models.Finding{

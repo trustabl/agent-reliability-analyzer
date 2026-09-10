@@ -55,7 +55,7 @@ func SelectAndEmitMETA(profile models.RepoProfile, inv models.RepoInventory) []m
 				Explanation: fmt.Sprintf(
 					"This repo uses SDK %q, which Trustabl does not currently audit. "+
 						"No rules will fire against agents or tools from this SDK.", sdk),
-				SuggestedFix: "If detection for this SDK is needed, file an issue or contribute a policy pack for it to the trustabl-rules repository.",
+				SuggestedFix: "If detection for this SDK is needed, file an issue or contribute a policy pack for it to the agent-reliability-rules repository.",
 				Confidence:   1.0,
 			})
 		}

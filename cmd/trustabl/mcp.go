@@ -64,7 +64,7 @@ func newMCPCommand(tel *telemetry.Client) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&f.rulesRepo, "rules-repo", "",
-		"rules repository URL (default: official trustabl-rules; or TRUSTABL_RULES_REPO)")
+		"rules repository URL (default: official agent-reliability-rules; or TRUSTABL_RULES_REPO)")
 	cmd.Flags().StringVar(&f.rulesRef, "rules-ref", "",
 		"rules branch or tag to use (default: the repo's default branch)")
 	cmd.Flags().StringVar(&f.rulesSource, "rules-source", "",

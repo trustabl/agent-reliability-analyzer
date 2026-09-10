@@ -30,7 +30,7 @@ trustabl version
 
 If the command is not found, tell the user:
 
-> Trustabl is not installed. Download the latest release from https://github.com/trustabl/trustabl and make sure the binary is in your PATH, then re-run.
+> Trustabl is not installed. Download the latest release from https://github.com/trustabl/agent-reliability-analyzer and make sure the binary is in your PATH, then re-run.
 
 Then stop.
 

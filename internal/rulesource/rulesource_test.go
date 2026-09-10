@@ -174,9 +174,9 @@ func TestValidateRepoURL(t *testing.T) {
 		raw     string
 		wantErr bool
 	}{
-		{"https://github.com/trustabl/trustabl-rules", false},
-		{"ssh://git@github.com/trustabl/trustabl-rules.git", false},
-		{"git@github.com:trustabl/trustabl-rules.git", false},
+		{"https://github.com/trustabl/agent-reliability-rules", false},
+		{"ssh://git@github.com/trustabl/agent-reliability-rules.git", false},
+		{"git@github.com:trustabl/agent-reliability-rules.git", false},
 		{"/local/path/to/rules", false}, // bare local path: legitimate offline source
 		{`C:\local\rules`, false},       // Windows drive path: scheme "c" treated as local
 		{"git://example.com/rules.git", true},

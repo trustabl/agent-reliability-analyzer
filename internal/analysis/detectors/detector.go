@@ -20,7 +20,7 @@ import (
 
 // safeDetect runs one detector's Detect call, recovering any panic so a single
 // malformed rule cannot crash the whole scan. Rule packs are loaded from an
-// external repo (trustabl-rules), so a rule that steers a predicate into a nil
+// external repo (agent-reliability-rules), so a rule that steers a predicate into a nil
 // dereference or an out-of-range index is untrusted input — it must degrade to
 // a skipped detector plus a diagnostic finding, not a process abort. The
 // returned finding is emitted through the same deterministic sort as every other

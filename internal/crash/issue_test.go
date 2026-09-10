@@ -13,7 +13,7 @@ func TestIssueURL(t *testing.T) {
 		Version:    "1.2.3", Commit: "abc", OS: "darwin", Arch: "arm64",
 	}
 	u := IssueURL(r, "/home/u/.config/trustabl/crash-x.log")
-	if !strings.HasPrefix(u, "https://github.com/trustabl/trustabl/issues/new?") {
+	if !strings.HasPrefix(u, "https://github.com/trustabl/agent-reliability-analyzer/issues/new?") {
 		t.Fatalf("unexpected base: %s", u)
 	}
 	parsed, err := url.Parse(u)

@@ -237,4 +237,4 @@ The choice is saved to `~/.config/trustabl/telemetry.json` and never asked again
 
 ## Questions
 
-Open an issue at [github.com/trustabl/trustabl/issues](https://github.com/trustabl/trustabl/issues) or reach out on [Discord](https://discord.gg/maQ7QMPsB).
+Open an issue at [github.com/trustabl/agent-reliability-analyzer/issues](https://github.com/trustabl/agent-reliability-analyzer/issues) or reach out on [Discord](https://discord.gg/maQ7QMPsB).

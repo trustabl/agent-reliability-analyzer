@@ -81,7 +81,7 @@ are analyzed in depth; JavaScript and Go are recognized during recon but not yet
 AST-parsed.
 
 Detection rules are not built into this binary: they are resolved from the
-trustabl-rules repository at scan time and cached locally, with an offline
+agent-reliability-rules repository at scan time and cached locally, with an offline
 fallback. Run "trustabl rules pull" to pre-fetch them.
 
 Exit codes: 0 = clean (no finding >= medium), 1 = findings >= medium (or >= low

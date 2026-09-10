@@ -4,7 +4,7 @@ How to read, verify, and trust the output of `trustabl attest` — the signed
 claim a Trustabl scan makes about a repository.
 
 This covers the **open-source CLI only**. Everything here works with the
-Apache-2.0 binary from [trustabl/trustabl](https://github.com/trustabl/trustabl)
+Apache-2.0 binary from [trustabl/agent-reliability-analyzer](https://github.com/trustabl/agent-reliability-analyzer)
 and needs no Trustabl account.
 
 ---

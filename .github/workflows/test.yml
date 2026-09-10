@@ -32,33 +32,33 @@ jobs:
 
   rules-sync:
     # Fail if the in-repo rules fixture has drifted from the production
-    # trustabl-rules pack (a rule shipped but not mirrored, or vice versa).
+    # agent-reliability-rules pack (a rule shipped but not mirrored, or vice versa).
     # See CLAUDE.md "Two-repo rule model".
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       # A coordinated rules change ships as paired PRs (one here, one in
-      # trustabl-rules). To let this PR's fixture validate against the matching
-      # production PR before either merges, check out trustabl-rules at a branch
+      # agent-reliability-rules). To let this PR's fixture validate against the matching
+      # production PR before either merges, check out agent-reliability-rules at a branch
       # of the SAME name as this PR's head branch when it exists; otherwise fall
       # back to main. On push to main, head_ref is empty, so this always uses
       # main — main is still guarded against the real production pack.
-      - name: Resolve trustabl-rules ref
+      - name: Resolve agent-reliability-rules ref
         id: rulesref
         run: |
           ref="${{ github.head_ref }}"
           if [ -n "$ref" ] && git ls-remote --exit-code --heads \
-              https://github.com/trustabl/trustabl-rules.git "$ref" >/dev/null 2>&1; then
+              https://github.com/trustabl/agent-reliability-rules.git "$ref" >/dev/null 2>&1; then
             echo "ref=$ref" >> "$GITHUB_OUTPUT"
           else
             echo "ref=main" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout trustabl-rules
+      - name: Checkout agent-reliability-rules
         uses: actions/checkout@v4
         with:
-          repository: trustabl/trustabl-rules
+          repository: trustabl/agent-reliability-rules
           ref: ${{ steps.rulesref.outputs.ref }}
           path: .rules
 

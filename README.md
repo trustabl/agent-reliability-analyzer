@@ -8,12 +8,12 @@ CrewAI, and MCP agents — before production.
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
-  <a href="https://github.com/trustabl/trustabl/releases"><img src="https://img.shields.io/github/v/release/trustabl/trustabl" alt="Latest release"></a>
-  <a href="https://github.com/trustabl/trustabl/releases"><img src="https://img.shields.io/github/downloads/trustabl/trustabl/total?label=downloads&color=2ea043" alt="Total downloads"></a>
-  <a href="https://github.com/trustabl/trustabl/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/trustabl/trustabl/test.yml?branch=main&amp;label=tests" alt="Tests"></a>
-  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/trustabl/trustabl" alt="Go version"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/v/release/trustabl/agent-reliability-analyzer" alt="Latest release"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/downloads/trustabl/agent-reliability-analyzer/total?label=downloads&color=2ea043" alt="Total downloads"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/trustabl/agent-reliability-analyzer/test.yml?branch=main&amp;label=tests" alt="Tests"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/trustabl/agent-reliability-analyzer" alt="Go version"></a>
   <br>
-  <a href="https://github.com/trustabl/trustabl-rules"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrustabl%2Ftrustabl-rules%2Fmain%2Fbadges%2Frules.json" alt="Detection rule count"></a>
+  <a href="https://github.com/trustabl/agent-reliability-rules"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrustabl%2Fagent-reliability-rules%2Fmain%2Fbadges%2Frules.json" alt="Detection rule count"></a>
   <a href="COVERAGE.md"><img src="https://img.shields.io/badge/SDKs-9-blue" alt="9 SDKs supported"></a>
   <a href="COVERAGE.md"><img src="https://img.shields.io/badge/languages-7-blue" alt="7 languages supported"></a>
   <a href="COVERAGE.md"><img src="https://img.shields.io/badge/scopes-5-blue" alt="5 detection scopes"></a>
@@ -214,7 +214,7 @@ statically configured.
 
 The binary ships with **no embedded rules**. Before the pipeline runs,
 Trustabl resolves its detection rules from a separate git repository
-([`trustabl-rules`](https://github.com/trustabl/trustabl-rules)) —
+([`agent-reliability-rules`](https://github.com/trustabl/agent-reliability-rules)) —
 fetching the latest, caching the clone locally, and falling back to the
 cache when the network is unreachable. This decouples rule updates from
 binary releases: rules can be added or changed without rebuilding the
@@ -565,12 +565,17 @@ docker run --rm -v "$PWD:/repo" ghcr.io/trustabl/trustabl:latest scan /repo
 ### Direct download
 
 Grab a prebuilt archive for your platform from the
-[Releases page](https://github.com/trustabl/trustabl/releases). Each release
+[Releases page](https://github.com/trustabl/agent-reliability-analyzer/releases). Each release
 includes a `checksums.txt` and a build-provenance attestation; verify with:
 
 ```sh
-gh attestation verify <archive> --repo trustabl/trustabl
+gh attestation verify <archive> --repo trustabl/agent-reliability-analyzer
 ```
+
+> Archives released **before** the repository was renamed verify only under the
+> old slug (`--repo trustabl/trustabl`): the Sigstore certificate binds the
+> repository path as it was at signing time, so the recorded identity cannot
+> follow a rename.
 ## Attestation
 ### Test Usage Example
 #### **Prerequisite and setup:**
@@ -718,11 +723,11 @@ or home config:
 
 ```sh
 # Project-level (scoped to this repo)
-curl -fsSL https://raw.githubusercontent.com/trustabl/trustabl/main/agents/trustabl.md \
+curl -fsSL https://raw.githubusercontent.com/trustabl/agent-reliability-analyzer/main/agents/trustabl.md \
   -o .claude/agents/trustabl.md
 
 # Global (available in every project)
-curl -fsSL https://raw.githubusercontent.com/trustabl/trustabl/main/agents/trustabl.md \
+curl -fsSL https://raw.githubusercontent.com/trustabl/agent-reliability-analyzer/main/agents/trustabl.md \
   -o ~/.claude/agents/trustabl.md
 ```
 
@@ -837,11 +842,11 @@ trustabl verify trustabl.json --key cosign.pub --no-tlog   # key-mode, offline
 trustabl rules pull
 
 # Validate a local rule-pack directory against this build's schema (CI gate
-# for the trustabl-rules repo — strict-loads every pack, fails on the first error)
+# for the agent-reliability-rules repo — strict-loads every pack, fails on the first error)
 trustabl rules validate ./trustabl-rules
 
 # Use a custom rules repo, or pin a specific released ruleset (env: TRUSTABL_RULES_REPO).
-# Default pulls the latest reviewed rules from trustabl-rules main; pin a tag for stability.
+# Default pulls the latest reviewed rules from agent-reliability-rules main; pin a tag for stability.
 trustabl scan ./repo --rules-repo https://github.com/org/my-rules
 trustabl scan ./repo --rules-ref v0.1.0
 
@@ -1155,7 +1160,7 @@ scoop install trustabl
 **Install the extension:**
 
 ```bash
-gemini extensions install https://github.com/trustabl/trustabl
+gemini extensions install https://github.com/trustabl/agent-reliability-analyzer
 ```
 
 **Register the MCP server** so Gemini CLI can call `mcp__trustabl__scan`. Add
@@ -1283,13 +1288,13 @@ The scan only **fails** (exit 2) when nothing usable remains:
 | TypeScript discovery | `internal/analysis/ts_discovery.go`, `ts_agents.go`, `ts_mcp_servers.go`, `ts_handler_facts.go`, `ts_openai_tools.go`, `ts_openai_agents.go`, `ts_openai_hosted_tools.go`, `ts_openai_mcp_servers.go`, `ts_openai_guardrails.go`, `ts_openai_sessions.go`, `ts_adk_tools.go`, `ts_adk_agents.go`, `ts_adk_hosted_tools.go`, `astutil/ts.go` |
 | Detector runtime   | `internal/analysis/detectors/`           |
 | Rule source        | `internal/rulesource/` (git fetch + cache + schema-version gate) |
-| Detector rules     | external `trustabl-rules` repo (tests: `testdata/rules-fixture/`) |
+| Detector rules     | external `agent-reliability-rules` repo (tests: `testdata/rules-fixture/`) |
 | Rule engine        | `internal/rules/{schema,loader,evaluator,predicates,rule_detector}.go` |
 | Scoring engine     | `internal/analysis/scoring.go`           |
 | Report renderer    | `internal/review/diff.go` (human), `internal/sarif/render.go` (SARIF), JSON marshal in `cmd/trustabl` |
 | LLM config         | `internal/llm/` (key storage · masking · validation) |
 
-Rule packs live in the separate `trustabl-rules` git repository (grouped
+Rule packs live in the separate `agent-reliability-rules` git repository (grouped
 `{claude_sdk,openai_sdk,google_adk,mcp}/`), resolved at scan time rather
 than embedded in the binary. Naming convention: `CSDK-NNN` for Claude
 Agent SDK rules (CSDK-0xx tool-scope, CSDK-1xx agent + subagent-scope),

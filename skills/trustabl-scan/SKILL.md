@@ -63,7 +63,7 @@ The tool returns the full scan result as JSON — the same `ScanResult` shape as
 the CLI's `--format json` output, with a `findings` array to reason over. There
 is no exit code: decide what is actionable by reading finding **severities**
 (`medium` and above are commit-blockers; see "How to read findings"). The server
-fetches and caches the `trustabl-rules` pack itself, falling back to its local
+fetches and caches the `agent-reliability-rules` pack itself, falling back to its local
 cache when offline.
 
 **CLI fallback.** If the `mcp__trustabl__scan` tool is not available this session
@@ -166,5 +166,5 @@ docker run --rm -v "$PWD:/repo" ghcr.io/trustabl/trustabl:latest scan /repo
 ```
 
 Prebuilt archives for each platform are on the GitHub Releases page
-(https://github.com/trustabl/trustabl/releases). Confirm the install with
+(https://github.com/trustabl/agent-reliability-analyzer/releases). Confirm the install with
 `trustabl version`.

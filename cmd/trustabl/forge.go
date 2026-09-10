@@ -91,7 +91,7 @@ section per detected SDK, with rules ordered by severity.`,
 	cmd.Flags().StringVarP(&output, "output", "o", "",
 		"write the generated SKILL.md to this path (default: stdout)")
 	cmd.Flags().StringVar(&rulesRef, "rules-ref", "",
-		"pin the trustabl-rules branch or tag (default: latest cached)")
+		"pin the agent-reliability-rules branch or tag (default: latest cached)")
 
 	cmd.AddCommand(newForgeCheckCommand())
 
