@@ -92,8 +92,9 @@ rulebook are all in sync.
 ## Class 1 — Claude SDK / OpenAI SDK
 
 Claude SDK repo-scope: **shipped as CSDK-205.** OpenAI Agents SDK: **shipped
-as OAI-115 (Python) and OAI-116 (TypeScript)** — see below. Claude SDK
-agent-scope remains not implemented.
+as OAI-115 (Python allow-list), OAI-116 (TypeScript allow-list), and OAI-117
+(TypeScript require-approval)** — see below. Claude SDK agent-scope remains
+not implemented.
 
 ### Claude SDK repo-scope: shipped (CSDK-205)
 
@@ -350,17 +351,24 @@ diverges *by language* for an identical source-level omission:
 | `Agent(tools=[...])` | zero tools | safe — no rule (same as LangChain / plain ADK `tools=`) |
 | MCP `tool_filter` / `toolFilter` | server's full catalogue | risky — ADK-111 shape (mechanism 1) |
 | `HostedMCPTool.tool_config.allowed_tools` | server's full catalogue | risky — ADK-111 shape (mechanism 2) |
-| `HostedMCPTool.tool_config.require_approval` | TS: never-approve; Python: platform default approve | risky in TS, safe in Python — language-gated |
+| `HostedMCPTool.tool_config.require_approval` | TS: never-approve (**shipped, OAI-117**); Python: platform default approve — not implemented, confirmed a false-positive shape | risky in TS, safe in Python — language-gated |
 | `function_tool(needs_approval=)` | `False` | risky — already shipped as OAI-111 |
 | `function_tool(is_enabled=)` | `True` | not a security gate — dynamic enablement, ignore |
 
 **Status of the three next steps originally listed here:** (1) `HostedMCPTool`
 `allowed_tools` rule — **shipped, OAI-115**; (2) TS hosted-tool kwarg
 capture, which unblocked both the TS `allowedTools` rule and (separately) a
-future TS `require_approval: 'never'` rule — **capture shipped** (commit
-`0c330b6`), and the `allowedTools` rule it unblocked **shipped as OAI-116**;
-the `require_approval: 'never'` rule remains a distinct, not-yet-built
-follow-up (see the "does not evaluate `require_approval`" gap in each rule's
-rulebook doc). (3) MCP `tool_filter` — discovery + new predicate family +
-schema bump — **still not implemented**, the next pickup point for this
-doc.
+TS `require_approval: 'never'` rule — **capture shipped** (commit `0c330b6`),
+the `allowedTools` rule it unblocked **shipped as OAI-116**, and the
+`require_approval: 'never'` rule it separately unblocked **shipped as
+OAI-117** (medium/0.65 — the consequence is a missing runtime gate rather
+than an unbounded catalog, and the predicate cannot distinguish negligent
+omission from a deliberately-read-only server, hence the confidence
+discount below OAI-115/116; fires on omission only, not on an explicit
+`requireApproval: 'never'`, since the latter is a reviewable choice that
+OAI-116's own fix text recommends). Re-verified against
+`openai-agents-python`'s `tool.py`/`run_config.py` for this rule that
+Python genuinely has no equivalent gap (no SDK-level default injection,
+confirmed in source rather than assumed) — no parallel Python rule was
+added. (3) MCP `tool_filter` — discovery + new predicate family + schema
+bump — **still not implemented**, the next pickup point for this doc.
