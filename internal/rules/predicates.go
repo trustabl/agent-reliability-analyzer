@@ -780,6 +780,36 @@ func PredAgentUsesHostedToolClass(classes []string, a models.AgentDef) bool {
 	return false
 }
 
+// PredAgentMCPServerKwargMissing fires when the agent wires at least one MCP
+// server of any of the named Classes whose Kwarg is absent, or present but
+// explicitly None (mirroring PredAgentKwargMissing's None-counts-as-missing
+// rule). Positive logic, not `not: ..._kwarg_present`: with multiple wired
+// servers, negating a presence check would go silent as soon as ANY one of
+// them sets the kwarg, masking the others that don't. Requires Resolved — an
+// unresolved/external ref's kwargs cannot be inspected, so it is skipped
+// rather than counted as missing. Finding a ref whose Class matches doubles
+// as the "agent actually uses this class" check other predicate pairs need a
+// separate agent_uses_*_class clause for — no such clause is needed here.
+func PredAgentMCPServerKwargMissing(expr MCPServerKwargExpr, a models.AgentDef) bool {
+	classes := make(map[string]bool, len(expr.Classes))
+	for _, c := range expr.Classes {
+		classes[c] = true
+	}
+	for _, ref := range a.MCPServerRefs {
+		if !classes[ref.Class] || ref.Resolved == nil {
+			continue
+		}
+		kw := lookupKwargInTree(ref.Resolved.Kwargs, expr.Kwarg)
+		if kw == nil {
+			return true // absent
+		}
+		if kw.Value != nil && kw.Value.Kind == models.ExprLiteralNone {
+			return true // present but explicitly None — ineffective
+		}
+	}
+	return false
+}
+
 // PredAgentIsSubagentOfAny returns true if the agent under test appears as
 // a Resolved target in any other agent's HandoffRefs in the inventory.
 // Matching is by Name+FilePath (Resolved is a pointer to a specific def in

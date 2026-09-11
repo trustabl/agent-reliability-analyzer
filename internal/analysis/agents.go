@@ -285,6 +285,7 @@ func ResolveEdges(inv *models.RepoInventory, parsed []ParsedFile) {
 							SDK:       models.SDKOpenAIAgents,
 							Language:  models.LanguagePython,
 							Location:  aliasDef.Location,
+							Kwargs:    aliasDef.Kwargs,
 						})
 						a.MCPServerRefs = append(a.MCPServerRefs, models.MCPServerRef{
 							Class:    aliasDef.Class,

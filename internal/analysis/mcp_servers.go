@@ -40,10 +40,6 @@ func classifyMCPServerCall(callItem models.Expr, filePath string) (models.MCPSer
 	if !IsMCPServerClass(name) {
 		return models.MCPServerDef{}, false
 	}
-	// Kwargs intentionally not captured at v1 — Expr.Text preserves the raw
-	// call site for any future detector that needs the args (e.g. inspecting
-	// MCPServerStdio params.command). Reparsing the kwargs from the ExprCall
-	// text into MCPServerDef.Kwargs is a fast-follow if a rule needs them.
 	return models.MCPServerDef{
 		Class:     name,
 		Transport: MCPTransportFromClass(name),
@@ -54,6 +50,7 @@ func classifyMCPServerCall(callItem models.Expr, filePath string) (models.MCPSer
 			Line:     callItem.Line,
 			EndLine:  callItem.EndLine,
 		},
+		Kwargs: hostedKwargTree(callItem),
 	}, true
 }
 
@@ -146,6 +143,7 @@ func collectWithStatementMCPAliases(pf ParsedFile) map[string]models.MCPServerDe
 				if !IsMCPServerClass(name) {
 					continue
 				}
+				kwargs, _ := extractCallKwargs(callNode, pf.Source)
 				out[astutil.NodeText(aliasNode, pf.Source)] = models.MCPServerDef{
 					Class:     name,
 					Transport: MCPTransportFromClass(name),
@@ -156,6 +154,7 @@ func collectWithStatementMCPAliases(pf ParsedFile) map[string]models.MCPServerDe
 						Line:     int(callNode.StartPoint().Row) + 1,
 						EndLine:  int(callNode.EndPoint().Row) + 1,
 					},
+					Kwargs: kwargs,
 				}
 			}
 		}

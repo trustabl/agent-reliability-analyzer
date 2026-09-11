@@ -72,6 +72,9 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentRunCallUsageLimitsMissing != nil && PredAgentRunCallUsageLimitsMissing(a, inv) != *e.AgentRunCallUsageLimitsMissing {
 		return false
 	}
+	if e.AgentMCPServerKwargMissing != nil && !PredAgentMCPServerKwargMissing(*e.AgentMCPServerKwargMissing, a) {
+		return false
+	}
 	return true
 }
 
@@ -383,6 +386,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_is_subagent_of_any":        true,
 		"agent_hosted_tool_kwarg_present": true, "agent_hosted_tool_kwarg_value": true,
 		"agent_run_call_max_turns_missing": true, "agent_run_call_usage_limits_missing": true,
+		"agent_mcp_server_kwarg_missing": true,
 	},
 	models.ScopeSubagent: {
 		"subagent_grants_tool": true,
@@ -463,6 +467,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentHostedToolKwargValue != nil, "agent_hosted_tool_kwarg_value")
 	add(e.AgentRunCallMaxTurnsMissing != nil, "agent_run_call_max_turns_missing")
 	add(e.AgentRunCallUsageLimitsMissing != nil, "agent_run_call_usage_limits_missing")
+	add(e.AgentMCPServerKwargMissing != nil, "agent_mcp_server_kwarg_missing")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
 	// Skill scope

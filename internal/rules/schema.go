@@ -89,6 +89,7 @@ type MatchExpr struct {
 	AgentHostedToolKwargValue      *HostedToolKwargValueExpr `yaml:"agent_hosted_tool_kwarg_value,omitempty"`
 	AgentRunCallMaxTurnsMissing    *bool                     `yaml:"agent_run_call_max_turns_missing,omitempty"`
 	AgentRunCallUsageLimitsMissing *bool                     `yaml:"agent_run_call_usage_limits_missing,omitempty"`
+	AgentMCPServerKwargMissing     *MCPServerKwargExpr       `yaml:"agent_mcp_server_kwarg_missing,omitempty"`
 
 	// Subagent-scope predicates
 	SubagentGrantsTool []string `yaml:"subagent_grants_tool,omitempty"`
@@ -147,6 +148,19 @@ type HostedToolKwargValueExpr struct {
 	Class string `yaml:"class"`
 	Kwarg string `yaml:"kwarg"`
 	Value string `yaml:"value"` // compared after quote-stripping for string literals
+}
+
+// MCPServerKwargExpr matches the absence of a kwarg on an MCP server instance
+// of any of the named classes wired to the agent via mcp_servers=/mcpServers:
+// (e.g. MCPServerStdio's tool_filter). Classes is a list, not a single string
+// like HostedToolKwargExpr.Class: unlike a hosted-tool rule (one rule, one
+// tool class), MCPServerStdio/Sse/StreamableHttp all share tool_filter as the
+// same allow-list mechanism, so one rule must check all three without a
+// separate agent_uses_mcp_server_class clause — the class check is already
+// implied by finding a matching ref in the loop.
+type MCPServerKwargExpr struct {
+	Classes []string `yaml:"classes"`
+	Kwarg   string   `yaml:"kwarg"` // dotted-path supported
 }
 
 // ParamNameMatchExpr matches parameter names against exact/contains/suffix/prefix patterns.
