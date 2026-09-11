@@ -115,3 +115,43 @@ rules:
       object also works). Re-review the list whenever the agent's task
       changes, and set requireApproval explicitly for anything
       side-effecting rather than leaving it at its 'never' default.
+
+  - id: OAI-117
+    title: TypeScript agent wires a hostedMcpTool with no requireApproval setting
+    severity: medium
+    confidence: 0.65
+    language: typescript
+    applies_to:
+      - openai_agent
+    scope: agent
+    match:
+      all:
+        - agent_uses_hosted_tool_class: [hostedMcpTool]
+        - not:
+            agent_hosted_tool_kwarg_present:
+              class: hostedMcpTool
+              kwarg: requireApproval
+    explanation: >
+      This TypeScript OpenAI Agents SDK agent wires a hostedMcpTool() whose
+      options omit requireApproval. Omission is not "unset": hostedMcpTool()
+      injects require_approval: 'never' into the tool payload when the option
+      is absent, so every tool the remote MCP server exposes executes with no
+      human confirmation. That silently inverts the Responses API's own
+      default, which is to request approval before data is shared with a
+      remote MCP server — the same code written in Python, or against the raw
+      API, would prompt. Nothing in the source says "auto-approve", so a
+      reviewer reading this agent has no way to see that the gate is off. The
+      risk is orthogonal to allowedTools: an allow-list bounds which tool
+      names the model may call, but the tools behind those names are defined
+      by the server, on the far side of a trust boundary this codebase does
+      not control, and can change behavior under a stable name at any time.
+    fix: >
+      Set requireApproval explicitly on the hostedMcpTool({...}) options so
+      the choice is visible in review. Use 'always' for any server that can
+      write or take side effects, or a filter object to gate only the
+      dangerous subset while letting reads through, e.g. hostedMcpTool({
+      serverLabel: "deepwiki", serverUrl: "https://mcp.deepwiki.com/mcp",
+      requireApproval: { never: { toolNames: ["ask_question"] } } }), pairing
+      it with an onApproval handler. If the server is genuinely read-only,
+      requireApproval: 'never' is the right answer — write it out rather than
+      leaving it implied.

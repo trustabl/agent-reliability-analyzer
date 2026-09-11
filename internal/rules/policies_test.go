@@ -4027,6 +4027,43 @@ var policyAgentRuleCases = []policyAgentCase{
 		models.RepoInventory{},
 		false},
 
+	// ─── OAI-117 TS agent hostedMcpTool without requireApproval ───────────────
+	{"OAI-117 fires when hostedMcpTool has no requireApproval", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", serverUrl: \"https://mcp.deepwiki.com/mcp\" })] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-117 fires when hostedMcpTool has no options at all", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool()] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-117 fires when allowedTools is set but requireApproval is absent", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", allowedTools: [\"ask_question\"] })] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-117 silent when requireApproval is 'always'", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", requireApproval: \"always\" })] });\n"),
+		models.RepoInventory{},
+		false},
+	{"OAI-117 silent when requireApproval is explicitly 'never'", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", requireApproval: \"never\" })] });\n"),
+		models.RepoInventory{},
+		false},
+	{"OAI-117 silent when requireApproval is a toolNames filter object", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", requireApproval: { never: { toolNames: [\"ask_question\"] } } })] });\n"),
+		models.RepoInventory{},
+		false},
+	{"OAI-117 silent when no hostedMcpTool", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, webSearchTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [webSearchTool()] });\n"),
+		models.RepoInventory{},
+		false},
+
 	// ─── ADK-109 TS LlmAgent has no description ───────────────────────────────
 	{"ADK-109 fires on TS LlmAgent with no description", "ADK-109",
 		parseTSADKAgentInline("import { LlmAgent } from \"@google/adk\";\n" +
