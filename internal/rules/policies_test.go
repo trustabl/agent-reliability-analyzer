@@ -3032,6 +3032,91 @@ var policyAgentRuleCases = []policyAgentCase{
 		models.RepoInventory{},
 		false},
 
+	// ─── OAI-118 MCP server without tool_filter (E1 hosted-kwarg, multi-class) ─
+	{"OAI-118 fires when MCPServerStdio has no tool_filter", "OAI-118",
+		models.AgentDef{
+			SDK:      models.SDKOpenAIAgents,
+			Class:    "Agent",
+			Language: models.LanguagePython,
+			MCPServerRefs: []models.MCPServerRef{
+				{Class: "MCPServerStdio", Resolved: &models.MCPServerDef{Class: "MCPServerStdio",
+					Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+						"params": {Children: map[string]*models.KwargTree{
+							"command": {Value: &models.Expr{Kind: models.ExprLiteralString, Text: `"npx"`}},
+						}},
+					}}}},
+			},
+		},
+		models.RepoInventory{},
+		true},
+	{"OAI-118 fires when MCPServerSse has no kwargs at all", "OAI-118",
+		models.AgentDef{
+			SDK:      models.SDKOpenAIAgents,
+			Class:    "Agent",
+			Language: models.LanguagePython,
+			MCPServerRefs: []models.MCPServerRef{
+				{Class: "MCPServerSse", Resolved: &models.MCPServerDef{Class: "MCPServerSse"}},
+			},
+		},
+		models.RepoInventory{},
+		true},
+	{"OAI-118 fires when tool_filter is explicitly None", "OAI-118",
+		models.AgentDef{
+			SDK:      models.SDKOpenAIAgents,
+			Class:    "Agent",
+			Language: models.LanguagePython,
+			MCPServerRefs: []models.MCPServerRef{
+				{Class: "MCPServerStreamableHttp", Resolved: &models.MCPServerDef{Class: "MCPServerStreamableHttp",
+					Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+						"tool_filter": {Value: &models.Expr{Kind: models.ExprLiteralNone, Text: "None"}},
+					}}}},
+			},
+		},
+		models.RepoInventory{},
+		true},
+	{"OAI-118 silent when MCPServerStdio sets tool_filter", "OAI-118",
+		models.AgentDef{
+			SDK:      models.SDKOpenAIAgents,
+			Class:    "Agent",
+			Language: models.LanguagePython,
+			MCPServerRefs: []models.MCPServerRef{
+				{Class: "MCPServerStdio", Resolved: &models.MCPServerDef{Class: "MCPServerStdio",
+					Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+						"tool_filter": {Value: &models.Expr{Kind: models.ExprCall, Text: `create_static_tool_filter(allowed_tool_names=["read_file"])`}},
+					}}}},
+			},
+		},
+		models.RepoInventory{},
+		false},
+	// An agent with no MCP server at all is out of scope for this rule —
+	// nothing to restrict, so it must not fire just because tool_filter is
+	// absent.
+	{"OAI-118 silent when agent has no MCP server", "OAI-118",
+		models.AgentDef{
+			SDK:      models.SDKOpenAIAgents,
+			Class:    "Agent",
+			Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{
+				{Class: "WebSearchTool", Resolved: &models.HostedToolDef{Class: "WebSearchTool"}},
+			},
+		},
+		models.RepoInventory{},
+		false},
+	// An unresolved/external MCP server ref cannot be inspected for
+	// tool_filter, so it must not be counted as missing — matches
+	// agent_hosted_tool_kwarg_present's Resolved-required convention.
+	{"OAI-118 silent when MCP server ref is unresolved (external)", "OAI-118",
+		models.AgentDef{
+			SDK:      models.SDKOpenAIAgents,
+			Class:    "Agent",
+			Language: models.LanguagePython,
+			MCPServerRefs: []models.MCPServerRef{
+				{Class: "MCPServerStdio", External: true},
+			},
+		},
+		models.RepoInventory{},
+		false},
+
 	// ─── CSDK-101 Claude subagent granted Bash ────────────────────────────────
 	{"CSDK-101 fires when AgentDefinition grants Bash", "CSDK-101",
 		models.AgentDef{
@@ -4023,6 +4108,61 @@ var policyAgentRuleCases = []policyAgentCase{
 		false},
 	{"OAI-116 silent when no hostedMcpTool", "OAI-116",
 		parseTSOpenAIAgentInlineResolved("import { Agent, webSearchTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [webSearchTool()] });\n"),
+		models.RepoInventory{},
+		false},
+
+	// ─── OAI-117 TS agent hostedMcpTool without requireApproval ────────────────
+	{"OAI-117 fires when hostedMcpTool has no requireApproval", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", serverUrl: \"https://mcp.deepwiki.com/mcp\", allowedTools: [\"ask_question\"] })] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-117 fires when hostedMcpTool has no options at all", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool()] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-117 silent when requireApproval is set to always", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", requireApproval: \"always\" })] });\n"),
+		models.RepoInventory{},
+		false},
+	{"OAI-117 silent when requireApproval is a filter object", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, hostedMcpTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [hostedMcpTool({ serverLabel: \"deepwiki\", requireApproval: { never: { toolNames: [\"ask_question\"] } } })] });\n"),
+		models.RepoInventory{},
+		false},
+	{"OAI-117 silent when no hostedMcpTool", "OAI-117",
+		parseTSOpenAIAgentInlineResolved("import { Agent, webSearchTool } from \"@openai/agents\";\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [webSearchTool()] });\n"),
+		models.RepoInventory{},
+		false},
+
+	// ─── OAI-119 TS agent MCP server without toolFilter (multi-class) ──────────
+	{"OAI-119 fires when MCPServerStdio has no toolFilter", "OAI-119",
+		parseTSOpenAIMCPAgentInlineResolved("import { Agent, MCPServerStdio } from \"@openai/agents\";\n" +
+			"const fs = new MCPServerStdio({ command: \"npx\" });\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", mcpServers: [fs] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-119 fires when MCPServerSSE has no toolFilter", "OAI-119",
+		parseTSOpenAIMCPAgentInlineResolved("import { Agent, MCPServerSSE } from \"@openai/agents\";\n" +
+			"const sse = new MCPServerSSE({ url: \"https://example.com/sse\" });\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", mcpServers: [sse] });\n"),
+		models.RepoInventory{},
+		true},
+	{"OAI-119 silent when toolFilter is set via createMCPToolStaticFilter", "OAI-119",
+		parseTSOpenAIMCPAgentInlineResolved("import { Agent, MCPServerStdio, createMCPToolStaticFilter } from \"@openai/agents\";\n" +
+			"const fs = new MCPServerStdio({ command: \"npx\", toolFilter: createMCPToolStaticFilter({ allowed: [\"read_file\"] }) });\n" +
+			"const a = new Agent({ name: \"x\", instructions: \"y\", mcpServers: [fs] });\n"),
+		models.RepoInventory{},
+		false},
+	// An agent with no MCP server at all is out of scope for this rule —
+	// nothing to restrict, so it must not fire just because toolFilter is
+	// absent.
+	{"OAI-119 silent when no MCP server", "OAI-119",
+		parseTSOpenAIMCPAgentInlineResolved("import { Agent, webSearchTool } from \"@openai/agents\";\n" +
 			"const a = new Agent({ name: \"x\", instructions: \"y\", tools: [webSearchTool()] });\n"),
 		models.RepoInventory{},
 		false},

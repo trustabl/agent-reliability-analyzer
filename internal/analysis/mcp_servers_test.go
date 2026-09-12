@@ -282,6 +282,94 @@ agent = Agent(
 	}
 }
 
+// TestMCPServers_InlineKwargsCaptured verifies that an inline
+// MCPServerStdio(tool_filter=...) call's kwargs land on MCPServerDef.Kwargs
+// (classifyMCPServerCall path), so agent-scope rules can inspect tool_filter.
+func TestMCPServers_InlineKwargsCaptured(t *testing.T) {
+	src := `
+from agents import Agent
+from agents.mcp import MCPServerStdio
+
+agent = Agent(
+    name="fs",
+    mcp_servers=[MCPServerStdio(params={"command": "npx"}, tool_filter=["read_file"])],
+)
+`
+	pf := parsePyFile(t, "main.py", src)
+	inv := &models.RepoInventory{Agents: analysis.DiscoverAgents([]analysis.ParsedFile{pf})}
+	analysis.ResolveEdges(inv, []analysis.ParsedFile{pf})
+
+	if len(inv.MCPServers) != 1 {
+		t.Fatalf("expected 1 MCP server, got %d", len(inv.MCPServers))
+	}
+	m := inv.MCPServers[0]
+	if m.Kwargs == nil {
+		t.Fatalf("expected non-nil Kwargs, got nil")
+	}
+	if _, ok := m.Kwargs.Children["tool_filter"]; !ok {
+		t.Errorf("expected tool_filter in Kwargs.Children, got %+v", m.Kwargs.Children)
+	}
+}
+
+// TestMCPServers_AsyncWithAliasKwargsCaptured verifies that an
+// `async with MCPServerStdio(tool_filter=...) as fs:` alias's kwargs land on
+// MCPServerDef.Kwargs (collectWithStatementMCPAliases path).
+func TestMCPServers_AsyncWithAliasKwargsCaptured(t *testing.T) {
+	src := `
+from agents import Agent
+from agents.mcp import MCPServerStdio
+
+async def main():
+    async with MCPServerStdio(params={"command": "npx"}, tool_filter=["read_file"]) as fs:
+        agent = Agent(name="a", mcp_servers=[fs])
+`
+	pf := parsePyFile(t, "main.py", src)
+	inv := &models.RepoInventory{Agents: analysis.DiscoverAgents([]analysis.ParsedFile{pf})}
+	analysis.ResolveEdges(inv, []analysis.ParsedFile{pf})
+
+	if len(inv.MCPServers) != 1 {
+		t.Fatalf("expected 1 MCP server, got %d", len(inv.MCPServers))
+	}
+	m := inv.MCPServers[0]
+	if m.Kwargs == nil {
+		t.Fatalf("expected non-nil Kwargs, got nil")
+	}
+	if _, ok := m.Kwargs.Children["tool_filter"]; !ok {
+		t.Errorf("expected tool_filter in Kwargs.Children, got %+v", m.Kwargs.Children)
+	}
+
+	refs := inv.Agents[0].MCPServerRefs
+	if len(refs) != 1 || refs[0].Resolved == nil {
+		t.Fatalf("expected one resolved ref, got %+v", refs)
+	}
+	if refs[0].Resolved.Kwargs == nil {
+		t.Errorf("expected the agent's resolved ref to carry Kwargs too (alias-copy path)")
+	}
+}
+
+// TestMCPServers_InlineNoKwargs verifies that an inline MCPServerStdio() call
+// with no keyword arguments at all leaves Kwargs nil, not a non-nil empty tree
+// — mirrors hostedKwargTree's nil-on-empty contract so agent_mcp_server_kwarg_missing
+// sees a clean "absent" signal either way.
+func TestMCPServers_InlineNoKwargs(t *testing.T) {
+	src := `
+from agents import Agent
+from agents.mcp import MCPServerStdio
+
+agent = Agent(name="fs", mcp_servers=[MCPServerStdio()])
+`
+	pf := parsePyFile(t, "main.py", src)
+	inv := &models.RepoInventory{Agents: analysis.DiscoverAgents([]analysis.ParsedFile{pf})}
+	analysis.ResolveEdges(inv, []analysis.ParsedFile{pf})
+
+	if len(inv.MCPServers) != 1 {
+		t.Fatalf("expected 1 MCP server, got %d", len(inv.MCPServers))
+	}
+	if inv.MCPServers[0].Kwargs != nil {
+		t.Errorf("expected nil Kwargs for a no-args call, got %+v", inv.MCPServers[0].Kwargs)
+	}
+}
+
 // TestMCPServers_WithAliasEndLine verifies that the MCPServerDef produced via
 // with-statement alias carries EndLine > Line.
 //

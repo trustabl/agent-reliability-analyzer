@@ -4,10 +4,11 @@ This closes out the design blocker on detecting agents with missing or
 overly-broad tool access control. Investigation split the supported SDKs
 into three behavior classes, because "empty allow-list" does not mean the
 same thing in each one. This doc records the LangChain decision (not
-applicable), scopes and partially ships the Claude SDK / OpenAI SDK work
-(Class 1), and records Google ADK, the one class that shipped as a real rule
-first — see [ADK-111](../../testdata/rules-fixture/google_adk/agent_safety.yaml)
-— because ADK is the one SDK where an explicit allow-list genuinely narrows an
+applicable), scopes and ships the Claude SDK / OpenAI SDK work (Class 1,
+OpenAI half now fully shipped; Claude SDK agent-scope still open), and
+records Google ADK, the one class that shipped as a real rule first — see
+[ADK-111](../../testdata/rules-fixture/google_adk/agent_safety.yaml) —
+because ADK is the one SDK where an explicit allow-list genuinely narrows an
 otherwise-unbounded tool surface. Claude SDK's repo-scope half of Class 1
 shipped next, as **CSDK-205** — see below.
 
@@ -92,8 +93,8 @@ rulebook are all in sync.
 ## Class 1 — Claude SDK / OpenAI SDK
 
 Claude SDK repo-scope: **shipped as CSDK-205.** OpenAI Agents SDK: **shipped
-as OAI-115 (Python) and OAI-116 (TypeScript)** — see below. Claude SDK
-agent-scope remains not implemented.
+as OAI-115/118 (Python) and OAI-116/117/119 (TypeScript)** — see below, fully
+closing out the OpenAI half. Claude SDK agent-scope remains not implemented.
 
 ### Claude SDK repo-scope: shipped (CSDK-205)
 
@@ -359,8 +360,45 @@ diverges *by language* for an identical source-level omission:
 capture, which unblocked both the TS `allowedTools` rule and (separately) a
 future TS `require_approval: 'never'` rule — **capture shipped** (commit
 `0c330b6`), and the `allowedTools` rule it unblocked **shipped as OAI-116**;
-the `require_approval: 'never'` rule remains a distinct, not-yet-built
-follow-up (see the "does not evaluate `require_approval`" gap in each rule's
-rulebook doc). (3) MCP `tool_filter` — discovery + new predicate family +
-schema bump — **still not implemented**, the next pickup point for this
-doc.
+the `require_approval: 'never'` rule **shipped as OAI-117**. (3) MCP
+`tool_filter` — discovery + new predicate family + schema bump — **shipped as
+OAI-118** (Python) and **OAI-119** (TypeScript), closing out the OpenAI half
+of Class 1.
+
+**MCP `tool_filter` — shipped (OAI-118 / OAI-119).** Delivered exactly the
+shape this section anticipated: Python `MCPServerDef.Kwargs` is now populated
+at all three construction sites — `classifyMCPServerCall`,
+`collectWithStatementMCPAliases` (the `async with X() as srv:` alias, using
+`extractCallKwargs` directly since that path holds a raw `*sitter.Node`, not
+an `Expr`), and the alias-to-def copy inside `ResolveEdges`, which previously
+re-listed fields and silently dropped Kwargs on the copy. New predicate
+`agent_mcp_server_kwarg_missing` (`schema_version` 15 → 16) is the one
+deliberate schema departure from the `HostedToolKwargExpr` shape it mirrors:
+it takes `classes: [...]` (a list) rather than a single `class:`, because
+`MCPServerStdio`/`MCPServerSse`/`MCPServerStreamableHttp` all share
+`tool_filter` as the identical allow-list mechanism — one rule per language
+covers all three constructors, rather than three rules per language. This also
+means no separate `agent_uses_mcp_server_class` presence check is needed (the
+kind ADK-111/OAI-115/116 pair with a `not: ..._kwarg_present`): finding a
+matching-class `MCPServerRef` in the loop already proves the agent uses that
+class, so `agent_mcp_server_kwarg_missing` is used bare, positive logic, no
+`not:` wrapper — required because with two servers of different classes
+wired, a negated presence check would go silent as soon as any ONE of them
+sets the kwarg. Severity/confidence: high / 0.75 for both languages, matching
+ADK-111 and OAI-116 — no confidence discount like OAI-115's 0.7, since
+`src/agents/mcp/util.py` makes `tool_filter=None` → no filtering unambiguous
+in SDK source, with no server-side platform default to soften it (unlike
+`HostedMCPTool`'s `require_approval`). Known false negative: a blocked-only
+`create_static_tool_filter(blocked_tool_names=[...])` reads as "present," not
+an allow-list. Known false negative on the discovery side: TS only resolves
+`const`-bound MCP servers (`mcpServers: [x]` where `x` is a same-file
+identifier); an inline `new MCPServerStdio({...})` directly inside the
+`mcpServers:` array produces no ref to inspect.
+
+Agent scope was chosen over introducing a sixth rule scope
+(`mcp_server`) — `AgentDef.MCPServerRefs[].Resolved` already reaches the def
+via the same mechanism `HostedToolRefs[].Resolved` uses for ADK-111, so no new
+`models.Scope`, detector interface, or `LoadFor`/`LoadRegistry` dispatch case
+was needed. Accepted cost, consistent with every other hosted-tool-shaped rule
+in this pack: findings attribute to the agent, not the MCP server's own call
+site, and an MCP server wired to no agent goes unflagged.

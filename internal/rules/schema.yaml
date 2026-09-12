@@ -346,6 +346,21 @@ rules:
 #       resolvable to it by variable name, and none of those calls set
 #       usage_limits. Same silence rule as agent_run_call_max_turns_missing.
 #
+#   agent_mcp_server_kwarg_missing: {classes: [MCPServerStdio, ...], kwarg: tool_filter}
+#       Returns true if the agent wires at least one MCP server of any class in
+#       `classes` whose `kwarg` is absent OR present with literal None. `kwarg`
+#       supports dotted paths. Requires the MCP server ref to be resolved (the
+#       def carries the captured kwargs) — an unresolved/external ref is
+#       skipped, not counted as missing. `classes` is a list (unlike
+#       agent_hosted_tool_kwarg_present's single `class`) because
+#       MCPServerStdio/Sse/StreamableHttp all share tool_filter as the same
+#       allow-list mechanism, so one rule checks all three. Positive logic
+#       (not a negated `_present` predicate, and no separate
+#       agent_uses_*_class clause needed): finding a ref whose class is in the
+#       list already proves the agent uses it, and with multiple wired servers
+#       negating a presence check would go silent as soon as ANY one sets the
+#       kwarg, masking the others that don't.
+#
 #
 # ━━━ SUBAGENT-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # (used only in scope: subagent rules)

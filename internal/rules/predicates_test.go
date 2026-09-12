@@ -227,6 +227,34 @@ func parseTSOpenAIAgentInlineResolved(src string) models.AgentDef {
 	return inv.Agents[0]
 }
 
+// parseTSOpenAIMCPAgentInlineResolved parses a TS snippet, discovers its
+// OpenAI Agents SDK MCP servers (const x = new MCPServerStdio({...})) AND
+// agent(s), then runs analysis.ResolveEdges — required for predicates like
+// agent_mcp_server_kwarg_missing, which read MCPServerRef.Resolved.Kwargs and
+// silently never match an unresolved ref. Unlike
+// parseTSOpenAIAgentInlineResolved, this also seeds inv.MCPServers via
+// DiscoverTSOpenAIMCPServers, mirroring the scanner's own discovery order
+// (scanner.go: MCP servers discovered before ResolveEdges runs) — ResolveEdges
+// itself only resolves mcpServers: [x] refs against defs already in
+// inv.MCPServers, it does not discover them. Panics (no *testing.T available
+// in package-level case tables).
+func parseTSOpenAIMCPAgentInlineResolved(src string) models.AgentDef {
+	tree, err := astutil.NewTSParser().ParseCtx(context.Background(), nil, []byte(src))
+	if err != nil {
+		panic("parseTSOpenAIMCPAgentInlineResolved parse: " + err.Error())
+	}
+	pf := analysis.ParsedFile{RelPath: "src/a.ts", Tree: tree, Source: []byte(src)}
+	inv := models.RepoInventory{
+		MCPServers: analysis.DiscoverTSOpenAIMCPServers([]analysis.ParsedFile{pf}, func(string) {}),
+		Agents:     analysis.DiscoverTSOpenAIAgents([]analysis.ParsedFile{pf}, func(string) {}),
+	}
+	if len(inv.Agents) == 0 {
+		panic("parseTSOpenAIMCPAgentInlineResolved: no agent discovered")
+	}
+	analysis.ResolveEdges(&inv, []analysis.ParsedFile{pf})
+	return inv.Agents[0]
+}
+
 // parseTSADKAgentInline parses a TS snippet and returns the first discovered
 // Google ADK agent. Panics (no *testing.T available in package-level case
 // tables).

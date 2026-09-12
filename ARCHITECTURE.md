@@ -849,7 +849,9 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   processed for MCP server constructors (`MCPServerStdio`, `MCPServerSse`,
   `MCPServerStreamableHttp`) — both inline calls and aliases bound by
   `async with X() as srv:`. Each match becomes an `MCPServerDef` and an entry in
-  `MCPServerRefs`. After all agents are processed, `inv.HostedTools` and
+  `MCPServerRefs`; the constructor's kwargs (e.g. `tool_filter=`) are captured
+  onto `MCPServerDef.Kwargs` the same way hosted-tool kwargs are (OAI-118 reads
+  this). After all agents are processed, `inv.HostedTools` and
   `inv.MCPServers` are sorted by `(FilePath, Line, Class)` and
   `HostedToolRefs`/`MCPServerRefs.Resolved` pointers are re-resolved to the
   post-sort positions. TS OpenAI tool/MCP/guardrail refs use a Name+VarName
