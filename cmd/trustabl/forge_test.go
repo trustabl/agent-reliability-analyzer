@@ -8,7 +8,41 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/trustabl/trustabl/internal/forge"
+	"github.com/trustabl/trustabl/internal/models"
 )
+
+func TestBuildForgeStamp_StampsCurrentTemplateVersion(t *testing.T) {
+	// Guards the seam runForge assembles its PolicyStamp through: deleting
+	// the Template field there would compile and pass every golden/
+	// determinism test (which all build their own PolicyStamp), while
+	// production would stamp template: 0 into every generated skill and
+	// report every freshly generated file as permanently stale.
+	cats := []models.DetectorCategory{models.DetectorCategory("claude_sdk"), models.DetectorCategory("mcp")}
+	stamp := buildForgeStamp("2026-09-07", "abc1234def", 13, cats)
+
+	if stamp.Template != forge.TemplateVersion {
+		t.Errorf("Template = %d, want forge.TemplateVersion (%d)", stamp.Template, forge.TemplateVersion)
+	}
+	if stamp.Date != "2026-09-07" {
+		t.Errorf("Date = %q, want %q", stamp.Date, "2026-09-07")
+	}
+	if stamp.RulesSHA != "abc1234def" {
+		t.Errorf("RulesSHA = %q, want %q", stamp.RulesSHA, "abc1234def")
+	}
+	if stamp.SchemaVersion != 13 {
+		t.Errorf("SchemaVersion = %d, want 13", stamp.SchemaVersion)
+	}
+	if len(stamp.Categories) != len(cats) {
+		t.Fatalf("Categories = %v, want %v", stamp.Categories, cats)
+	}
+	for i, c := range cats {
+		if stamp.Categories[i] != c {
+			t.Errorf("Categories[%d] = %q, want %q", i, stamp.Categories[i], c)
+		}
+	}
+}
 
 func TestForgeCommand_NoPolicyFlag_NoArgs_OK(t *testing.T) {
 	// --policy is optional; no args and no --policy should be accepted by cobra

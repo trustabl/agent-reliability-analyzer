@@ -2317,15 +2317,22 @@ writing any SDK code.
    `trustabl scan`, keyed on `--rules-ref`. All policy packs are loaded;
    `GenerateCombined` filters to the requested categories itself.
 
-4. **GenerateCombined** (`internal/forge/gen.go`) — routes each rule into
-   per-category, per-scope buckets (`tools`, `agents`, `subagents`, `repos`,
-   `skills`), emits one `## SDK Name` section per category in
-   `stamp.Categories` order, with `### Tool / Agent / Subagent / Repo / Skill
-   Rules` subsections (empty subsections omitted). Rules within each subsection
-   are sorted by severity (critical first) then rule ID ascending. A passive
-   stamp comment (`<!-- generated: DATE | rules: SHA | schema: VERSION | sdks:
-   LIST -->`) is embedded in the body — not in frontmatter — so the file is
-   scannable to detect staleness.
+4. **GenerateCombined** (`internal/forge/gen.go`) — emits a passive stamp
+   comment (`<!-- generated: DATE | rules: SHA | schema: VERSION | sdks: LIST
+   | template: N -->`) in the body — not in frontmatter — so the file is
+   scannable to detect staleness. `template` is `TemplateVersion` (currently
+   `2`); a stamp with no `template` field predates it and parses as `1`. Right
+   after the stamp, GenerateCombined emits a constant `## How to Apply These
+   Constraints` apply-loop section: a static four-step procedure telling the
+   model to check each definition it writes against the matching constraints,
+   name any violation by rule ID, apply that rule's directive, and log the
+   repair. It then routes each rule into per-category, per-scope buckets
+   (`tools`, `agents`, `subagents`, `repos`, `skills`), emitting one
+   `## SDK Name` section per category in `stamp.Categories` order, with
+   `### Tool / Agent / Subagent / Repo / Skill Rules` subsections (empty
+   subsections omitted). Rules within each subsection are sorted by severity
+   (critical first) then rule ID ascending. `Generate` (below) does not emit
+   the apply-loop section.
 
 **matchConditionForScope** dispatches "When this applies" text by scope: tool →
 "When defining a tool.", agent → "When declaring an agent.", repo → "For any

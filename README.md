@@ -1000,9 +1000,15 @@ Multiple categories are comma-separated: `--policy openai_sdk,mcp`.
 
 - A frontmatter block (`name: trustabl-pre-coding`, `allowed-tools: Read`,
   `disable-model-invocation: false`).
-- A passive stamp comment embedding the rules SHA, date, schema version, and
-  detected SDK list — so you know exactly which ruleset produced the file
-  and when to regenerate.
+- A passive stamp comment embedding the rules SHA, date, schema version,
+  template (layout) version, and detected SDK list — so you know exactly
+  which ruleset and layout produced the file and when to regenerate.
+- A `## How to Apply These Constraints` apply-loop section, immediately after
+  the stamp: a static four-step procedure telling the model to check each
+  definition it writes against the matching constraints, name any violation
+  by rule ID, apply that rule's directive, and log the repair. This is a
+  self-check the model performs — it does not run `trustabl scan` itself;
+  scanning the resulting code remains a separate step.
 - One `## SDK Name` section per detected SDK, each containing `### Tool Rules`,
   `### Agent Rules`, `### Subagent Rules`, `### Repo Rules`, and
   `### Skill Rules` subsections (empty subsections are omitted).
@@ -1011,8 +1017,9 @@ Multiple categories are comma-separated: `--policy openai_sdk,mcp`.
 
 Drop the output into `.claude/skills/trustabl-pre-coding/SKILL.md` in the
 agent repo and Claude Code will invoke it automatically before any agent code
-is written. Re-run `trustabl forge` after adding a new SDK dependency or after
-pulling a rules update to refresh the constraints.
+is written. Re-run `trustabl forge` after adding a new SDK dependency, after
+pulling a rules update, or after upgrading to a forge version with a newer
+template — `trustabl forge check` reports staleness from either cause.
 
 ### Continuous integration
 

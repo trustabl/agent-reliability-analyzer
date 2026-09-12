@@ -17,15 +17,18 @@ func newForgeCheckCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "check [file]",
-		Short: "Check whether a forge-generated SKILL.md is current with the latest rules",
-		Long: `Check whether a forge-generated SKILL.md is current with the latest rules.
+		Short: "Check whether a forge-generated SKILL.md is current with the latest rules and template",
+		Long: `Check whether a forge-generated SKILL.md is current with the latest rules and
+template layout.
 
 Reads the provenance stamp embedded in the file by "trustabl forge", resolves
-the current rules SHA, and reports whether they match.
+the current rules SHA, and compares both the stamp's rules SHA against the
+resolved rules SHA and its template field against the engine's
+TemplateVersion. Either mismatch is reported as stale.
 
 Exit codes:
-  0  — stamp found and SHA matches current rules (file is current)
-  1  — stale (SHA mismatch), unstamped, or file not found (user action needed)
+  0  — stamp found and both the rules SHA and template version match current (file is current)
+  1  — stale (rules SHA mismatch, template mismatch, or both), unstamped, or file not found (user action needed)
   2  — error resolving rules or reading the file (operator/environment fault)`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
@@ -80,24 +83,10 @@ func runForgeCheck(cmd *cobra.Command, path, rulesRef string, isDefault bool) er
 		return exitCodeError{code: 2}
 	}
 
-	if stamp.SHA == res.SHA {
-		fmt.Fprintf(cmd.OutOrStdout(),
-			"up to date (rules: %s, generated: %s)\n",
-			shortSHA(stamp.SHA), stamp.Date)
+	upToDate, msg := forge.CheckStamp(stamp, res.SHA, forge.TemplateVersion, path)
+	fmt.Fprint(cmd.OutOrStdout(), msg)
+	if upToDate {
 		return nil
 	}
-
-	fmt.Fprintf(cmd.OutOrStdout(),
-		"outdated: generated from %s, current rules are %s\nregenerate: trustabl forge --output %s\n",
-		shortSHA(stamp.SHA), shortSHA(res.SHA), path)
 	return exitCodeError{code: 1}
-}
-
-// shortSHA returns the first 7 characters of a SHA for display, or the full
-// string when it is shorter than 7 characters.
-func shortSHA(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
 }
