@@ -2189,6 +2189,25 @@ def lookup_order(order_id: str) -> str:
         raise ModelRetry("order_id was empty; supply the customer's order number")
     return order_id
 `, wantFires: false},
+
+	// ─── LC-008: LangChain tool raises with no structured error contract ────
+	{name: "LC-008 fires on uncaught raise", ruleID: "LC-008", kind: models.KindLangChainTool, src: `
+def lookup_order(order_id: str) -> str:
+    """Look up an order."""
+    if not order_id:
+        raise ValueError("order_id is required")
+    return order_id
+`, wantFires: true},
+	{name: "LC-008 silent when the failure is caught", ruleID: "LC-008", kind: models.KindLangChainTool, src: `
+def lookup_order(order_id: str) -> dict:
+    """Look up an order."""
+    try:
+        if not order_id:
+            raise ValueError("order_id is required")
+        return {"order_id": order_id}
+    except ValueError as exc:
+        return {"error": str(exc), "retryable": False}
+`, wantFires: false},
 }
 
 // policyRepoRuleCases covers repo-scoped rules.
