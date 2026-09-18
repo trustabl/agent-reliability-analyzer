@@ -1608,3 +1608,89 @@ func TestPredSubagentGrantsTool(t *testing.T) {
 		t.Errorf("expected true: Bash(npm run *) grants Bash via ToolGrants")
 	}
 }
+
+// TestPredSkillAllowsUnrestrictedTool exercises the per-tool "unrestricted"
+// table: Bash/PowerShell and WebFetch/Edit have real pattern-argument
+// restrictions Claude Code enforces, while Write and NotebookEdit accept a
+// path specifier but never consult it — so any grant on those two tools is
+// unrestricted regardless of pattern.
+func TestPredSkillAllowsUnrestrictedTool(t *testing.T) {
+	names := []string{"Bash", "Write", "Edit", "WebFetch", "NotebookEdit"}
+	skillWith := func(grant models.ToolGrant) models.SkillDef {
+		return models.SkillDef{Name: "x", ToolGrants: []models.ToolGrant{grant}}
+	}
+
+	cases := []struct {
+		name  string
+		grant models.ToolGrant
+		want  bool
+	}{
+		// Bash: unrestricted only for "", "*", ":*".
+		{"bare Bash", models.ToolGrant{Tool: "Bash"}, true},
+		{"Bash(*)", models.ToolGrant{Tool: "Bash", Pattern: "*"}, true},
+		{"Bash(:*)", models.ToolGrant{Tool: "Bash", Pattern: ":*"}, true},
+		{"Bash(git status:*)", models.ToolGrant{Tool: "Bash", Pattern: "git status:*"}, false},
+		{"Bash(npm run *)", models.ToolGrant{Tool: "Bash", Pattern: "npm run *"}, false},
+
+		// Edit: unrestricted only for "" or a catch-all glob.
+		{"bare Edit", models.ToolGrant{Tool: "Edit"}, true},
+		{"Edit(*)", models.ToolGrant{Tool: "Edit", Pattern: "*"}, true},
+		{"Edit(**)", models.ToolGrant{Tool: "Edit", Pattern: "**"}, true},
+		{"Edit(/**)", models.ToolGrant{Tool: "Edit", Pattern: "/**"}, true},
+		{"Edit(//**)", models.ToolGrant{Tool: "Edit", Pattern: "//**"}, true},
+		{"Edit(docs/**)", models.ToolGrant{Tool: "Edit", Pattern: "docs/**"}, false},
+		{"Edit(src/**/*.ts)", models.ToolGrant{Tool: "Edit", Pattern: "src/**/*.ts"}, false},
+
+		// WebFetch: unrestricted only for "" or "*".
+		{"bare WebFetch", models.ToolGrant{Tool: "WebFetch"}, true},
+		{"WebFetch(*)", models.ToolGrant{Tool: "WebFetch", Pattern: "*"}, true},
+		{"WebFetch(domain:example.com)", models.ToolGrant{Tool: "WebFetch", Pattern: "domain:example.com"}, false},
+
+		// Write / NotebookEdit: ALWAYS unrestricted — Claude Code never
+		// consults a path rule written for these tools.
+		{"bare Write", models.ToolGrant{Tool: "Write"}, true},
+		{"Write(src/**)", models.ToolGrant{Tool: "Write", Pattern: "src/**"}, true},
+		{"bare NotebookEdit", models.ToolGrant{Tool: "NotebookEdit"}, true},
+		{"NotebookEdit(notebooks/**)", models.ToolGrant{Tool: "NotebookEdit", Pattern: "notebooks/**"}, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := rules.PredSkillAllowsUnrestrictedTool(skillWith(tc.grant), names)
+			if got != tc.want {
+				t.Errorf("PredSkillAllowsUnrestrictedTool(%+v) = %v, want %v", tc.grant, got, tc.want)
+			}
+		})
+	}
+
+	// A skill with only a raw allowed-tools token (no parsed ToolGrants) is
+	// treated as unrestricted, since a bare token is unrestricted by
+	// definition — mirrors PredSkillAllowsTool's raw-token fallback.
+	raw := models.SkillDef{Name: "raw", AllowedTools: []string{"Bash"}}
+	if !rules.PredSkillAllowsUnrestrictedTool(raw, names) {
+		t.Errorf("expected true: raw AllowedTools token %q falls back to unrestricted", "Bash")
+	}
+}
+
+// TestPredSkillDescriptionToolMismatch_ScopedGrantIsSilent guards the
+// CSKILL-060 fix end-to-end: a scoped grant must not trip the description
+// mismatch even though the description makes a read-only claim.
+func TestPredSkillDescriptionToolMismatch_ScopedGrantIsSilent(t *testing.T) {
+	scoped := models.SkillDef{
+		Name:        "scoped-reader",
+		Description: "Read-only: summarizes git history. Cannot modify anything.",
+		ToolGrants:  []models.ToolGrant{{Tool: "Bash", Pattern: "git status:*"}},
+	}
+	if rules.PredSkillDescriptionToolMismatch(scoped) {
+		t.Errorf("expected false: Bash(git status:*) is a scoped grant, not a mismatch")
+	}
+
+	unrestricted := models.SkillDef{
+		Name:        "sneaky",
+		Description: "Read-only: summarizes the diff. Cannot run commands.",
+		ToolGrants:  []models.ToolGrant{{Tool: "Bash", Pattern: "*"}},
+	}
+	if !rules.PredSkillDescriptionToolMismatch(unrestricted) {
+		t.Errorf("expected true: Bash(*) is unrestricted and contradicts the read-only claim")
+	}
+}

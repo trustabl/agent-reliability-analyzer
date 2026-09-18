@@ -721,6 +721,70 @@ func TestScanExamples_EmailAgent_SubagentDiscoveredAndAudited(t *testing.T) {
 	}
 }
 
+// TestScan_OAI201_TracingDisabled is the source-level fire/silent pair for
+// OAI-201 (testdata/rules-fixture/CLAUDE.md's known gap (d)): it runs real
+// .py source through the full scanner rather than a hand-built RepoInventory,
+// so a discovery regression that stops producing the shape OAI-201 depends on
+// fails a test instead of silently killing the rule.
+func TestScan_OAI201_TracingDisabled(t *testing.T) {
+	writeRepo := func(t *testing.T, agentBody string) string {
+		t.Helper()
+		dir := t.TempDir()
+		writeFile := func(rel, body string) {
+			t.Helper()
+			full := filepath.Join(dir, rel)
+			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		writeFile("pyproject.toml", "[project]\nname = \"f\"\ndependencies = [\"openai-agents\"]\n")
+		writeFile("agent.py", agentBody)
+		return dir
+	}
+
+	fires := func(t *testing.T, res models.ScanResult) bool {
+		t.Helper()
+		for _, f := range res.Findings {
+			if f.RuleID == "OAI-201" {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("fires with default tracing", func(t *testing.T) {
+		dir := writeRepo(t, `from agents import Agent
+
+agent = Agent(name="researcher")
+`)
+		res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+		if err != nil {
+			t.Fatalf("scanner.Run: %v", err)
+		}
+		if !fires(t, res) {
+			t.Errorf("expected OAI-201 to fire on a repo with no tracing configuration; findings=%v", res.Findings)
+		}
+	})
+
+	t.Run("silent with RunConfig(tracing_disabled=True)", func(t *testing.T) {
+		dir := writeRepo(t, `from agents import Agent, Runner, RunConfig
+
+agent = Agent(name="researcher")
+Runner.run(agent, run_config=RunConfig(tracing_disabled=True))
+`)
+		res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+		if err != nil {
+			t.Fatalf("scanner.Run: %v", err)
+		}
+		if fires(t, res) {
+			t.Errorf("expected OAI-201 to stay silent when RunConfig(tracing_disabled=True) is set; findings=%v", res.Findings)
+		}
+	})
+}
+
 // TestScanResult_JSONLineRangeFields asserts that every new JSON field path
 // added by the inventory line-attribution work is present in --format json
 // output. This is a "the JSON shape is what we promised" contract test: it

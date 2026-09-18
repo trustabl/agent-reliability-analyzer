@@ -989,6 +989,10 @@ func PredSkillBodyHasInjectionMarker(s models.SkillDef) bool {
 // PredSkillAllowsTool reports whether the skill pre-approves any of names via
 // allowed-tools. It matches the parsed grant's Tool first (so "Bash(git *)"
 // matches "Bash") then the raw allowed-tools tokens.
+//
+// This predicate does NOT consult the grant's Pattern — "Bash(git status:*)"
+// matches identically to a bare "Bash". Use PredSkillAllowsUnrestrictedTool
+// when a narrowly-scoped grant should not count.
 func PredSkillAllowsTool(s models.SkillDef, names []string) bool {
 	want := make(map[string]bool, len(names))
 	for _, n := range names {
@@ -1007,17 +1011,82 @@ func PredSkillAllowsTool(s models.SkillDef, names []string) bool {
 	return false
 }
 
+// skillGrantIsUnrestricted reports whether a parsed ToolGrant places no real
+// constraint on what it authorizes, per Claude Code's own permission-rule
+// semantics (see code.claude.com/docs/en/permissions):
+//
+//   - Bash / PowerShell: unrestricted only for an empty, "*", or ":*" pattern
+//     — Bash(git status:*) is a genuine command-prefix restriction.
+//   - Edit (the tool Claude Code actually consults for file-path rules; see
+//     below): unrestricted only for an empty pattern or a catch-all glob
+//     ("*", "**", "/**", "//**"), never a real gitignore-style path pattern
+//     like "docs/**".
+//   - WebFetch: unrestricted only for an empty or "*" pattern — a
+//     "domain:example.com" specifier is a genuine restriction.
+//   - Write and NotebookEdit: ALWAYS unrestricted, regardless of any pattern
+//     written in the grant. Claude Code accepts a path specifier on these
+//     tools but never consults it — only an Edit rule is checked for file
+//     writes (it warns at startup that a Write/NotebookEdit path rule is
+//     dead). So "Write(src/**)" grants exactly as much as bare "Write".
+func skillGrantIsUnrestricted(g models.ToolGrant) bool {
+	pattern := strings.TrimSpace(g.Pattern)
+	switch g.Tool {
+	case "Write", "NotebookEdit":
+		return true
+	case "Bash", "PowerShell":
+		switch pattern {
+		case "", "*", ":*":
+			return true
+		}
+		return false
+	case "Edit":
+		switch pattern {
+		case "", "*", "**", "/**", "//**":
+			return true
+		}
+		return false
+	case "WebFetch":
+		switch pattern {
+		case "", "*":
+			return true
+		}
+		return false
+	default:
+		return pattern == ""
+	}
+}
+
 // PredSkillAllowsUnrestrictedShell reports whether the skill pre-approves
 // unrestricted shell via allowed-tools — a bare `Bash` grant or a wildcard
 // pattern (`Bash(*)` / `Bash(:*)`). allowed-tools is an auto-approval list, not a
 // sandbox, so this lets the skill run any shell command without prompting.
 func PredSkillAllowsUnrestrictedShell(s models.SkillDef) bool {
 	for _, g := range s.ToolGrants {
-		if g.Tool != "Bash" {
-			continue
+		if g.Tool == "Bash" && skillGrantIsUnrestricted(g) {
+			return true
 		}
-		switch strings.TrimSpace(g.Pattern) {
-		case "", "*", ":*":
+	}
+	return false
+}
+
+// PredSkillAllowsUnrestrictedTool reports whether the skill pre-approves any
+// of names via allowed-tools with a genuinely unrestricted grant — unlike
+// PredSkillAllowsTool, a narrowly-scoped grant (Bash(git status:*),
+// Edit(docs/**), WebFetch(domain:example.com)) does not count. A raw
+// allowed-tools token with no parsed grant (s.AllowedTools fallback) is
+// treated as unrestricted, since a bare token is unrestricted by definition.
+func PredSkillAllowsUnrestrictedTool(s models.SkillDef, names []string) bool {
+	want := make(map[string]bool, len(names))
+	for _, n := range names {
+		want[n] = true
+	}
+	for _, g := range s.ToolGrants {
+		if want[g.Tool] && skillGrantIsUnrestricted(g) {
+			return true
+		}
+	}
+	for _, t := range s.AllowedTools {
+		if want[t] {
 			return true
 		}
 	}
@@ -1090,14 +1159,16 @@ func PredSkillBundledFileHasHardcodedSecret(s models.SkillDef) bool {
 var sideEffectingSkillTools = []string{"Bash", "Write", "Edit", "WebFetch", "NotebookEdit"}
 
 // PredSkillDescriptionToolMismatch reports whether the skill's description
-// explicitly claims to be read-only / side-effect-free while it pre-approves a
-// side-effecting tool (or unrestricted shell) — the metadata then understates
-// the real capability, which is the signal a reviewer relies on.
+// explicitly claims to be read-only / side-effect-free while it pre-approves an
+// unrestricted side-effecting tool grant — the metadata then understates the
+// real capability, which is the signal a reviewer relies on. A narrowly-scoped
+// grant (Bash(git status:*), Edit(docs/**)) does not misrepresent the
+// description, so it is not counted.
 func PredSkillDescriptionToolMismatch(s models.SkillDef) bool {
 	if !skillReadOnlyClaimRe.MatchString(s.Description) {
 		return false
 	}
-	return PredSkillAllowsUnrestrictedShell(s) || PredSkillAllowsTool(s, sideEffectingSkillTools)
+	return PredSkillAllowsUnrestrictedTool(s, sideEffectingSkillTools)
 }
 
 func PredSkillHasDescription(s models.SkillDef) bool {

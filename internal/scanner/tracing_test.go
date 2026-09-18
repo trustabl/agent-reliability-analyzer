@@ -56,6 +56,48 @@ func TestComputeUsesDefaultTracing(t *testing.T) {
 			src:  "my_add_trace_processor_helper = None\n",
 			want: true,
 		},
+		{
+			name: "set_tracing_disabled(True) disables default",
+			src:  "from agents import set_tracing_disabled\nset_tracing_disabled(True)\n",
+			want: false,
+		},
+		{
+			name: "set_tracing_disabled(False) does not disable default",
+			src:  "from agents import set_tracing_disabled\nset_tracing_disabled(False)\n",
+			want: true,
+		},
+		{
+			name: "attribute-form set_tracing_disabled(True) disables default",
+			src:  "import agents\nagents.set_tracing_disabled(True)\n",
+			want: false,
+		},
+		{
+			name: "RunConfig(tracing_disabled=True) disables default",
+			src:  "from agents import RunConfig\ncfg = RunConfig(tracing_disabled=True)\n",
+			want: false,
+		},
+		{
+			name: "RunConfig(tracing_disabled=False) does not disable default",
+			src:  "from agents import RunConfig\ncfg = RunConfig(tracing_disabled=False)\n",
+			want: true,
+		},
+		{
+			name: "inline run_config=RunConfig(tracing_disabled=True) disables default",
+			src: "from agents import Agent, Runner, RunConfig\n" +
+				"agent = Agent(name='a')\n" +
+				"Runner.run(agent, run_config=RunConfig(tracing_disabled=True))\n",
+			want: false,
+		},
+		{
+			name: "RunConfig with an unrelated kwarg does not disable default",
+			src:  "from agents import RunConfig\ncfg = RunConfig(workflow_name='wf')\n",
+			want: true,
+		},
+		{
+			name: "lookalike RunConfig-suffixed identifier does not disable default",
+			src:  "MyRunConfig(tracing_disabled=True)\n",
+			want: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

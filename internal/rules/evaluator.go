@@ -202,6 +202,9 @@ func (e MatchExpr) EvaluateSkill(s models.SkillDef, inv models.RepoInventory) bo
 	if len(e.SkillAllowsTool) > 0 && !PredSkillAllowsTool(s, e.SkillAllowsTool) {
 		return false
 	}
+	if len(e.SkillAllowsUnrestrictedTool) > 0 && !PredSkillAllowsUnrestrictedTool(s, e.SkillAllowsUnrestrictedTool) {
+		return false
+	}
 	if e.SkillModelInvocable != nil && PredSkillModelInvocable(s) != *e.SkillModelInvocable {
 		return false
 	}
@@ -398,6 +401,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 	models.ScopeSkill: {
 		"skill_allows_unrestricted_shell":               true,
 		"skill_allows_tool":                             true,
+		"skill_allows_unrestricted_tool":                true,
 		"skill_model_invocable":                         true,
 		"skill_body_has_dynamic_exec":                   true,
 		"skill_dynamic_exec_touches_network_or_secrets": true,
@@ -478,6 +482,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	// Skill scope
 	add(e.SkillAllowsUnrestrictedShell != nil, "skill_allows_unrestricted_shell")
 	add(len(e.SkillAllowsTool) > 0, "skill_allows_tool")
+	add(len(e.SkillAllowsUnrestrictedTool) > 0, "skill_allows_unrestricted_tool")
 	add(e.SkillModelInvocable != nil, "skill_model_invocable")
 	add(e.SkillBodyHasDynamicExec != nil, "skill_body_has_dynamic_exec")
 	add(e.SkillDynamicExecTouchesNetworkOrSecrets != nil, "skill_dynamic_exec_touches_network_or_secrets")

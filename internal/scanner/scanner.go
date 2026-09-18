@@ -668,11 +668,22 @@ var tracingProcessorFuncs = map[string]bool{
 	"set_trace_processors": true,
 }
 
-// disablesDefaultTracing reports whether a parsed file installs a custom trace
-// processor or references the tracing-disable env var. It inspects typed AST
-// nodes — call-function names and string literals — rather than substring-
-// scanning raw source, so a mention inside a comment or an unrelated identifier
-// no longer produces a false signal (the inventory-owns-AST-facts contract).
+// tracingDisableFuncs are OpenAI Agents SDK calls that disable tracing outright
+// when their first positional argument is the literal True — the SDK's
+// module-level `set_tracing_disabled(True)` switch.
+var tracingDisableFuncs = map[string]bool{
+	"set_tracing_disabled": true,
+}
+
+// disablesDefaultTracing reports whether a parsed file disables or replaces
+// OpenAI Agents SDK default tracing, by any of four documented mechanisms:
+// installing a custom trace processor (add_trace_processor /
+// set_trace_processors), referencing the OPENAI_AGENTS_DISABLE_TRACING env
+// var, calling set_tracing_disabled(True), or constructing
+// RunConfig(tracing_disabled=True). It inspects typed AST nodes — call-function
+// names, call arguments, and string literals — rather than substring-scanning
+// raw source, so a mention inside a comment or an unrelated identifier no
+// longer produces a false signal (the inventory-owns-AST-facts contract).
 func disablesDefaultTracing(pf analysis.ParsedFile) bool {
 	found := false
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
@@ -691,7 +702,19 @@ func disablesDefaultTracing(pf analysis.ParsedFile) bool {
 			if i := strings.LastIndex(name, "."); i >= 0 {
 				name = name[i+1:]
 			}
-			if tracingProcessorFuncs[name] {
+			switch {
+			case tracingProcessorFuncs[name]:
+				found = true
+				return false
+			case tracingDisableFuncs[name] && callFirstPositionalArgIsTrue(n):
+				found = true
+				return false
+			case name == "RunConfig" && callKeywordArgIsTrue(n, "tracing_disabled", pf.Source):
+				// Matches both the inline Runner.run(agent, run_config=RunConfig(...))
+				// form and an assigned-variable form (cfg = RunConfig(...)) — the
+				// walk finds the RunConfig(...) construction wherever it appears in
+				// the file, with no dataflow needed to connect it back to the run
+				// call.
 				found = true
 				return false
 			}
@@ -707,6 +730,42 @@ func disablesDefaultTracing(pf analysis.ParsedFile) bool {
 		return true
 	})
 	return found
+}
+
+// callFirstPositionalArgIsTrue reports whether callNode's first positional
+// argument (i.e. not a keyword argument) is the literal True.
+func callFirstPositionalArgIsTrue(callNode *sitter.Node) bool {
+	args := callNode.ChildByFieldName("arguments")
+	if args == nil {
+		return false
+	}
+	if args.NamedChildCount() == 0 {
+		return false
+	}
+	first := args.NamedChild(0)
+	return first != nil && first.Type() == "true"
+}
+
+// callKeywordArgIsTrue reports whether callNode has a keyword argument named
+// kwarg whose value is the literal True.
+func callKeywordArgIsTrue(callNode *sitter.Node, kwarg string, src []byte) bool {
+	args := callNode.ChildByFieldName("arguments")
+	if args == nil {
+		return false
+	}
+	for i := 0; i < int(args.NamedChildCount()); i++ {
+		child := args.NamedChild(i)
+		if child.Type() != "keyword_argument" {
+			continue
+		}
+		name := astutil.NodeText(child.ChildByFieldName("name"), src)
+		if name != kwarg {
+			continue
+		}
+		value := child.ChildByFieldName("value")
+		return value != nil && value.Type() == "true"
+	}
+	return false
 }
 
 // languagesLabel renders a stable, comma-separated language list for progress.

@@ -100,6 +100,7 @@ type MatchExpr struct {
 	// Skill-scope predicates
 	SkillAllowsUnrestrictedShell            *bool    `yaml:"skill_allows_unrestricted_shell,omitempty"`
 	SkillAllowsTool                         []string `yaml:"skill_allows_tool,omitempty"`
+	SkillAllowsUnrestrictedTool             []string `yaml:"skill_allows_unrestricted_tool,omitempty"`
 	SkillModelInvocable                     *bool    `yaml:"skill_model_invocable,omitempty"`
 	SkillBodyHasDynamicExec                 *bool    `yaml:"skill_body_has_dynamic_exec,omitempty"`
 	SkillDynamicExecTouchesNetworkOrSecrets *bool    `yaml:"skill_dynamic_exec_touches_network_or_secrets,omitempty"`

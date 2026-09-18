@@ -117,7 +117,7 @@ rules:
             - scan
             - vulnerability
             - compliance
-        - skill_allows_tool:
+        - skill_allows_unrestricted_tool:
             - Bash
             - Write
             - Edit
@@ -126,15 +126,16 @@ rules:
     explanation: >
       This skill's name claims a security, audit, pentest, or compliance
       purpose — a role that is expected to observe and report, not mutate —
-      yet its allowed-tools pre-approve a side-effecting or exfiltration-
-      capable tool (Bash / Write / Edit / WebFetch / NotebookEdit). A skill
-      that can be steered into "auditing" a system while holding write or
-      shell access turns a read-first review into a privilege-escalation
-      path, whether by an ambiguous request or an injected instruction
-      encountered mid-audit.
+      yet its allowed-tools pre-approve an unrestricted side-effecting or
+      exfiltration-capable tool (Bash / Write / Edit / WebFetch /
+      NotebookEdit). A skill that can be steered into "auditing" a system
+      while holding unscoped write or shell access turns a read-first review
+      into a privilege-escalation path, whether by an ambiguous request or an
+      injected instruction encountered mid-audit.
     fix: >
       Narrow allowed-tools to the read-only set an audit role actually needs
-      (Read, Grep, Glob). If the skill genuinely must remediate what it finds,
+      (Read, Grep, Glob), or to scoped grants such as `Bash(git status:*)` or
+      `Edit(docs/**)`. If the skill genuinely must remediate what it finds,
       split remediation into a separate, explicitly-named skill so the
       audit-only skill's grants match what its name promises.
 

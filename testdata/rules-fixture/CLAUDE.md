@@ -221,12 +221,19 @@ production-grade, in priority order:
   `buildTool`, TS in `tsHandlerFacts`) and `PredAgentUsesToolKind` honors it
   for `shell_invocation`. Residual: the agent rules still only key on shell
   reach, not the broader "filesystem-touching" half their titles also name.
-- **(d) Source-level fire/silent fixtures.** Per-rule cases in
-  `policies_test.go` feed hand-constructed typed inputs, so they prove
-  predicate logic but not discovery → detection end-to-end. Add fixtures
-  that run real `.py` snippets through the full scanner, so a discovery
-  change that stops producing a shape a rule depends on fails a test
-  instead of silently killing the rule.
+- **(d) Source-level fire/silent fixtures — started, not general.** Per-rule
+  cases in `policies_test.go` feed hand-constructed typed inputs, so they
+  prove predicate logic but not discovery → detection end-to-end. OAI-201
+  (`internal/scanner/scanner_test.go`,
+  `TestScan_OAI201_TracingDisabled`) now has a fire/silent pair that runs
+  real `.py` source through the full scanner rather than a hand-built
+  `RepoInventory` — it fires on a plain `Agent(...)` repo and goes silent on
+  `Runner.run(agent, run_config=RunConfig(tracing_disabled=True))`. The rest
+  of the pack still uses hand-constructed inputs; add more fixtures of this
+  shape as rules whose detection lives inside computed-fact logic (like
+  `disablesDefaultTracing`) are touched, so a discovery change that stops
+  producing a shape a rule depends on fails a test instead of silently
+  killing the rule.
 
 ## Output discipline for explanation/fix text
 
