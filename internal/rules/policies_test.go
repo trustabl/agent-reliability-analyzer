@@ -2854,6 +2854,28 @@ var policyAgentRuleCases = []policyAgentCase{
 			}}},
 		models.RepoInventory{}, false},
 
+	{"LC-103 fires when agent wires RequestsGetTool", "LC-103",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{{Class: "RequestsGetTool"}},
+		},
+		models.RepoInventory{}, true},
+	{"LC-103 fires on a StateGraph wiring RequestsPostTool", "LC-103",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{{Class: "RequestsPostTool"}},
+		},
+		models.RepoInventory{}, true},
+	{"LC-103 silent without a hosted tool", "LC-103",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython},
+		models.RepoInventory{}, false},
+	{"LC-103 silent when the hosted tool is PythonREPLTool, not a Requests class", "LC-103",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{{Class: "PythonREPLTool"}},
+		},
+		models.RepoInventory{}, false},
+
 	// ─── CrewAI agent rules (CREW-*) ────────────────────────────────────────
 	{"CREW-101 fires when allow_code_execution=True", "CREW-101",
 		models.AgentDef{
