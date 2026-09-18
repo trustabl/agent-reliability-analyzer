@@ -132,7 +132,7 @@ rules:
     match:
       all:
         - skill_model_invocable: true
-        - skill_allows_tool:
+        - skill_allows_unrestricted_tool:
             - Bash
             - Write
             - Edit
@@ -140,14 +140,17 @@ rules:
             - NotebookEdit
     explanation: >
       Claude can auto-invoke this skill (disable-model-invocation is not set) and
-      it pre-approves a side-effecting or exfiltration-capable tool (Bash / Write
-      / Edit / WebFetch / NotebookEdit). The model can therefore be steered — by
-      an ambiguous request or an injected instruction — into triggering the skill
-      and its tools without the user choosing to.
+      it pre-approves an unrestricted side-effecting or exfiltration-capable tool
+      (Bash / Write / Edit / WebFetch / NotebookEdit). The model can therefore be
+      steered — by an ambiguous request or an injected instruction — into
+      triggering the skill and its tools without the user choosing to, with no
+      command, path, or domain scoping to contain the blast radius.
     fix: >
       Add `disable-model-invocation: true` so only the user can invoke this skill,
-      or narrow allowed-tools to read-only tools (Read, Grep, Glob). Reserve
-      auto-invocation for skills that carry knowledge, not side effects.
+      or narrow allowed-tools to read-only tools (Read, Grep, Glob) or to scoped
+      grants such as `Bash(git status:*)`, `Edit(docs/**)`, or
+      `WebFetch(domain:example.com)`. Reserve unscoped auto-invocation for skills
+      that carry knowledge, not side effects.
 
   - id: CSKILL-010
     title: Bundled skill script performs network egress
@@ -228,14 +231,15 @@ rules:
       skill_description_tool_mismatch: true
     explanation: >
       This skill's description claims it is read-only or side-effect-free, yet its
-      allowed-tools pre-approve a side-effecting or exfiltration-capable tool
-      (Bash / Write / Edit / WebFetch / NotebookEdit, or unrestricted shell). The
+      allowed-tools pre-approve an unrestricted side-effecting or exfiltration-
+      capable tool (Bash / Write / Edit / WebFetch / NotebookEdit). The
       description is the signal a user relies on when deciding to install or trust
       a skill, so a description that understates the real capability is a
       metadata-vs-behavior mismatch an attacker can hide behind.
     fix: >
       Make the description match the grants: either narrow allowed-tools to the
-      read-only set the description promises (Read, Grep, Glob), or correct the
+      read-only set the description promises (Read, Grep, Glob) or to scoped
+      grants such as `Bash(git status:*)` or `Edit(docs/**)`, or correct the
       description to disclose the side-effecting tools the skill actually uses.
 
   - id: CSKILL-070

@@ -95,11 +95,11 @@ in post-build scan — prevent it now.
 ## [CSKILL-050] Model-invocable skill grants side-effecting tools
 **Severity:** high | **Confidence:** 0.80
 
-**Directive:** Add `disable-model-invocation: true` so only the user can invoke this skill, or narrow allowed-tools to read-only tools (Read, Grep, Glob).
+**Directive:** Add `disable-model-invocation: true` so only the user can invoke this skill, or narrow allowed-tools to read-only tools (Read, Grep, Glob) or to scoped grants such as `Bash(git status:*)`, `Edit(docs/**)`, or `WebFetch(domain:example.com)`.
 
-**Why:** Claude can auto-invoke this skill (disable-model-invocation is not set) and it pre-approves a side-effecting or exfiltration-capable tool (Bash / Write / Edit / WebFetch / NotebookEdit).
+**Why:** Claude can auto-invoke this skill (disable-model-invocation is not set) and it pre-approves an unrestricted side-effecting or exfiltration-capable tool (Bash / Write / Edit / WebFetch / NotebookEdit).
 
-**When this applies:** Any skill where disable-model-invocation is not set to true, and Any skill pre-approving Bash, Write, Edit, WebFetch, or NotebookEdit in allowed-tools.
+**When this applies:** Any skill where disable-model-invocation is not set to true, and Any skill pre-approving Bash, Write, Edit, WebFetch, or NotebookEdit in allowed-tools with a genuinely unrestricted grant.
 
 ---
 
@@ -128,9 +128,9 @@ in post-build scan — prevent it now.
 ## [CSKILL-060] Skill description claims read-only but grants side-effecting tools
 **Severity:** medium | **Confidence:** 0.50
 
-**Directive:** Make the description match the grants: either narrow allowed-tools to the read-only set the description promises (Read, Grep, Glob), or correct the description to disclose the side-effecting tools the skill actually uses.
+**Directive:** Make the description match the grants: either narrow allowed-tools to the read-only set the description promises (Read, Grep, Glob) or to scoped grants such as `Bash(git status:*)` or `Edit(docs/**)`, or correct the description to disclose the side-effecting tools the skill actually uses.
 
-**Why:** This skill's description claims it is read-only or side-effect-free, yet its allowed-tools pre-approve a side-effecting or exfiltration-capable tool (Bash / Write / Edit / WebFetch / NotebookEdit, or unrestricted shell).
+**Why:** This skill's description claims it is read-only or side-effect-free, yet its allowed-tools pre-approve an unrestricted side-effecting or exfiltration- capable tool (Bash / Write / Edit / WebFetch / NotebookEdit).
 
 **When this applies:** Any skill whose description claims read-only but grants side-effecting tools.
 

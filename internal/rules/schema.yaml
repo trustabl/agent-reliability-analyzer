@@ -354,7 +354,6 @@ rules:
 #       resolvable to it by variable name, and none of those calls set
 #       usage_limits. Same silence rule as agent_run_call_max_turns_missing.
 #
-<<<<<<< HEAD
 #   agent_mcp_server_kwarg_missing: {classes: [MCPServerStdio, ...], kwarg: tool_filter}
 #       Returns true if the agent wires at least one MCP server of any class in
 #       `classes` whose `kwarg` is absent OR present with literal None. `kwarg`
@@ -369,7 +368,7 @@ rules:
 #       list already proves the agent uses it, and with multiple wired servers
 #       negating a presence check would go silent as soon as ANY one sets the
 #       kwarg, masking the others that don't.
-=======
+#
 #   agent_file_url_force_download: bool
 #       Pydantic AI only. Returns true if discovery stamped
 #       AgentDef.FileURLForceDownload as "True" or "allow-local" — a
@@ -377,7 +376,6 @@ rules:
 #       in the agent's file set force_download to a host-side download
 #       (True) or a private-IP-allowing download ('allow-local'). Silent
 #       when the field is empty (kwarg absent or False).
->>>>>>> 0810342 (feat(pydantic): detect FileUrl and WebFetchTool force_download (PYD-104))
 #
 #
 # ━━━ SUBAGENT-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -401,12 +399,28 @@ rules:
 #
 #   skill_allows_tool: [Bash, Write, WebFetch, ...]
 #       Fires when allowed-tools pre-approves any of the given Claude Code tool
-#       names (matches the parsed grant Tool, then the raw token).
+#       names (matches the parsed grant Tool, then the raw token). PATTERN-BLIND:
+#       ignores the grant's Pattern, so "Bash(git status:*)" matches identically
+#       to a bare "Bash". Prefer skill_allows_unrestricted_tool when a narrowly-
+#       scoped grant should not count.
+#
+#   skill_allows_unrestricted_tool: [Bash, Write, WebFetch, ...]
+#       Fires when allowed-tools pre-approves any of the given tool names with a
+#       genuinely unrestricted grant. Unlike skill_allows_tool, this consults the
+#       grant's Pattern per Claude Code's own permission-rule semantics: Bash/
+#       PowerShell are unrestricted only for "" / "*" / ":*"; WebFetch only for
+#       "" / "*" (a "domain:example.com" specifier is a real restriction); Edit
+#       only for "" or a catch-all glob ("*", "**", "/**", "//**") — a real path
+#       pattern like "docs/**" is a real restriction. Write and NotebookEdit are
+#       ALWAYS unrestricted regardless of any pattern written in the grant,
+#       because Claude Code accepts but never consults a path specifier on those
+#       two tools (only an Edit rule is checked for file writes).
 #
 #   skill_model_invocable: true
 #       Fires when the model can auto-invoke the skill (disable-model-invocation
-#       is not set). Pair with skill_allows_tool to flag a model-triggerable
-#       side-effecting skill. Bool predicate.
+#       is not set). Pair with skill_allows_unrestricted_tool to flag a
+#       model-triggerable skill with a genuinely unrestricted side-effecting
+#       grant. Bool predicate.
 #
 #   skill_body_has_dynamic_exec: true
 #       Fires when the SKILL.md body uses dynamic-context shell execution (the
@@ -507,8 +521,16 @@ rules:
 #
 #   repo_uses_default_tracing: true | false
 #       Fires when the scanner's derived UsesDefaultTracing flag matches.
-#       UsesDefaultTracing is true when no add_trace_processor or
-#       OPENAI_AGENTS_DISABLE_TRACING appears anywhere in parsed Python files.
+#       UsesDefaultTracing is false (tracing is NOT on the pure default path)
+#       when any parsed Python file's AST contains one of four documented
+#       disable mechanisms: an add_trace_processor / set_trace_processors call,
+#       an OPENAI_AGENTS_DISABLE_TRACING string literal, a set_tracing_disabled
+#       (True) call, or a RunConfig(tracing_disabled=True) construction
+#       (matched anywhere in the file, so both the inline
+#       Runner.run(agent, run_config=RunConfig(...)) form and an assigned-
+#       variable form are covered without dataflow). The match is AST-scoped
+#       (call-function names, call arguments, string literals) — a mention
+#       inside a comment or an unrelated identifier does not count.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads

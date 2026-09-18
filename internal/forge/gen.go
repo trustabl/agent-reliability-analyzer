@@ -77,6 +77,8 @@ func matchCondition(expr rules.MatchExpr) string {
 		return "Any skill containing instruction-override phrasing, invisible Unicode, or encoded blobs."
 	case len(expr.SkillAllowsTool) > 0:
 		return "Any skill pre-approving Bash, Write, Edit, WebFetch, or NotebookEdit in allowed-tools."
+	case len(expr.SkillAllowsUnrestrictedTool) > 0:
+		return "Any skill pre-approving Bash, Write, Edit, WebFetch, or NotebookEdit in allowed-tools with a genuinely unrestricted grant."
 	case expr.SkillModelInvocable != nil:
 		return "Any skill where disable-model-invocation is not set to true."
 	case expr.SkillBundledScriptNetworkEgress != nil:
