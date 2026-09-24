@@ -16,16 +16,25 @@ listing lives.
 
 ## Agent frameworks
 
-| Ecosystem | What Trustabl checks | Listing |
-|---|---|---|
-| **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | Listing in progress |
-| **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | Listing in progress |
-| **Google ADK** | Agents, tools, skills, plugins and callbacks | Listing in progress |
-| **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Not listed |
-| **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | Listing in progress |
-| **LangChain / LangGraph** | Tool contracts, unbounded graphs, missing checkpointers, human-in-the-loop gaps | Not listed |
-| **CrewAI** | Unsafe tools, unbounded delegation, missing iteration caps, weak tool contracts | Not listed |
-| **AutoGen / AG2** | Host-side code execution, missing human review, unbounded rounds, untyped tools | Not listed |
+Every framework below is covered by the rule packs today. The order is the order
+we are pursuing an official listing in each ecosystem's own directory.
+
+| # | Ecosystem | What Trustabl checks | Listing |
+|---|---|---|---|
+| 1 | **Google ADK** | Agents, tools, skills, plugins and callbacks | Not listed |
+| 2 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | Not listed |
+| 3 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Not listed |
+| 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | Not listed |
+| 5 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | Not listed |
+
+These three are analysed the same way, but their ecosystems publish no
+integrations directory, so there is nowhere to list:
+
+| Ecosystem | What Trustabl checks |
+|---|---|
+| **LangChain / LangGraph** | Tool contracts, unbounded graphs, missing checkpointers, human-in-the-loop gaps |
+| **CrewAI** | Unsafe tools, unbounded delegation, missing iteration caps, weak tool contracts |
+| **AutoGen / AG2** | Host-side code execution, missing human review, unbounded rounds, untyped tools |
 
 Rules are versioned separately from the engine and fetched at scan time, so a
 scan picks up new detections for these frameworks without upgrading the binary.
@@ -57,8 +66,8 @@ Registry listing: not listed.
 
 | Ecosystem | Relationship | Listing |
 |---|---|---|
-| **in-toto** | Trustabl emits a signed scan attestation; in-toto makes it verifiable across the supply chain, so a verifier can prove an agent was checked against a known ruleset before it shipped | Listing in progress |
-| **NVIDIA OpenShell** | Trustabl derives least-privilege policy from agent code, identity and required endpoints; OpenShell enforces it at runtime | Listing in progress |
+| **in-toto** | Trustabl emits a signed scan attestation; in-toto makes it verifiable across the supply chain, so a verifier can prove an agent was checked against a known ruleset before it shipped | Not listed |
+| **NVIDIA OpenShell** | Trustabl derives least-privilege policy from agent code, identity and required endpoints; OpenShell enforces it at runtime | Not listed |
 
 See [`attestation.md`](attestation.md) for the attestation format.
 
