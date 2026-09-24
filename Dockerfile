@@ -6,4 +6,8 @@
 FROM gcr.io/distroless/cc-debian12:nonroot
 ARG TARGETPLATFORM
 COPY $TARGETPLATFORM/trustabl /usr/local/bin/trustabl
+# The MCP Registry verifies OCI ownership by reading this annotation off the
+# image and matching it against `name` in server.json. Without it, publishing
+# fails with "Registry validation failed for package". Keep the two in sync.
+LABEL io.modelcontextprotocol.server.name="io.github.trustabl/agent-reliability-analyzer"
 ENTRYPOINT ["/usr/local/bin/trustabl"]
