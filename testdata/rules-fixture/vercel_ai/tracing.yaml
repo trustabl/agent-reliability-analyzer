@@ -1,0 +1,54 @@
+policy:
+  id: vercel_ai_tracing
+  name: Vercel AI SDK observability configuration
+  category: vercel_ai
+  description: >
+    Repo-scoped rules covering whether a Vercel AI SDK project can be observed
+    in production.
+
+rules:
+  - id: VAI-201
+    title: Vercel AI SDK project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - vercel_ai
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [vercel_ai]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project calls the Vercel AI SDK but wires no observability backend.
+      The SDK emits telemetry only when experimental_telemetry is enabled per
+      call AND an OpenTelemetry provider is registered; neither appears here, so
+      streamed generations and tool round-trips leave no record.
+    fix: >
+      Register a provider once at startup — registerOTel() from @vercel/otel, or
+      a NodeSDK from @opentelemetry/sdk-node with an OTLP exporter — then pass
+      experimental_telemetry: { isEnabled: true } to your generateText /
+      streamText calls.
+
+  - id: VAI-101
+    title: Call has no experimental_telemetry while the project is instrumented
+    severity: low
+    confidence: 0.7
+    language: typescript
+    applies_to:
+      - vercel_ai_agent
+    scope: agent
+    match:
+      all:
+        - repo_has_observability: true
+        - agent_kwarg_missing: [experimental_telemetry]
+    explanation: >
+      This project registers an OpenTelemetry provider, but this call does not
+      enable experimental_telemetry. The Vercel AI SDK emits spans only when
+      telemetry is enabled on the call itself, so a registered provider is not
+      enough — this generation produces no spans while its siblings do.
+    fix: >
+      Add experimental_telemetry: { isEnabled: true } to this call. Leave
+      recordInputs / recordOutputs off unless prompt and response text is safe
+      to store in your tracing backend.

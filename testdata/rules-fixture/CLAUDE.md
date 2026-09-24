@@ -103,6 +103,11 @@ SDK enum values used by the `repo_has_sdk_in_code` predicate:
 | `openshell`        | NVIDIA OpenShell SDK (no rules currently target this — OSH-* moved to a closed-source project) |
 | `mcp`              | Model Context Protocol               |
 | `google_adk`       | Google ADK (Python)                  |
+| `langchain`        | LangChain / LangGraph                |
+| `crewai`           | CrewAI                               |
+| `pydantic_ai`      | Pydantic AI                          |
+| `vercel_ai`        | Vercel AI SDK (TypeScript)           |
+| `autogen`          | AutoGen / AG2                        |
 
 Repo-scope rules typically combine `applies_to` with a `repo_has_sdk_in_code`
 predicate to narrow firing to repos that actually use the SDK in code (e.g.

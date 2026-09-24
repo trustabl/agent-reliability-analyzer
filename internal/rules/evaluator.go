@@ -75,6 +75,13 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentMCPServerKwargMissing != nil && !PredAgentMCPServerKwargMissing(*e.AgentMCPServerKwargMissing, a) {
 		return false
 	}
+	// Cross-scope predicate. EvaluateAgent already receives the inventory, so a
+	// repo-level fact is available here. The agent-scope observability rules gate
+	// on it so they read "this agent is the outlier" rather than repeating the
+	// repo's missing-observability complaint once per agent.
+	if e.RepoHasObservability != nil && !PredRepoHasObservability(*e.RepoHasObservability, inv) {
+		return false
+	}
 	if e.AgentFileURLForceDownload != nil && PredAgentFileURLForceDownload(a) != *e.AgentFileURLForceDownload {
 		return false
 	}
@@ -115,6 +122,27 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 		return false
 	}
 	if e.RepoUsesDefaultTracing != nil && !PredRepoUsesDefaultTracing(*e.RepoUsesDefaultTracing, inv) {
+		return false
+	}
+	if e.RepoHasObservability != nil && !PredRepoHasObservability(*e.RepoHasObservability, inv) {
+		return false
+	}
+	if e.RepoObservabilityInspectable != nil && !PredRepoObservabilityInspectable(*e.RepoObservabilityInspectable, inv) {
+		return false
+	}
+	if e.RepoObservabilityInitialized != nil && !PredRepoObservabilityInitialized(*e.RepoObservabilityInitialized, inv) {
+		return false
+	}
+	if e.RepoObservabilityDeclared != nil && !PredRepoObservabilityDeclared(*e.RepoObservabilityDeclared, p) {
+		return false
+	}
+	if len(e.RepoObservabilityVendor) > 0 && !PredRepoObservabilityVendor(e.RepoObservabilityVendor, inv) {
+		return false
+	}
+	if e.RepoObservabilityConsoleOnly != nil && !PredRepoObservabilityConsoleOnly(*e.RepoObservabilityConsoleOnly, inv) {
+		return false
+	}
+	if e.RepoObservabilityCapturesContent != nil && !PredRepoObservabilityCapturesContent(*e.RepoObservabilityCapturesContent, inv) {
 		return false
 	}
 	if len(e.RepoClaudeDefaultModeIs) > 0 && !PredRepoClaudeDefaultModeIs(e.RepoClaudeDefaultModeIs, inv) {
@@ -392,6 +420,9 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_is_subagent_of_any":        true,
 		"agent_hosted_tool_kwarg_present": true, "agent_hosted_tool_kwarg_value": true,
 		"agent_run_call_max_turns_missing": true, "agent_run_call_usage_limits_missing": true,
+		// Dual-scope: a repo-level fact used to gate agent-scope observability
+		// rules. EvaluateAgent receives the inventory, so this is free.
+		"repo_has_observability":         true,
 		"agent_mcp_server_kwarg_missing": true,
 		"agent_file_url_force_download":  true,
 	},
@@ -425,6 +456,13 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_claude_options_permission_mode_is":       true,
 		"repo_claude_options_max_turns_missing":        true,
 		"repo_claude_options_disallowed_tools_missing": true,
+		"repo_has_observability":                       true,
+		"repo_observability_inspectable":               true,
+		"repo_observability_initialized":               true,
+		"repo_observability_declared":                  true,
+		"repo_observability_vendor":                    true,
+		"repo_observability_console_only":              true,
+		"repo_observability_captures_content":          true,
 	},
 }
 
@@ -506,6 +544,13 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(len(e.RepoClaudeOptionsPermissionModeIs) > 0, "repo_claude_options_permission_mode_is")
 	add(e.RepoClaudeOptionsMaxTurnsMissing != nil, "repo_claude_options_max_turns_missing")
 	add(e.RepoClaudeOptionsDisallowedToolsMissing != nil, "repo_claude_options_disallowed_tools_missing")
+	add(e.RepoHasObservability != nil, "repo_has_observability")
+	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
+	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")
+	add(e.RepoObservabilityDeclared != nil, "repo_observability_declared")
+	add(len(e.RepoObservabilityVendor) > 0, "repo_observability_vendor")
+	add(e.RepoObservabilityConsoleOnly != nil, "repo_observability_console_only")
+	add(e.RepoObservabilityCapturesContent != nil, "repo_observability_captures_content")
 	return n
 }
 

@@ -26,8 +26,85 @@ func Recon(src *Source, onFile func(string)) (models.RepoProfile, error) {
 	return models.RepoProfile{
 		Languages: langs,
 		SDKDeps:   sdks,
+		ObsDeps:   detectObsDeps(src.RootPath),
 		Manifest:  manifest,
 	}, nil
+}
+
+// obsDepNeedles maps a manifest substring to the observability vendor it
+// declares. Patterns are lowercase; manifest text is lowercased before matching.
+// Kept separate from detectSDKDeps' needles on purpose — see the ObsDep doc
+// comment for why these must not become SDKDeps.
+var obsDepNeedles = []struct {
+	Vendor  models.ObservabilityVendor
+	Pattern string
+}{
+	{models.VendorOTel, "opentelemetry"},
+	{models.VendorOTel, "@opentelemetry/"},
+	{models.VendorOpenLLMetry, "traceloop-sdk"},
+	{models.VendorOpenLLMetry, "@traceloop/"},
+	{models.VendorOpenInference, "openinference"},
+	{models.VendorOpenInference, "arize-phoenix"},
+	{models.VendorLangfuse, "langfuse"},
+	{models.VendorLangSmith, "langsmith"},
+	{models.VendorLogfire, "logfire"},
+	{models.VendorBraintrust, "braintrust"},
+	{models.VendorWeave, "weave"},
+	{models.VendorAgentOps, "agentops"},
+	{models.VendorMLflow, "mlflow"},
+	{models.VendorDatadogLLMObs, "ddtrace"},
+	// Helicone is deliberately absent: it is a provider base-URL override, not
+	// an importable package, so no AST pass can ever produce a code signal for
+	// it (see DiscoverObservability). Declaring the dep here without any way
+	// to observe it being wired would permanently misfire OBS-005 ("declared
+	// but never wired") on every real Helicone user with no way to clear it.
+	// Deferred until the base-URL-literal detection is implemented.
+}
+
+// obsDepManifests are the fixed-name root manifests the needle scan reads.
+var obsDepManifests = []string{
+	"pyproject.toml", "requirements.txt", "Pipfile", "poetry.lock", "package.json",
+}
+
+// detectObsDeps scans the root dependency manifests for declared observability
+// packages. Recon-only: a declared dep is a PRE-FILTER for the AST pass, never
+// evidence on its own — repo_has_observability is satisfied by code signals.
+func detectObsDeps(root string) []models.ObsDep {
+	seen := make(map[string]bool)
+	var out []models.ObsDep
+	for _, mfile := range obsDepManifests {
+		path := filepath.Join(root, mfile)
+		// Size-cap before reading: these fixed root paths bypass the manifest
+		// walk's gate, so a hostile multi-GiB manifest would otherwise be
+		// slurped into memory.
+		fi, serr := os.Stat(path)
+		if serr != nil || fi.IsDir() || fi.Size() > maxScannedFileBytes {
+			continue
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		text := strings.ToLower(string(b))
+		for _, n := range obsDepNeedles {
+			if !strings.Contains(text, n.Pattern) {
+				continue
+			}
+			key := string(n.Vendor) + "@" + mfile
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, models.ObsDep{Vendor: n.Vendor, Source: mfile, Confidence: 0.9})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Vendor != out[j].Vendor {
+			return out[i].Vendor < out[j].Vendor
+		}
+		return out[i].Source < out[j].Source
+	})
+	return out
 }
 
 func languagesFromManifest(m models.ScanManifest) []models.Language {

@@ -1,0 +1,31 @@
+policy:
+  id: crewai_tracing
+  name: CrewAI observability configuration
+  category: crewai
+  description: >
+    Repo-scoped rules covering whether a CrewAI project can be observed in
+    production.
+
+rules:
+  - id: CREW-202
+    title: CrewAI project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - crewai
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [crewai]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project defines a CrewAI crew but wires no observability backend.
+      Multi-agent crews delegate between agents, so a bad result is usually
+      produced several hand-offs away from where it surfaces; with no recorded
+      run there is no way to find which agent introduced it.
+    fix: >
+      Initialize an instrumentation SDK before kicking off the crew —
+      AgentOps (agentops.init()), OpenLLMetry (Traceloop.init()), or an
+      OpenTelemetry tracer provider with an OTLP exporter.

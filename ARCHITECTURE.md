@@ -383,14 +383,14 @@ flowchart TD
 
     subgraph S1["Step 1 — Recon"]
         recon["ingestion.Recon"]
-        profile[["RepoProfile<br/>Languages · SDKDeps · Manifest · Components"]]
+        profile[["RepoProfile<br/>Languages · SDKDeps · ObsDeps · Manifest · Components"]]
         recon --> profile
     end
 
     subgraph S2["Step 2 — Inventory (per-language AST)"]
-        disc["analysis.DiscoverTools<br/>DiscoverAgents<br/>DiscoverGuardrails<br/>DiscoverSessions<br/>DiscoverSubagents<br/>DiscoverSkills<br/>DiscoverDependencies<br/>DiscoverSlashCommands<br/>DiscoverPlugins<br/>DiscoverClaudeSettings<br/>DiscoverADKAgents<br/>DiscoverADKTools<br/>DiscoverClaudeAgentOptions<br/>DiscoverAgentRunCalls<br/>LangChain/CrewAI/AutoGen/PydanticAI (Py)<br/>TS: OpenAI/ADK/LangChain/Vercel/MCP-proper<br/>Go/CSharp/PHP/Rust MCP"]
+        disc["analysis.DiscoverTools<br/>DiscoverAgents<br/>DiscoverGuardrails<br/>DiscoverSessions<br/>DiscoverSubagents<br/>DiscoverSkills<br/>DiscoverDependencies<br/>DiscoverSlashCommands<br/>DiscoverPlugins<br/>DiscoverClaudeSettings<br/>DiscoverADKAgents<br/>DiscoverADKTools<br/>DiscoverClaudeAgentOptions<br/>DiscoverAgentRunCalls<br/>DiscoverObservability<br/>LangChain/CrewAI/AutoGen/PydanticAI (Py)<br/>TS: OpenAI/ADK/LangChain/Vercel/MCP-proper<br/>Go/CSharp/PHP/Rust MCP"]
         edges["analysis.ResolveEdges"]
-        inv[["RepoInventory<br/>Tools · Agents · Guardrails · Sessions<br/>SDKsDetected · HasShellInvocations · UsesDefaultTracing<br/>Dependencies (BOM)<br/>MCPServers · Subagents · Skills · SlashCommands<br/>PluginManifests · ClaudeSettings · ClaudeAgentOptions<br/>AgentRunCalls"]]
+        inv[["RepoInventory<br/>Tools · Agents · Guardrails · Sessions<br/>SDKsDetected · HasShellInvocations · UsesDefaultTracing<br/>ObservabilitySignals<br/>Dependencies (BOM)<br/>MCPServers · Subagents · Skills · SlashCommands<br/>PluginManifests · ClaudeSettings · ClaudeAgentOptions<br/>AgentRunCalls"]]
         disc --> edges --> inv
     end
 
@@ -479,6 +479,62 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   decorated functions.
 - **DiscoverSessions** — finds construction sites for `*Session` classes from
   the agents SDK.
+- **DiscoverObservability** (`observability.go`) — one pass over the parsed
+  Python and TS/JS files emitting a typed `ObservabilitySignal` per
+  observability fact found: the vendor (`otel`, `langfuse`, `logfire`,
+  `openinference`, `openllmetry`, `braintrust`, `weave`, `agentops`, `mlflow`,
+  `datadog_llmobs`, `langsmith`, `native`) and a `Kind` grading the
+  evidence — `import` (module imported), `init` (provider set or vendor client
+  constructed), `exporter` (span exporter, normalized to its sink: `console`,
+  `otlp`, `jaeger`, `zipkin`, `memory`), `content_capture` (a switch sending
+  full prompt/response text to the backend), `instrument_kwarg` (a per-agent
+  opt-in). The import-vs-init split is load-bearing: an import alone proves the
+  package is present, only an init proves traces have somewhere to go, and
+  `OBS-001` fires on exactly that gap. TS init matching is import-gated (names
+  like `NodeSDK` are too generic to match ungated); the Python side gates its
+  own generic bare (receiver-less) callee names the same way — `init_logger`
+  and `autolog` only count as evidence when the file also imports `braintrust`
+  / `mlflow` respectively, since an ungated match would fire on any same-named
+  local helper function. Language dispatch is by extension, so Go/C#/PHP/Rust
+  files in `allParsed` contribute nothing rather than being run through the
+  Python matcher. Exporter and content-capture detection (`obsExporterNames`,
+  `obsContentCaptureKwargs`/`obsContentCaptureEnvVars`) is Python-only today —
+  `tsObservabilitySignals` has no equivalent walk — which is why `OBS-002` and
+  `OBS-003` are the only observability rules that set `language: python`
+  explicitly rather than firing across every SDK in their `applies_to`.
+  Wired in `scanner.go` after `ResolveEdges` because it reads `allParsed`
+  (Python + TS/JS), unlike `computeUsesDefaultTracing`, which is Python-only.
+
+  `DiscoverAgentObservabilitySignals` (same file) is the AgentDef-level
+  counterpart, called separately in `scanner.go` and combined with the
+  file-level pass via `analysis.MergeObservabilitySignals` (which re-sorts the
+  union — concatenating two independently-sorted slices does not itself
+  produce a sorted one). It covers the three SDKs whose native "traces are on"
+  evidence lives on the agent constructor kwargs rather than a standalone init
+  call anywhere in the file: Pydantic AI `instrument=True` (bool-literal
+  gated — `instrument=False` is an explicit opt-out, not evidence), Vercel
+  `experimental_telemetry`, and LangChain `callbacks=` (both gated only on
+  present-and-not-`None`, matching the missing-kwarg contract their paired
+  agent-scope outlier rules PYD-107/VAI-101/LC-112 already use). Without this,
+  `repo_observability_initialized`'s `instrument_kwarg` half was unreachable —
+  a Pydantic AI project instrumented only via `instrument=True` would
+  misclassify as "imported but never initialized" and misfire `OBS-001`.
+  Mirrored to `ScanResult.Observability` so a scan can report the positive
+  signal (e.g. `langfuse · init · app/tracing.py:12`), not only findings.
+  Additive inventory — like `Dependencies`, it is **not** folded into `ScanID`.
+
+  The **declared** half of the picture comes from recon, not this pass:
+  `detectObsDeps` (`internal/ingestion/normalizer.go`) needle-scans the root
+  dependency manifests into `RepoProfile.ObsDeps`, kept separate from `SDKDeps`
+  so `META-002` cannot fire on a tracing dep. A declared dep never satisfies
+  `repo_has_observability` — that needs a code signal — but
+  `repo_observability_declared` reads it directly, which is what lets `OBS-005`
+  separate "ships a tracing dependency and never wired it" (medium) from "never
+  tried" (the absence rules, low). That predicate counts only hand-edited
+  manifests (`pyproject.toml`, `requirements.txt`, `Pipfile`, `package.json`);
+  `poetry.lock` is excluded because a lock file carries the transitive closure,
+  where a match proves nobody's intent.
+
 - **DiscoverSubagents** (`subagents.go`) — **hybrid** discovery in two passes.
   Pass 1 reads every `.claude/agents/*.md` component (matched at any path depth
   — monorepos that nest agent projects under `agent/.claude/agents/` or
@@ -1397,10 +1453,12 @@ classDiagram
 RepoProfile {
     Languages []Language   // detected by file extension
     SDKDeps   []SDKDep     // declared deps (from manifests)
+    ObsDeps   []ObsDep     // declared observability deps (from manifests)
     Manifest  ScanManifest // file inventory + discovered components
 }
 
 SDKDep { Name, Source string; Confidence float64 }
+ObsDep { Vendor ObservabilityVendor; Source string; Confidence float64 }
 SDK = "claude_agent_sdk" | "openai_agents" | "mcp" | "openshell" | "google_adk"
 
 // Inventory output
@@ -1422,6 +1480,7 @@ RepoInventory {
     HasShellInvocations bool      // any Python function calling subprocess.* / os.system / os.popen ("openshell" risk surface, not an SDK)
     Manifest            ScanManifest
     UsesDefaultTracing  bool
+    ObservabilitySignals []ObservabilitySignal // vendor + Kind (import/init/exporter/content_capture/instrument_kwarg), sorted by (File, StartLine, Vendor, Kind)
 }
 
 // deriveSDKsDetected (internal/scanner/scanner.go) folds markdown subagent

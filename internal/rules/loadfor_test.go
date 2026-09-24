@@ -76,3 +76,31 @@ rules:
 		t.Errorf("skipped = %v, want [FUT-001]", skipped)
 	}
 }
+
+// The observability pack is cross-SDK: its category is not an SDK, so the
+// SDK-driven pack gate would drop it entirely and OBS-001..003 could never
+// fire. It must load unconditionally (like openshell and claude_skill); its
+// rules stay gated by their own applies_to and predicates.
+func TestLoadFor_LoadsObservabilityPackUnconditionally(t *testing.T) {
+	reg, _, err := rules.LoadFor(fixtureFS(t), []models.SDK{models.SDKOpenAIAgents})
+	if err != nil {
+		t.Fatalf("LoadFor: %v", err)
+	}
+	profile := models.RepoProfile{Languages: []models.Language{models.LanguagePython}}
+	inv := models.RepoInventory{
+		SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+		Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		ObservabilitySignals: []models.ObservabilitySignal{
+			{Vendor: models.VendorLangfuse, Kind: models.ObsSignalImport, File: "app.py", StartLine: 1},
+		},
+	}
+	var sawOBS bool
+	for _, f := range reg.Run(profile, inv, nil, nil) {
+		if f.RuleID == "OBS-001" {
+			sawOBS = true
+		}
+	}
+	if !sawOBS {
+		t.Fatal("OBS-001 did not fire: the observability pack was not loaded by LoadFor")
+	}
+}

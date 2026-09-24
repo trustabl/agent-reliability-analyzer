@@ -396,6 +396,14 @@ func Run(cfg Config) (models.ScanResult, error) {
 	allParsed = append(allParsed, phpFiles...)
 	allParsed = append(allParsed, rustFiles...)
 	analysis.ResolveEdges(&inventory, allParsed)
+	// Observability signals span Python and TS/JS, so they are computed from
+	// allParsed rather than the Python-only `parsed` slice that
+	// computeUsesDefaultTracing uses. DiscoverObservability ignores every other
+	// language by extension.
+	inventory.ObservabilitySignals = analysis.MergeObservabilitySignals(
+		analysis.DiscoverObservability(allParsed),
+		analysis.DiscoverAgentObservabilitySignals(agents),
+	)
 	inventory.Subagents = analysis.DiscoverSubagents(profile.Manifest)
 	inventory.Skills = analysis.DiscoverSkills(profile.Manifest)
 	inventory.Dependencies = analysis.DiscoverDependencies(profile.Manifest.RepoRoot)
@@ -546,6 +554,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 		Subagents:           inventory.Subagents,
 		Skills:              inventory.Skills,
 		Dependencies:        inventory.Dependencies,
+		Observability:       inventory.ObservabilitySignals,
 		Vulnerabilities:     vulns,
 		Secrets:             secrets,
 		SlashCommands:       inventory.SlashCommands,

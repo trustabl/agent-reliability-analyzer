@@ -490,3 +490,38 @@ func TestDetectSDKDeps_NemoAgentToolkitAbsent(t *testing.T) {
 		}
 	}
 }
+
+// Observability deps are a SEPARATE recon signal from SDK deps: folding them
+// into SDKDeps would make META-002 ("declared but unused in code") fire forever
+// on every repo that declares an observability package.
+func TestDetectObsDeps_FindsVendorsAndIgnoresAgentSDKs(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("langfuse==2.0.0\nopenai-agents\nopentelemetry-sdk\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := detectObsDeps(dir)
+	want := []models.ObsDep{
+		{Vendor: models.VendorLangfuse, Source: "requirements.txt", Confidence: 0.9},
+		{Vendor: models.VendorOTel, Source: "requirements.txt", Confidence: 0.9},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d deps %+v, want %d", len(got), got, len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestDetectObsDeps_NoObservabilityDeclared(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("openai-agents\nfastapi\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectObsDeps(dir); len(got) != 0 {
+		t.Fatalf("got %+v, want no observability deps", got)
+	}
+}

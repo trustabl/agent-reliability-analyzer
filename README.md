@@ -113,6 +113,7 @@ The failures are rarely exotic. They are the same handful of gaps, over and over
 - An agent holding shell tools with **no input guardrails**
 - A tool making an HTTP call with **no timeout**, hanging the whole run
 - **Untyped tool parameters**, so the model guesses and guesses wrong
+- **No observability wired at all**, so the first three have no trace to read
 - A tool description so vague the model calls the wrong tool — 56% of MCP tool
   descriptions fail to state their purpose clearly, and 97.1% carry at least one
   description defect (Hasan et al., *MCP Tool Descriptions Are Smelly!*,
@@ -395,6 +396,15 @@ files in the scanned repo. Each run produces a `ScanResult` containing:
 - **The discovered inventory** — tools, agents, hosted tools, MCP
   servers, subagents, skills, slash commands, plugin manifests, and
   Claude settings — surfaced at the top level for CI consumers.
+- **Observability signals** (`observability`) — the instrumentation found in
+  code, one record per fact: the vendor (OpenTelemetry, Langfuse, Logfire,
+  Phoenix/OpenInference, OpenLLMetry, Braintrust, Weave, AgentOps, MLflow,
+  Datadog LLM Observability, LangSmith) and whether it is merely **imported** or
+  actually **initialized**, with the file and line. That distinction is the
+  point: a repo that imports a tracing SDK and never starts it looks
+  instrumented in its manifest and produces no traces at all. Detected
+  statically in Python and TypeScript/JavaScript only — Trustabl does not ingest
+  runtime traces.
 
 ### The summary's tool surface, broken out
 
@@ -843,7 +853,7 @@ trustabl rules pull
 
 # Validate a local rule-pack directory against this build's schema (CI gate
 # for the agent-reliability-rules repo — strict-loads every pack, fails on the first error)
-trustabl rules validate ./trustabl-rules
+trustabl rules validate ./agent-reliability-rules
 
 # Use a custom rules repo, or pin a specific released ruleset (env: TRUSTABL_RULES_REPO).
 # Default pulls the latest reviewed rules from agent-reliability-rules main; pin a tag for stability.
