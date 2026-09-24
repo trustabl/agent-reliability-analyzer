@@ -38,10 +38,18 @@ Trustabl analyses MCP servers as a first-class scope: tool annotations, caller-
 controlled URLs, missing titles, and tools that shell out.
 
 Trustabl also ships an MCP server of its own, so an agent can run a scan as a
-tool call. Sources:
+tool call. It is built into the CLI — `trustabl mcp` runs a stdio MCP server
+exposing a `scan` tool backed by the same analysis as `trustabl scan`:
 
-- Server: [trustabl/trustabl-cursor](https://github.com/trustabl/trustabl-cursor)
-- Registry listing: in progress
+```json
+{
+  "mcpServers": {
+    "trustabl": { "command": "trustabl", "args": ["mcp"] }
+  }
+}
+```
+
+Registry listing: not listed.
 
 ---
 
