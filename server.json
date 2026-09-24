@@ -1,0 +1,53 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.trustabl/agent-reliability-analyzer",
+  "title": "Trustabl",
+  "description": "Find and fix reliability and safety gaps in agent code, across nine agent SDKs.",
+  "version": "0.1.11",
+  "repository": {
+    "url": "https://github.com/trustabl/agent-reliability-analyzer",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/trustabl/agent-reliability-analyzer:0.1.11",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--rm"
+        },
+        {
+          "type": "named",
+          "name": "-i"
+        },
+        {
+          "type": "named",
+          "name": "-v",
+          "value": "{source_path}:/workspace:ro",
+          "variables": {
+            "source_path": {
+              "description": "Absolute path to the repository you want Trustabl to scan",
+              "format": "filepath",
+              "isRequired": true
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "-w",
+          "value": "/workspace"
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ]
+    }
+  ]
+}

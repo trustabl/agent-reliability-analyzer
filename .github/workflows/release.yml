@@ -130,3 +130,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          # The MCP Registry verifies OCI ownership by reading
+          # io.modelcontextprotocol.server.name and matching it against `name` in
+          # server.json. The Dockerfile LABEL only reaches each per-arch image
+          # config; on a multi-arch build the OCI index carries no such
+          # annotation, so set it here too. Keep all three in sync.
+          annotations: |
+            index:io.modelcontextprotocol.server.name=io.github.trustabl/agent-reliability-analyzer
+            manifest:io.modelcontextprotocol.server.name=io.github.trustabl/agent-reliability-analyzer
