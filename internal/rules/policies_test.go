@@ -3213,7 +3213,7 @@ var policyRepoRuleCases = []policyRepoCase{
 		false},
 
 	// ─── CSDK-202 session permission_mode bypass (repo-scoped) ───────────────
-	{"CSDK-202 fires when ClaudeAgentOptions permission_mode is bypassPermissions", "CSDK-202",
+	{"CSDK-202 fires when ClaudeAgentOptions permission_mode is bypassPermissions with no deny-list", "CSDK-202",
 		models.RepoProfile{},
 		models.RepoInventory{
 			SDKsDetected:       []models.SDK{models.SDKClaudeAgentSDK},
@@ -3233,6 +3233,61 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoInventory{
 			SDKsDetected:       []models.SDK{models.SDKClaudeAgentSDK},
 			ClaudeAgentOptions: []models.ClaudeAgentOptionsDef{{}},
+		},
+		false},
+	// CSDK-202 now correlates permission_mode and disallowed_tools at the SAME
+	// construction site: a deny-list present at that site silences it.
+	{"CSDK-202 silent when disallowed_tools is set alongside bypassPermissions", "CSDK-202",
+		models.RepoProfile{},
+		models.RepoInventory{
+			SDKsDetected:       []models.SDK{models.SDKClaudeAgentSDK},
+			ClaudeAgentOptions: []models.ClaudeAgentOptionsDef{optionsWithModeAndDisallowedTools("bypassPermissions", "Bash")},
+		},
+		false},
+	// A repo-wide absence check would be silenced here because SOME
+	// construction sets a deny-list — but the risky bypassPermissions site
+	// has none, so the per-site correlation must still fire.
+	{"CSDK-202 fires when one of several sites bypasses with no deny-list even though another has one", "CSDK-202",
+		models.RepoProfile{},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKClaudeAgentSDK},
+			ClaudeAgentOptions: []models.ClaudeAgentOptionsDef{
+				optionsWithModeAndDisallowedTools("acceptEdits", "Bash"),
+				optionsWithPermissionMode("bypassPermissions"),
+			},
+		},
+		true},
+	// Opaque sites are NOT skipped by repo_claude_options_mode_without_kwarg —
+	// a deny-list hidden inside the ** unpack is not one this engine can see,
+	// so it reads as absent at this specific site.
+	{"CSDK-202 fires when the only bypassPermissions site is opaque with no visible deny-list", "CSDK-202",
+		models.RepoProfile{},
+		models.RepoInventory{
+			SDKsDetected:       []models.SDK{models.SDKClaudeAgentSDK},
+			ClaudeAgentOptions: []models.ClaudeAgentOptionsDef{opaqueOptionsWithPermissionMode("bypassPermissions")},
+		},
+		true},
+
+	// ─── CSDK-206 bypassPermissions with a deny-list present (repo-scoped) ───
+	{"CSDK-206 fires when bypassPermissions is paired with a deny-list", "CSDK-206",
+		models.RepoProfile{},
+		models.RepoInventory{
+			SDKsDetected:       []models.SDK{models.SDKClaudeAgentSDK},
+			ClaudeAgentOptions: []models.ClaudeAgentOptionsDef{optionsWithModeAndDisallowedTools("bypassPermissions", "Bash")},
+		},
+		true},
+	{"CSDK-206 silent when bypassPermissions has no deny-list (CSDK-202's rule, not this one)", "CSDK-206",
+		models.RepoProfile{},
+		models.RepoInventory{
+			SDKsDetected:       []models.SDK{models.SDKClaudeAgentSDK},
+			ClaudeAgentOptions: []models.ClaudeAgentOptionsDef{optionsWithPermissionMode("bypassPermissions")},
+		},
+		false},
+	{"CSDK-206 silent when there is no bypassPermissions anywhere", "CSDK-206",
+		models.RepoProfile{},
+		models.RepoInventory{
+			SDKsDetected:       []models.SDK{models.SDKClaudeAgentSDK},
+			ClaudeAgentOptions: []models.ClaudeAgentOptionsDef{optionsWithModeAndDisallowedTools("acceptEdits", "Bash")},
 		},
 		false},
 
@@ -3930,18 +3985,39 @@ var policySkillRuleCases = []policySkillCase{
 	{"CSKILL-080 fires when the name claims a crypto operation", "CSKILL-080",
 		models.SkillDef{Name: "encrypt-helper",
 			Location: models.Location{FilePath: ".claude/skills/encrypt-helper/SKILL.md"}}, models.RepoInventory{}, true},
+	{"CSKILL-080 fires when the description claims signing", "CSKILL-080",
+		models.SkillDef{Name: "release-helper", Description: "Signs release artifacts with Ed25519.",
+			Location: models.Location{FilePath: ".claude/skills/release-helper/SKILL.md"}}, models.RepoInventory{}, true},
 	{"CSKILL-080 silent when the name and description have no crypto terms", "CSKILL-080",
 		models.SkillDef{Name: "helper", Description: "Summarises the current git diff.",
 			Location: models.Location{FilePath: ".claude/skills/helper/SKILL.md"}}, models.RepoInventory{}, false},
+	{"CSKILL-080 silent on substring artifacts (design/assigns/signal)", "CSKILL-080",
+		models.SkillDef{Name: "design-helper", Description: "Design system helper; assigns signal handlers.",
+			Location: models.Location{FilePath: ".claude/skills/design-helper/SKILL.md"}}, models.RepoInventory{}, false},
+	{"CSKILL-080 silent when a crypto term appears only as a documentation example", "CSKILL-080",
+		models.SkillDef{Name: "helper", Description: "For example, hash a string using the utils module.",
+			Location: models.Location{FilePath: ".claude/skills/helper/SKILL.md"}}, models.RepoInventory{}, false},
 
-	{"CSKILL-081 fires when the body names a sensitive data class", "CSKILL-081",
+	{"CSKILL-081 fires when the body names a sensitive data class with an operational verb", "CSKILL-081",
 		models.SkillDef{Name: "helper",
 			Location: models.Location{FilePath: ".claude/skills/helper/SKILL.md"},
 			Body:     "# Helper\n\nReads the user's password from the config file."}, models.RepoInventory{}, true},
+	{"CSKILL-081 fires when the body claims to encrypt credentials", "CSKILL-081",
+		models.SkillDef{Name: "helper",
+			Location: models.Location{FilePath: ".claude/skills/helper/SKILL.md"},
+			Body:     "# Helper\n\nThe skill encrypts credentials before storing them."}, models.RepoInventory{}, true},
 	{"CSKILL-081 silent when the body and description name no sensitive data", "CSKILL-081",
 		models.SkillDef{Name: "helper",
 			Location: models.Location{FilePath: ".claude/skills/helper/SKILL.md"},
 			Body:     "# Helper\n\nSummarises the current git diff."}, models.RepoInventory{}, false},
+	{"CSKILL-081 silent when a credential class is only named, not handled", "CSKILL-081",
+		models.SkillDef{Name: "helper",
+			Location: models.Location{FilePath: ".claude/skills/helper/SKILL.md"},
+			Body:     "# Helper\n\nAPI keys live in GitHub Actions secrets."}, models.RepoInventory{}, false},
+	{"CSKILL-081 silent on a substring artifact (case-insensitive)", "CSKILL-081",
+		models.SkillDef{Name: "helper",
+			Location: models.Location{FilePath: ".claude/skills/helper/SKILL.md"},
+			Body:     "# Helper\n\nMatching is case-insensitive."}, models.RepoInventory{}, false},
 
 	{"CSKILL-082 fires when a security-purpose skill grants Bash", "CSKILL-082",
 		models.SkillDef{Name: "security-audit",
@@ -5027,6 +5103,46 @@ var policyAgentRuleCases = []policyAgentCase{
 		},
 		models.RepoInventory{},
 		false},
+	{"CSDK-103 fires on bypassPermissions with Bash explicitly granted", "CSDK-103",
+		models.AgentDef{
+			SDK:      models.SDKClaudeAgentSDK,
+			Class:    "AgentDefinition",
+			Language: models.LanguagePython,
+			Name:     "worker",
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"permissionMode": {Value: &models.Expr{Kind: models.ExprLiteralString, Text: `"bypassPermissions"`}},
+				"tools": {Value: &models.Expr{Kind: models.ExprList, List: []models.Expr{
+					{Kind: models.ExprLiteralString, Text: `"Bash"`},
+				}}},
+			},
+			},
+			ToolRefs: []models.ToolRef{{Name: `"Bash"`, External: true}},
+		},
+		models.RepoInventory{},
+		true},
+	{"CSDK-103 silent on bypassPermissions with a read-only tools list", "CSDK-103",
+		models.AgentDef{
+			SDK:      models.SDKClaudeAgentSDK,
+			Class:    "AgentDefinition",
+			Language: models.LanguagePython,
+			Name:     "worker",
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"permissionMode": {Value: &models.Expr{Kind: models.ExprLiteralString, Text: `"bypassPermissions"`}},
+				"tools": {Value: &models.Expr{Kind: models.ExprList, List: []models.Expr{
+					{Kind: models.ExprLiteralString, Text: `"Read"`},
+					{Kind: models.ExprLiteralString, Text: `"Grep"`},
+					{Kind: models.ExprLiteralString, Text: `"Glob"`},
+				}}},
+			},
+			},
+			ToolRefs: []models.ToolRef{
+				{Name: `"Read"`, External: true},
+				{Name: `"Grep"`, External: true},
+				{Name: `"Glob"`, External: true},
+			},
+		},
+		models.RepoInventory{},
+		false},
 
 	// ─── CSDK-104 subagent granted Write/Edit ─────────────────────────────────
 	{"CSDK-104 fires when AgentDefinition grants Edit", "CSDK-104",
@@ -5623,6 +5739,39 @@ var policyAgentRuleCases = []policyAgentCase{
 		agent: parseTSAgentInline("import { query } from \"@anthropic-ai/claude-agent-sdk\";\n" +
 			"const a: AgentDefinition = { description: \"x\", prompt: \"y\", permissionMode: \"default\" };\n"),
 	},
+	{"CSDK-120 fires on bypassPermissions with Bash explicitly granted", "CSDK-120",
+		models.AgentDef{
+			SDK:      models.SDKClaudeAgentSDK,
+			Class:    "AgentDefinition",
+			Language: models.LanguageTypeScript,
+			Name:     "opsAgent",
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"permissionMode": {Value: &models.Expr{Kind: models.ExprLiteralString, Text: `"bypassPermissions"`}},
+				"tools": {Value: &models.Expr{Kind: models.ExprList, List: []models.Expr{
+					{Kind: models.ExprLiteralString, Text: `"Bash"`},
+				}}},
+			}},
+			ToolRefs: []models.ToolRef{{Name: `"Bash"`, External: true}},
+		},
+		models.RepoInventory{},
+		true},
+	{"CSDK-120 silent on bypassPermissions with a read-only tools list", "CSDK-120",
+		models.AgentDef{
+			SDK:      models.SDKClaudeAgentSDK,
+			Class:    "AgentDefinition",
+			Language: models.LanguageTypeScript,
+			Name:     "reader",
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"permissionMode": {Value: &models.Expr{Kind: models.ExprLiteralString, Text: `"bypassPermissions"`}},
+				"tools": {Value: &models.Expr{Kind: models.ExprList, List: []models.Expr{
+					{Kind: models.ExprLiteralString, Text: `"Read"`},
+					{Kind: models.ExprLiteralString, Text: `"Grep"`},
+				}}},
+			}},
+			ToolRefs: []models.ToolRef{{Name: `"Read"`, External: true}, {Name: `"Grep"`, External: true}},
+		},
+		models.RepoInventory{},
+		false},
 
 	// ─── CSDK-130 query() main agent granted Bash ────────────────────────────
 	{"CSDK-130 fires when query main agent allows Bash", "CSDK-130",

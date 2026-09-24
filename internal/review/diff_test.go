@@ -328,6 +328,71 @@ func TestRender_NonToolFindingsAppearUnderRepoWide(t *testing.T) {
 	}
 }
 
+// TestRender_TestPathFindingsGetOwnSection verifies the test-fixture vs.
+// production classification (internal/pathclass): a finding whose Origin is
+// models.OriginTest must not appear in the scored "Findings" groups (those
+// mirror result.Surfaces, which is already the production-only set) and must
+// instead render under its own trailing "Test-path findings" section.
+func TestRender_TestPathFindingsGetOwnSection(t *testing.T) {
+	result := models.ScanResult{
+		Repo: "./fixture",
+		Tools: []models.ToolDef{
+			{Name: "search", Kind: models.KindClaudeSDKTool, Language: models.LanguagePython},
+		},
+		Surfaces: []models.SurfaceReadiness{
+			{Kind: models.ScopeTool, Name: "search", Score: 1.0},
+		},
+		Findings: []models.Finding{
+			{
+				RuleID:       "OAI-042",
+				ToolName:     "search",
+				Severity:     models.SeverityHigh,
+				Title:        "production finding",
+				Explanation:  "shipped in production",
+				SuggestedFix: "fix it",
+				Confidence:   1.0,
+			},
+			{
+				RuleID:       "OAI-042",
+				ToolName:     "search",
+				FilePath:     "tests/agentcheck/test_openai_adapter.py",
+				Severity:     models.SeverityHigh,
+				Title:        "test-fixture finding",
+				Explanation:  "declared in a test fixture",
+				SuggestedFix: "fix it too",
+				Confidence:   1.0,
+				Origin:       models.OriginTest,
+			},
+		},
+		OverallScore: 1.0,
+	}
+
+	out := (&review.Renderer{NoColor: true}).Render(result)
+
+	if !strings.Contains(out, "Test-path findings (not scored)") {
+		t.Errorf("expected a trailing test-path findings section\n---\n%s", out)
+	}
+	if !strings.Contains(out, "test-fixture finding") {
+		t.Errorf("test-path finding title missing from human output\n---\n%s", out)
+	}
+	if !strings.Contains(out, "production finding") {
+		t.Errorf("production finding title missing from human output\n---\n%s", out)
+	}
+
+	// The test-path finding's title must appear strictly after the
+	// "Test-path findings" header, not mixed into the scored "search" group
+	// above it.
+	sectionIdx := strings.Index(out, "Test-path findings (not scored)")
+	testFindingIdx := strings.Index(out, "test-fixture finding")
+	prodFindingIdx := strings.Index(out, "production finding")
+	if testFindingIdx < sectionIdx {
+		t.Errorf("test-path finding rendered before its section header\n---\n%s", out)
+	}
+	if prodFindingIdx > sectionIdx {
+		t.Errorf("production finding rendered after the test-path section header, expected it in the scored group above\n---\n%s", out)
+	}
+}
+
 // TestRenderer_PrintsLineRange verifies that multi-line inventory entities
 // (agents, subagents, ClaudeSettings) render as "file:start-end" in the human
 // output, and that single-line entities (EndLine == Line) collapse to "file:N"

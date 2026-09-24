@@ -218,6 +218,53 @@ func TestResultFromFinding_LocatedToolFinding(t *testing.T) {
 	}
 }
 
+// TestResultFromFinding_TestOriginSuppressed covers the test-fixture vs.
+// production classification: a finding whose Origin is models.OriginTest
+// must carry an "origin" property and a result.suppressions entry, while a
+// production finding (Origin == "") must carry neither — SARIF 2.1.0
+// consumers (GitHub code scanning) exclude a suppressed result from the
+// default alert view without the engine dropping it from the document.
+func TestResultFromFinding_TestOriginSuppressed(t *testing.T) {
+	f := models.Finding{
+		RuleID:    "OAI-005",
+		Severity:  models.SeverityHigh,
+		ToolName:  "web_search",
+		FilePath:  "tests/agentcheck/test_openai_adapter.py",
+		StartLine: 12, EndLine: 12,
+		Title:        "hosted tool with no allow-list",
+		Explanation:  "…",
+		SuggestedFix: "…",
+		Confidence:   0.85,
+		Origin:       models.OriginTest,
+	}
+	r := resultFromFinding(f, nil, false)
+
+	if r.Properties["origin"] != "test" {
+		t.Errorf(`Properties["origin"] = %v, want "test"`, r.Properties["origin"])
+	}
+	if len(r.Suppressions) != 1 {
+		t.Fatalf("Suppressions len = %d, want 1", len(r.Suppressions))
+	}
+	if r.Suppressions[0].Kind != "external" {
+		t.Errorf("Suppressions[0].Kind = %q, want %q", r.Suppressions[0].Kind, "external")
+	}
+	if r.Suppressions[0].Justification == "" {
+		t.Error("Suppressions[0].Justification is empty")
+	}
+
+	// A production finding (Origin == "") must carry neither property nor
+	// suppression — the wire format for existing scans must stay unchanged.
+	prod := f
+	prod.Origin = ""
+	rp := resultFromFinding(prod, nil, false)
+	if _, ok := rp.Properties["origin"]; ok {
+		t.Errorf("production finding unexpectedly carries an origin property: %v", rp.Properties["origin"])
+	}
+	if len(rp.Suppressions) != 0 {
+		t.Errorf("production finding unexpectedly carries suppressions: %+v", rp.Suppressions)
+	}
+}
+
 func TestResultFromFinding_RepoScopedFindingNoLocation(t *testing.T) {
 	// Repo-scoped rule findings come out of findingFromRule with FilePath=""
 	// and Line=0. Per D5: emit as kind="informational", omit locations.

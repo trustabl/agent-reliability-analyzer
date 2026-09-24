@@ -10,7 +10,11 @@ records Google ADK, the one class that shipped as a real rule first — see
 [ADK-111](../../testdata/rules-fixture/google_adk/agent_safety.yaml) —
 because ADK is the one SDK where an explicit allow-list genuinely narrows an
 otherwise-unbounded tool surface. Claude SDK's repo-scope half of Class 1
-shipped next, as **CSDK-205** — see below.
+shipped next, as **CSDK-205** — see below. Outreach feedback in September
+2026 asked to soften CSDK-201/202 based on `allowed_tools` scope; that
+premise was refuted against the SDK's own docs and the fix was retargeted
+onto `disallowed_tools` (**CSDK-202/206**) and `AgentDefinition.tools`
+(**CSDK-103/120**) — see "bypassPermissions + allowed_tools" below.
 
 ## Class 3 — LangChain: no permission-model concept (not applicable)
 
@@ -146,12 +150,67 @@ had for CSDK-204. Documented in the rulebook's confidence-gap section rather
 than fixed, since tightening it would also change CSDK-204's long-shipped
 behavior.
 
-### Claude SDK agent-scope: scoped, not yet built
+### bypassPermissions + allowed_tools: outreach feedback misdiagnosed the risky shape (2026-09-21)
+
+Outreach feedback reported CSDK-201/202 (bypassPermissions) as under-scoped:
+the ask was to only fire, or fire at reduced severity, when `allowed_tools` at
+the same site is empty or narrowly scoped — treating a narrow allow-list as a
+mitigating factor. **That premise does not survive verification against the
+Agent SDK's own reference docs:**
+
+> `allowed_tools`: "Tools to auto-approve without prompting. **This does not
+> restrict Claude to only these tools.** … Other unlisted tools fall through
+> to `permission_mode` and `can_use_tool`."
+
+So `bypassPermissions` + an empty/narrow `allowed_tools` is the **maximally**
+dangerous shape, not a mitigated one — implementing the request as specified
+would have shipped a false negative on the worst configuration. Two
+mechanisms genuinely do restrict, and the fix was retargeted onto them:
+
+- **`disallowed_tools`** on `ClaudeAgentOptions(...)` — "denies matching calls
+  in every permission mode, **including bypassPermissions**." **CSDK-202**
+  was changed from a bare `permission_mode` check to
+  `repo_claude_options_mode_without_kwarg` (new predicate,
+  `PredRepoClaudeOptionsModeWithoutKwarg`), which correlates `permission_mode`
+  and `disallowed_tools` at the SAME `ClaudeAgentOptions(...)` construction
+  site — the two prior separate repo-wide predicates
+  (`repo_claude_options_permission_mode_is` /
+  `repo_claude_options_disallowed_tools_missing`) would silently go quiet on
+  a repo with two options objects, one safe with a deny-list and one
+  `bypassPermissions` without, because *some* construction sets the kwarg.
+  New rule **CSDK-206** (medium/0.6) fires the complementary case:
+  `bypassPermissions` paired WITH a `disallowed_tools` deny-list at the same
+  site — the residual risk being that a deny-list is allow-by-default and
+  only as good as what it excludes.
+- **`AgentDefinition.tools`** (Python) / the TS `AgentDefinition`'s `tools`
+  field — unlike `allowed_tools`, this genuinely restricts: "a tool you leave
+  out isn't in the subagent's session at all." **CSDK-103** and **CSDK-120**
+  (previously bare `permissionMode == bypassPermissions` checks) now add a
+  co-check: fire only when `tools` is omitted (inherits every tool available
+  to subagents) or grants a side-effecting/exfiltration-capable built-in
+  (Bash, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent, Task); go
+  silent on a genuinely read-only `tools` list (Read/Grep/Glob), matching the
+  precedent CSDK-111 already set for subagent markdown frontmatter.
+
+CSDK-201 (`.claude/settings.json` `defaultMode`) is unchanged: its
+`permissions.allow` has the same auto-approve-only semantics as
+`allowed_tools`, so there is no honest co-check to add there either.
+
+No schema/predicate change was needed for CSDK-103/120 (built entirely from
+the existing `agent_kwarg_missing` / `agent_grants_builtin_tool` predicates).
+CSDK-202/206 required the new `repo_claude_options_mode_without_kwarg`
+predicate (`schema_version` 17 → 18) because the risk is a per-construction-
+site correlation that neither existing repo-wide predicate could express.
+
+### Claude SDK agent-scope: bypassPermissions co-check shipped (CSDK-103/120); acceptEdits mirror still unbuilt
 
 There are two separate places `permission_mode` / `disallowed_tools` can
 appear in a Claude SDK codebase; the repo-scope one (`ClaudeAgentOptions(...)`
-session config) is now covered by CSDK-205 above. The agent-scope one remains
-scoped but unbuilt:
+session config) is now covered by CSDK-205 (and CSDK-202/206, above) The
+agent-scope `bypassPermissions` + `tools` co-check is now shipped as CSDK-103
+(Python) / CSDK-120 (TS) — see the section above. The distinct `acceptEdits`
+mirror sketched below (an agent-scope analogue of CSDK-205, not of
+CSDK-103/120) remains scoped but unbuilt:
 
 **`AgentDefinition(...)` in Python, or a `query(...)` main-agent's inline
 `options` in TS.** These constructors' kwargs land on `AgentDef.Kwargs`

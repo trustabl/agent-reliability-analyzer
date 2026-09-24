@@ -20,29 +20,34 @@ rules:
       - claude_skill
     scope: skill
     match:
-      any:
-        - skill_name_has_text:
-            - crypto
-            - encrypt
-            - decrypt
-            - sign
-            - hash
-            - certificate
-            - signing
-            - cipher
-            - asymmetric
-            - symmetric
-        - skill_description_has_text:
-            - crypto
-            - encrypt
-            - decrypt
-            - sign
-            - hash
-            - certificate
-            - signing
-            - cipher
-            - asymmetric
-            - symmetric
+      skill_text_matches:
+        fields: [name, description]
+        terms:
+          - crypto
+          - cryptographic
+          - encrypt
+          - decrypt
+          - cipher
+          - certificate
+          - keypair
+          - private key
+          - sign
+          - signature
+          - hash
+          - hmac
+          - asymmetric
+          - symmetric
+        exclude_context:
+          - example
+          - for instance
+          - e.g.
+          - such as
+          - sample
+          - documented
+          - documentation
+          - see the
+          - refer to
+          - placeholder
     explanation: >
       This skill's name or description claims a cryptographic operation —
       encrypting, decrypting, signing, hashing, or certificate handling — but
@@ -51,6 +56,9 @@ rules:
       signature, or a hardcoded key all look like working code right up until
       they fail under attack, and a skill invoked without those specifics gives
       Claude no constraint to hold to when it writes the actual crypto code.
+      A mention that is clearly an example or a pointer to documentation (e.g.
+      "for instance, hash a string" or "see the crypto docs") does not count —
+      only a claim that the skill itself performs the operation does.
     fix: >
       State the exact primitive the skill uses (e.g. "AES-256-GCM via the
       `cryptography` library", "Ed25519 signing"), where keys or certificates
@@ -66,36 +74,63 @@ rules:
       - claude_skill
     scope: skill
     match:
-      any:
-        - skill_body_has_text:
-            - password
-            - secret
-            - token
-            - ssn
-            - credit card
-            - pii
-            - personal data
-            - sensitive
-            - confidential
-            - private key
-        - skill_description_has_text:
-            - password
-            - secret
-            - token
-            - ssn
-            - credit card
-            - pii
-            - personal data
-            - sensitive
-            - confidential
-            - private key
+      skill_text_matches:
+        fields: [description, body]
+        terms:
+          - password
+          - secret
+          - credential
+          - token
+          - api key
+          - ssn
+          - social security
+          - credit card
+          - pii
+          - personal data
+          - sensitive data
+          - confidential
+          - private key
+        require_context:
+          - read
+          - write
+          - store
+          - save
+          - send
+          - transmit
+          - collect
+          - process
+          - handle
+          - log
+          - extract
+          - parse
+          - redact
+          - encrypt
+          - upload
+          - post
+          - fetch
+          - retrieve
+          - access
+        exclude_context:
+          - lives in
+          - live in
+          - configured in
+          - see the
+          - documentation
+          - example
+          - for instance
+          - e.g.
     explanation: >
       This skill's body or description names a sensitive data class —
-      passwords, tokens, SSNs, credit card numbers, PII, or private keys —
-      without stating what it does with that data beyond naming it. Without an
-      explicit data-minimization boundary and a stated purpose, there is no way
-      to tell whether the skill only touches the fields the task actually
-      requires or whether it retains what it reads.
+      passwords, tokens, SSNs, credit card numbers, PII, or private keys — in
+      the same sentence as an operational verb (reads, stores, sends,
+      processes, ...), so it claims to actually handle that data rather than
+      merely mention it, without stating what it does with that data beyond
+      naming it. Without an explicit data-minimization boundary and a stated
+      purpose, there is no way to tell whether the skill only touches the
+      fields the task actually requires or whether it retains what it reads. A
+      sentence that only states where a credential already lives (e.g. "API
+      keys live in GitHub Actions secrets") does not count — only a claim that
+      the skill itself operates on the data does.
     fix: >
       Declare exactly which sensitive fields the skill reads, why it needs
       them, and how long it keeps them (ideally: not at all, beyond the current

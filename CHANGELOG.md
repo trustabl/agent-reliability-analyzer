@@ -8,6 +8,15 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Changed
 
+- **Test-path findings are excluded from scoring and the exit-code gate by
+  default.** A finding whose file matches a test-path pattern (`tests/`,
+  `__tests__/`, `testdata/`, `test_*.py`, `*_test.go`, `*.spec.ts`, …; see
+  `internal/pathclass`) is still reported in every format but no longer counts
+  toward `OverallScore`/`Surfaces` or fails the build — closing the reported
+  gap where a `WebSearchTool` declared in a test fixture scored identically to
+  one shipped in production. **This can change `overall_score` and the exit
+  code** for a repo whose only agent/tool surface lives under a test path; pass
+  `--include-test-paths` to restore the previous behavior exactly.
 - **`ScanID` now folds the rules origin.** A provenance tag
   (`signed:<channel>` / `unsigned:custom` / `unsigned:default`) is folded into
   `ScanID` so two scans of the same code with rules of different provenance get
@@ -28,6 +37,16 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Added
 
+- **`--include-test-paths` flag and `Finding.Origin`.** New `internal/pathclass`
+  package classifies a finding's `FilePath` as production or test code by path
+  shape. `Finding` gains an additive `origin` JSON field (`omitempty`, so
+  production findings are wire-identical to before); the SARIF output gains a
+  matching `properties.origin` plus a `result.suppressions` entry (GitHub code
+  scanning excludes it from the default alert view without dropping it from
+  the document); the human output gains a trailing "Test-path findings (not
+  scored)" section. `--include-test-paths` opts these findings back into
+  scoring and the exit code. See "Changed" below for the default-behavior
+  impact.
 - **`custom` LLM provider for self-hosted / local model servers.** `trustabl
   enrich` can now target any OpenAI-compatible endpoint (LiteLLM, vLLM, a local
   model server, etc.) instead of a hosted provider. Set `OPENAI_BASE_URL` to

@@ -157,6 +157,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoClaudeOptionsDisallowedToolsMissing != nil && PredRepoClaudeOptionsDisallowedToolsMissing(inv) != *e.RepoClaudeOptionsDisallowedToolsMissing {
 		return false
 	}
+	if e.RepoClaudeOptionsModeWithoutKwarg != nil && !PredRepoClaudeOptionsModeWithoutKwarg(*e.RepoClaudeOptionsModeWithoutKwarg, inv) {
+		return false
+	}
 	return true
 }
 
@@ -276,6 +279,9 @@ func (e MatchExpr) EvaluateSkill(s models.SkillDef, inv models.RepoInventory) bo
 		return false
 	}
 	if len(e.SkillDescriptionHasText) > 0 && !PredSkillDescriptionHasText(e.SkillDescriptionHasText, s) {
+		return false
+	}
+	if e.SkillTextMatches != nil && !PredSkillTextMatches(*e.SkillTextMatches, s) {
 		return false
 	}
 	return true
@@ -448,6 +454,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"skill_body_has_text":                           true,
 		"skill_name_has_text":                           true,
 		"skill_description_has_text":                    true,
+		"skill_text_matches":                            true,
 	},
 	models.ScopeRepo: {
 		"repo_has_sdk_in_code":   true,
@@ -456,6 +463,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_claude_options_permission_mode_is":       true,
 		"repo_claude_options_max_turns_missing":        true,
 		"repo_claude_options_disallowed_tools_missing": true,
+		"repo_claude_options_mode_without_kwarg":       true,
 		"repo_has_observability":                       true,
 		"repo_observability_inspectable":               true,
 		"repo_observability_initialized":               true,
@@ -536,6 +544,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(len(e.SkillBodyHasText) > 0, "skill_body_has_text")
 	add(len(e.SkillNameHasText) > 0, "skill_name_has_text")
 	add(len(e.SkillDescriptionHasText) > 0, "skill_description_has_text")
+	add(e.SkillTextMatches != nil, "skill_text_matches")
 	// Repo scope
 	add(len(e.RepoHasSDKInCode) > 0, "repo_has_sdk_in_code")
 	add(len(e.RepoComponentPresent) > 0, "repo_component_present")
@@ -544,6 +553,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(len(e.RepoClaudeOptionsPermissionModeIs) > 0, "repo_claude_options_permission_mode_is")
 	add(e.RepoClaudeOptionsMaxTurnsMissing != nil, "repo_claude_options_max_turns_missing")
 	add(e.RepoClaudeOptionsDisallowedToolsMissing != nil, "repo_claude_options_disallowed_tools_missing")
+	add(e.RepoClaudeOptionsModeWithoutKwarg != nil, "repo_claude_options_mode_without_kwarg")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")

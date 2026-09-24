@@ -34,29 +34,75 @@ rules:
       Reserve bypassPermissions for disposable sandboxes, never a shared repo.
 
   - id: CSDK-202
-    title: Session permission mode bypasses approvals
+    title: Session permission mode bypasses approvals with no tool deny-list
     severity: high
     confidence: 0.9
     applies_to:
       - claude_sdk
     scope: repo
     match:
-      repo_claude_options_permission_mode_is:
-        - bypassPermissions
+      repo_claude_options_mode_without_kwarg:
+        modes:
+          - bypassPermissions
+        kwarg: disallowed_tools
     explanation: >
       A ClaudeAgentOptions(...) in this project sets permission_mode to
       "bypassPermissions", which turns off Claude Code's approval prompts for
-      that session. Every tool the agent can call — file writes, shell
-      commands, network fetches — then runs with no human in the loop, so a
+      that session, and the same construction sets no disallowed_tools.
+      allowed_tools does not help here — it only auto-approves tools, it does
+      not restrict which ones can run, so an empty or narrow allowed_tools
+      list alongside bypassPermissions is not a mitigation. Every tool the
+      agent can call — file writes, shell commands, network fetches — then
+      runs with no human in the loop and nothing bounding the surface, so a
       single prompt-injection or model error becomes an unguarded action. This
       is the in-code, session-level form of the settings.json defaultMode
       bypass (CSDK-201), and is where most applications actually enable it.
     fix: >
       Drop permission_mode="bypassPermissions" from the ClaudeAgentOptions(...)
       call, or set it to "default" so tool calls prompt (or "acceptEdits" to
-      auto-approve only file edits while still gating shell and network access).
-      Reserve bypassPermissions for disposable sandboxes, never code that runs
-      on a developer's or user's machine.
+      auto-approve only file edits while still gating shell and network
+      access). If bypassPermissions is genuinely required, pass
+      disallowed_tools= naming at minimum shell execution and any tool that
+      reaches the network or credentials — disallowed_tools denies matching
+      calls in every permission mode, including bypassPermissions, so it is
+      the one control that still bounds the surface. Reserve bypassPermissions
+      for disposable sandboxes, never code that runs on a developer's or
+      user's machine.
+
+  - id: CSDK-206
+    title: Session bypasses approvals with a deny-list that still leaves a broad surface
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - claude_sdk
+    scope: repo
+    match:
+      all:
+        - repo_claude_options_permission_mode_is:
+            - bypassPermissions
+        - not:
+            repo_claude_options_mode_without_kwarg:
+              modes:
+                - bypassPermissions
+              kwarg: disallowed_tools
+    explanation: >
+      A ClaudeAgentOptions(...) in this project sets permission_mode to
+      "bypassPermissions" and the same construction sets disallowed_tools, so
+      the named tools are denied in every permission mode including
+      bypassPermissions — a real, SDK-enforced bound on the tool surface, not
+      just an auto-approve list. The residual risk is what disallowed_tools
+      does not name: allowed_tools only auto-approves and does not restrict,
+      so every tool not on the deny-list still runs with no human approval
+      step at all under bypassPermissions. A deny-list is allow-by-default —
+      it is only as good as the completeness of what it excludes.
+    fix: >
+      Review the disallowed_tools list against every tool this session can
+      reach and confirm it denies shell execution and anything that touches
+      the network or credentials, not just an obvious tool or two. If the
+      session's actual tool needs are narrow, prefer naming them explicitly
+      with allowed_tools alongside a non-bypass permission_mode ("default" or
+      "acceptEdits") instead of relying on bypassPermissions plus a deny-list
+      to cover everything else.
 
   - id: CSDK-204
     title: Claude Agent SDK session sets no explicit max_turns limit

@@ -1233,6 +1233,138 @@ func PredSkillDescriptionHasText(needles []string, s models.SkillDef) bool {
 	return false
 }
 
+// skillSentenceSplitRe splits skill text into sentences on terminal
+// punctuation, newlines, and markdown list-item / heading starts — the same
+// granularity a human reviewer reads a SKILL.md at. It intentionally
+// over-splits (e.g. on a decimal point) rather than under-split: a false
+// sentence boundary only costs PredSkillTextMatches a same-sentence
+// require_context hit, which is a false negative on an already-narrow
+// predicate, not a false positive.
+var skillSentenceSplitRe = regexp.MustCompile(`(?m)[.!?\n]+|^\s*[-*+]\s+|^\s*#{1,6}\s+`)
+
+// skillAbbreviationReplacer strips the internal periods from "e.g." and
+// "i.e." (case already normalized to lower by the caller) before sentence
+// splitting, so the split on "." above does not fragment an abbreviation —
+// and, applied identically to a term, lets a rule list "e.g." as a literal
+// exclude_context phrase and have it survive to be matched.
+var skillAbbreviationReplacer = strings.NewReplacer("e.g.", "eg", "i.e.", "ie")
+
+// skillWordCharProse and skillWordCharSlug classify which runes count as
+// "inside a word" for boundary matching, per SkillTextMatchExpr's field-
+// dependent boundary rule: a skill name is a kebab/snake slug where "-"/"_"
+// are separators ("encrypt-helper" must match "encrypt"), while description
+// and body are prose where "-" is a word character ("case-sensitive" must
+// NOT match "sensitive").
+func skillWordCharProse(r rune) bool {
+	return r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+}
+
+func skillWordCharSlug(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+}
+
+// skillSurfaceForms returns term plus its common verb/noun inflections
+// (-s, -es, -ed, -ing), so a term like "sign" or "store" also matches
+// "signs"/"signing" or "stores"/"storing" in skill text. A term ending in
+// "e" drops it before "-ed"/"-ing" (store -> storing/stored, not
+// storeing/storeed) — the standard English spelling rule for those verbs.
+// Bogus forms this generates for a non-verb term (e.g. "tokenes") are
+// harmless: they simply never occur in real text, so they never match.
+func skillSurfaceForms(term string) []string {
+	forms := []string{term}
+	if strings.HasSuffix(term, "e") && len(term) > 1 {
+		stem := term[:len(term)-1]
+		forms = append(forms, stem+"ed", stem+"ing")
+	} else {
+		forms = append(forms, term+"ed", term+"ing")
+	}
+	forms = append(forms, term+"s", term+"es")
+	return forms
+}
+
+// skillSentenceHasTerm reports whether sentence contains an exact,
+// word-boundary-delimited (per isWordChar) occurrence of term or one of its
+// inflected surface forms (skillSurfaceForms) — e.g. "sign" matches "signs"/
+// "signed"/"signing" but not "design"/"assign"/"signal", since those fail
+// the boundary check or don't equal any generated form. Both sentence and
+// term are matched case-insensitively; callers pass already-lowercased,
+// abbreviation-normalized input (see skillAbbreviationReplacer).
+func skillSentenceHasTerm(sentence, term string, isWordChar func(rune) bool) bool {
+	runes := []rune(sentence)
+	for _, form := range skillSurfaceForms(term) {
+		formRunes := []rune(form)
+		n, m := len(runes), len(formRunes)
+		for start := 0; start+m <= n; start++ {
+			if start > 0 && isWordChar(runes[start-1]) {
+				continue
+			}
+			if string(runes[start:start+m]) != form {
+				continue
+			}
+			end := start + m
+			if end == n || !isWordChar(runes[end]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// skillTextMatchesAny reports whether any term in terms has a word-boundary
+// hit anywhere in text (already-lowercased), using isWordChar for the
+// field's boundary rule.
+func skillTextMatchesAny(text string, terms []string, isWordChar func(rune) bool) bool {
+	for _, t := range terms {
+		term := skillAbbreviationReplacer.Replace(strings.ToLower(t))
+		if skillSentenceHasTerm(text, term, isWordChar) {
+			return true
+		}
+	}
+	return false
+}
+
+// PredSkillTextMatches implements skill_text_matches: sentence-scoped,
+// word-boundary text matching with optional same-sentence context, built to
+// fix confirmed false positives in the raw-substring skill text predicates
+// (PredSkillBodyHasText / PredSkillNameHasText / PredSkillDescriptionHasText)
+// without changing those predicates' behavior for the other rules that still
+// use them. See SkillTextMatchExpr's doc comment for the exact semantics.
+func PredSkillTextMatches(e SkillTextMatchExpr, s models.SkillDef) bool {
+	for _, field := range e.Fields {
+		var text string
+		isWordChar := skillWordCharProse
+		switch field {
+		case "name":
+			text = s.Name
+			isWordChar = skillWordCharSlug
+		case "description":
+			text = s.Description
+		case "body":
+			text = s.Body
+		default:
+			continue
+		}
+		text = skillAbbreviationReplacer.Replace(strings.ToLower(text))
+		for _, sentence := range skillSentenceSplitRe.Split(text, -1) {
+			sentence = strings.TrimSpace(sentence)
+			if sentence == "" {
+				continue
+			}
+			if !skillTextMatchesAny(sentence, e.Terms, isWordChar) {
+				continue
+			}
+			if len(e.RequireContext) > 0 && !skillTextMatchesAny(sentence, e.RequireContext, isWordChar) {
+				continue
+			}
+			if len(e.ExcludeContext) > 0 && skillTextMatchesAny(sentence, e.ExcludeContext, isWordChar) {
+				continue
+			}
+			return true
+		}
+	}
+	return false
+}
+
 // ─── repo predicates ──────────────────────────────────────────────────────────
 
 func PredRepoHasSDKInCode(sdks []string, inv models.RepoInventory) bool {
@@ -1466,4 +1598,55 @@ func PredRepoObservabilityCapturesContent(want bool, inv models.RepoInventory) b
 		}
 	}
 	return found == want
+}
+
+// PredRepoClaudeOptionsModeWithoutKwarg fires when a SINGLE discovered
+// ClaudeAgentOptions(...) construction both sets permission_mode to one of
+// e.Modes and does not set e.Kwarg. This correlates the two facts at the
+// same construction site, unlike PredRepoClaudeOptionsPermissionModeIs and
+// repoClaudeOptionsMissingKwarg, which each read across every
+// ClaudeAgentOptions in the repo independently: a repo with two options
+// objects — one bypassPermissions with no deny-list, one safe with a
+// deny-list — would silence the repo-wide combination of those two
+// predicates even though the risky site is real. See ClaudeOptionsModeKwargExpr's
+// doc comment in schema.go.
+//
+// Unlike repoClaudeOptionsMissingKwarg, this predicate does NOT skip Opaque
+// (built with ** unpacking) constructions — it simply reads whichever kwargs
+// were captured explicitly at that call site. A kwarg hidden inside the
+// unpacked dict is therefore invisible and reads as absent (a deny-list this
+// engine cannot see is not one it can credit as bounding the tool surface),
+// while permission_mode or e.Kwarg written explicitly alongside the unpack
+// is read normally. This deliberately differs from repoClaudeOptionsMissingKwarg's
+// Opaque-skip, which exists because that helper answers "is any kwarg missing
+// ANYWHERE in the repo" — an unreadable site there could silently be the one
+// that sets it, so it's excluded rather than guessed at. This predicate
+// instead answers "is THIS specific risky site unmitigated", where an
+// unreadable deny-list is correctly treated as no mitigation at all.
+func PredRepoClaudeOptionsModeWithoutKwarg(e ClaudeOptionsModeKwargExpr, inv models.RepoInventory) bool {
+	for _, opt := range inv.ClaudeAgentOptions {
+		modeNode := lookupKwargInTree(opt.Kwargs, "permission_mode")
+		if modeNode == nil || modeNode.Value == nil {
+			continue
+		}
+		val := modeNode.Value.Text
+		if modeNode.Value.Kind == models.ExprLiteralString {
+			val = strings.Trim(val, `"'`)
+		}
+		modeMatches := false
+		for _, m := range e.Modes {
+			if val == m {
+				modeMatches = true
+				break
+			}
+		}
+		if !modeMatches {
+			continue
+		}
+		kwargNode := lookupKwargInTree(opt.Kwargs, e.Kwarg)
+		if kwargNode == nil || kwargNode.Value == nil {
+			return true // matching mode, no (or unreadable-opaque) kwarg at this site
+		}
+	}
+	return false
 }

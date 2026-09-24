@@ -49,6 +49,7 @@ type scanFlags struct {
 	vulnScan      bool
 	licenseScan   bool
 	secretScan    bool
+	includeTests  bool
 	attest        bool
 	attestKey     string
 	attestBundle  string
@@ -156,6 +157,9 @@ Exit codes:
 		"flag dependencies with copyleft licenses (GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, SSPL-1.0) as findings (opt-in)")
 	cmd.Flags().BoolVar(&f.secretScan, "secret-scan", false,
 		"scan all text files for hardcoded secret literals and credential reads (opt-in)")
+	cmd.Flags().BoolVar(&f.includeTests, "include-test-paths", false,
+		"score and fail on findings in test-path files (default: report them but exclude from the "+
+			"readiness score and exit code — see file_path/origin in --format json)")
 	cmd.Flags().BoolVar(&f.attest, "attest", false,
 		"after the scan, sign the JSON report into a cosign attestation (requires cosign on PATH; keyless by default — see 'trustabl attest')")
 	cmd.Flags().StringVar(&f.attestKey, "attest-key", "",
@@ -424,6 +428,7 @@ func resolveAndScan(cfg *scanner.Config, f scanFlags, rep progress.Reporter) (mo
 	cfg.VulnScan = f.vulnScan
 	cfg.LicenseScan = f.licenseScan
 	cfg.SecretScan = f.secretScan
+	cfg.IncludeTestPaths = f.includeTests
 	cfg.VulnNoUpdate = f.noRulesUpdate // --no-rules-update is the offline switch for both rules and the OSV DB
 	cfg.Progress = rep
 
@@ -441,7 +446,7 @@ func finishScan(result models.ScanResult, jobErr error, f scanFlags, log *logx.L
 	// Compute exit code once; reused by the telemetry Track call and the return
 	// path below. When jobErr != nil these paths return early and the value is
 	// unused, but computing it unconditionally keeps the logic in one place.
-	scanExitCode := exitCode(result, f.strict)
+	scanExitCode := exitCode(result, f.strict, f.includeTests)
 
 	if tel != nil && jobErr != nil {
 		errCategory := categorizeScanError(jobErr)
@@ -776,7 +781,7 @@ func writeSideOutputs(result models.ScanResult, f scanFlags) error {
 	return nil
 }
 
-func exitCode(result models.ScanResult, strict bool) int {
+func exitCode(result models.ScanResult, strict bool, includeTestPaths bool) int {
 	// A scan that evaluated nothing is the worst thing to pass silently under
 	// --strict: a mistyped path or a moved source tree leaves the gate green
 	// forever, and nobody investigates a passing build. --strict means "I expect
@@ -787,6 +792,12 @@ func exitCode(result models.ScanResult, strict bool) int {
 		return 1
 	}
 	for _, f := range result.Findings {
+		// A test-path finding (models.OriginTest) is reported but does not gate
+		// CI by default — see scanner.Config.IncludeTestPaths. --include-test-paths
+		// reproduces the pre-classification behavior exactly.
+		if f.Origin == models.OriginTest && !includeTestPaths {
+			continue
+		}
 		switch f.Severity {
 		case models.SeverityMedium, models.SeverityHigh, models.SeverityCritical:
 			return 1

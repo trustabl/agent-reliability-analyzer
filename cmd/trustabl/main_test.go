@@ -251,7 +251,7 @@ func TestExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := exitCode(models.ScanResult{Findings: tt.findings}, tt.strict)
+			got := exitCode(models.ScanResult{Findings: tt.findings}, tt.strict, false)
 			if got != tt.want {
 				t.Fatalf("exitCode(strict=%v, %d findings) = %d, want %d",
 					tt.strict, len(tt.findings), got, tt.want)
@@ -356,8 +356,8 @@ func TestSARIFToFile_RoundTrip(t *testing.T) {
 	}
 	// The finding is high severity, so the scan would exit 1; the file write must
 	// still have happened (it did, above) so the workflow can upload it.
-	if exitCode(result, false) != 1 {
-		t.Errorf("exitCode = %d, want 1 (a high finding present)", exitCode(result, false))
+	if exitCode(result, false, false) != 1 {
+		t.Errorf("exitCode = %d, want 1 (a high finding present)", exitCode(result, false, false))
 	}
 }
 
@@ -396,10 +396,10 @@ func TestValidateOutputFlags(t *testing.T) {
 func TestExitCode_StrictFailsEmptyScan(t *testing.T) {
 	empty := models.ScanResult{NoAgentSurfaces: true}
 
-	if got := exitCode(empty, true); got != 1 {
+	if got := exitCode(empty, true, false); got != 1 {
 		t.Errorf("exitCode(empty, strict=true) = %d, want 1", got)
 	}
-	if got := exitCode(empty, false); got != 0 {
+	if got := exitCode(empty, false, false); got != 0 {
 		t.Errorf("exitCode(empty, strict=false) = %d, want 0", got)
 	}
 
@@ -407,7 +407,36 @@ func TestExitCode_StrictFailsEmptyScan(t *testing.T) {
 	clean := models.ScanResult{
 		Surfaces: []models.SurfaceReadiness{{Kind: models.ScopeTool, Name: "t", Score: 1}},
 	}
-	if got := exitCode(clean, true); got != 0 {
+	if got := exitCode(clean, true, false); got != 0 {
 		t.Errorf("exitCode(clean repo, strict=true) = %d, want 0", got)
+	}
+}
+
+// TestExitCode_TestPathFindingsExcludedByDefault covers the test-fixture vs.
+// production classification: a high-severity finding whose Origin is
+// models.OriginTest must not fail the build by default, but must fail it
+// under --include-test-paths.
+func TestExitCode_TestPathFindingsExcludedByDefault(t *testing.T) {
+	result := models.ScanResult{
+		Findings: []models.Finding{
+			{Severity: models.SeverityHigh, Origin: models.OriginTest, FilePath: "tests/test_adapter.py"},
+		},
+	}
+	if got := exitCode(result, false, false); got != 0 {
+		t.Errorf("exitCode(test-path finding only, includeTestPaths=false) = %d, want 0", got)
+	}
+	if got := exitCode(result, false, true); got != 1 {
+		t.Errorf("exitCode(test-path finding only, includeTestPaths=true) = %d, want 1", got)
+	}
+
+	// A production finding alongside a test-path one still fails regardless.
+	mixed := models.ScanResult{
+		Findings: []models.Finding{
+			{Severity: models.SeverityHigh, Origin: models.OriginTest, FilePath: "tests/test_adapter.py"},
+			{Severity: models.SeverityHigh, FilePath: "src/agent.py"},
+		},
+	}
+	if got := exitCode(mixed, false, false); got != 1 {
+		t.Errorf("exitCode(mixed test+production findings) = %d, want 1", got)
 	}
 }

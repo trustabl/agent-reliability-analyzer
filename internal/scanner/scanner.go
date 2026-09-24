@@ -25,6 +25,7 @@ import (
 	"github.com/trustabl/trustabl/internal/ingestion"
 	"github.com/trustabl/trustabl/internal/logx"
 	"github.com/trustabl/trustabl/internal/models"
+	"github.com/trustabl/trustabl/internal/pathclass"
 	"github.com/trustabl/trustabl/internal/progress"
 	"github.com/trustabl/trustabl/internal/rules"
 )
@@ -86,6 +87,15 @@ type Config struct {
 	// (SECRET-LIT-001) and scripts that read credentials from the environment
 	// (SECRET-ENV-001). Off by default.
 	SecretScan bool
+
+	// IncludeTestPaths opts findings whose FilePath classifies as
+	// models.OriginTest (internal/pathclass) back into scoring and the exit-code
+	// gate. Off by default: a test-path finding is still reported (never
+	// dropped — see models.SurfaceOrigin) but is excluded from
+	// Surfaces/OverallScore/ProjectedScores and does not affect NoAgentSurfaces
+	// or the CLI exit code, because a WebSearchTool declared in a test fixture
+	// is not the same finding as one shipped in a production agent.
+	IncludeTestPaths bool
 
 	// Progress receives real-time phase events. Nil means no progress output.
 	Progress progress.Reporter
@@ -512,9 +522,58 @@ func Run(cfg Config) (models.ScanResult, error) {
 		log.Verbosef("secret-scan: %d potential secrets", len(secrets))
 	}
 
-	// Step 5: scoring
-	surfaces, overall := analysis.Score(tools, inventory.Agents, inventory.Subagents, inventory.Skills, findings)
-	projected := analysis.Project(tools, inventory.Agents, inventory.Subagents, inventory.Skills, findings)
+	// Step 4c: classify every finding's origin (production vs. test-path) by its
+	// FilePath — one pass over the fully-assembled findings list (rule + META +
+	// vuln/license/secret), so no individual finding constructor needs to know
+	// about path classification. Pure function of the already-normalized,
+	// forward-slash repo-relative path; never touches ScanManifest, so ScanID
+	// stays unaffected. See internal/pathclass and models.SurfaceOrigin.
+	for i := range findings {
+		findings[i].Origin = pathclass.Classify(findings[i].FilePath)
+	}
+
+	// Step 5: scoring. A test-path finding is still reported (it's in
+	// `findings` above, untouched) but by default must not move the readiness
+	// score, OverallScore, or NoAgentSurfaces: a WebSearchTool declared in
+	// tests/test_adapter.py is not a production agent surface, and scoring it
+	// the same as a shipped agent is exactly the non-actionable-finding
+	// complaint this classification exists to fix. --include-test-paths
+	// reproduces the pre-classification behavior exactly by scoring everything.
+	scoreTools, scoreAgents, scoreSubagents, scoreSkills, scoreFindings := tools, inventory.Agents, inventory.Subagents, inventory.Skills, findings
+	if !cfg.IncludeTestPaths {
+		scoreTools = nil
+		for _, t := range tools {
+			if pathclass.Classify(t.FilePath) != models.OriginTest {
+				scoreTools = append(scoreTools, t)
+			}
+		}
+		scoreAgents = nil
+		for _, a := range inventory.Agents {
+			if pathclass.Classify(a.FilePath) != models.OriginTest {
+				scoreAgents = append(scoreAgents, a)
+			}
+		}
+		scoreSubagents = nil
+		for _, s := range inventory.Subagents {
+			if pathclass.Classify(s.FilePath) != models.OriginTest {
+				scoreSubagents = append(scoreSubagents, s)
+			}
+		}
+		scoreSkills = nil
+		for _, s := range inventory.Skills {
+			if pathclass.Classify(s.FilePath) != models.OriginTest {
+				scoreSkills = append(scoreSkills, s)
+			}
+		}
+		scoreFindings = nil
+		for _, f := range findings {
+			if f.Origin != models.OriginTest {
+				scoreFindings = append(scoreFindings, f)
+			}
+		}
+	}
+	surfaces, overall := analysis.Score(scoreTools, scoreAgents, scoreSubagents, scoreSkills, scoreFindings)
+	projected := analysis.Project(scoreTools, scoreAgents, scoreSubagents, scoreSkills, scoreFindings)
 
 	// Coverage: how many AST-targeted source files we actually parsed vs. how
 	// many we attempted. Discovery skips files it cannot read or parse (one bad

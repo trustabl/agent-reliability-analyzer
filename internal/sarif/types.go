@@ -59,6 +59,21 @@ type Result struct {
 	Rank                *float64          `json:"rank,omitempty"`
 	PartialFingerprints map[string]string `json:"partialFingerprints,omitempty"`
 	Properties          map[string]any    `json:"properties,omitempty"`
+	// Suppressions marks a result as suppressed without dropping it from the
+	// document — set only for a models.OriginTest finding (a test-path file;
+	// see internal/pathclass). GitHub code scanning and other SARIF 2.1.0
+	// consumers exclude a suppressed result from the default alert view while
+	// keeping it visible in the raw log, which mirrors the engine's own
+	// tag-and-de-weight behavior (reported, not dropped, not scored).
+	Suppressions []Suppression `json:"suppressions,omitempty"`
+}
+
+// Suppression is a SARIF 2.1.0 result.suppressions entry (§3.31). kind
+// "external" means the suppression was determined by something other than an
+// inline source comment — here, the path classifier.
+type Suppression struct {
+	Kind          string `json:"kind"` // "inSource" | "external"
+	Justification string `json:"justification,omitempty"`
 }
 
 type Location struct {

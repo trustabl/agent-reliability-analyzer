@@ -259,9 +259,34 @@ func (r *Renderer) Render(result models.ScanResult) string {
 	// (ToolName = "") — under their own headers, sorted alphabetically for
 	// determinism. The empty-ToolName bucket renders under "(repo-wide)" so it
 	// doesn't look like a missing label.
+	//
+	// Test-path findings (models.OriginTest — see internal/pathclass) are
+	// excluded from this walk and rendered in their own trailing section below
+	// instead: result.Surfaces is already the production-only set scoring ran
+	// against, so a test-fixture finding grouped in here would sit alongside
+	// (and look equivalent to) a production one, which is the exact
+	// non-actionable-report problem this classification exists to fix.
 	b.WriteString(styleHeader.Render("Findings") + "\n")
+	writeFinding := func(f models.Finding) {
+		loc := f.FilePath
+		if f.StartLine > 0 {
+			loc = fmt.Sprintf("%s:%d", f.FilePath, f.StartLine)
+			if f.EndLine > f.StartLine {
+				loc += fmt.Sprintf("-%d", f.EndLine) // single line shows just the line
+			}
+		}
+		fmt.Fprintf(&b, "    [%s] %s %s  (%s)\n",
+			f.RuleID, sevTag(f.Severity), f.Title, loc)
+		fmt.Fprintf(&b, "        %s\n", styleDim.Render(wrapAt(f.Explanation, 86)))
+		fmt.Fprintf(&b, "        %s %s\n", styleDim.Render("fix:"), f.SuggestedFix)
+	}
 	byTool := map[string][]models.Finding{}
+	byToolTest := map[string][]models.Finding{}
 	for _, f := range result.Findings {
+		if f.Origin == models.OriginTest {
+			byToolTest[f.ToolName] = append(byToolTest[f.ToolName], f)
+			continue
+		}
 		byTool[f.ToolName] = append(byTool[f.ToolName], f)
 	}
 	rendered := map[string]bool{}
@@ -277,17 +302,7 @@ func (r *Renderer) Render(result models.ScanResult) string {
 		}
 		fmt.Fprintf(&b, "\n  %s\n", styleHeader.Render(header))
 		for _, f := range fs {
-			loc := f.FilePath
-			if f.StartLine > 0 {
-				loc = fmt.Sprintf("%s:%d", f.FilePath, f.StartLine)
-				if f.EndLine > f.StartLine {
-					loc += fmt.Sprintf("-%d", f.EndLine) // single line shows just the line
-				}
-			}
-			fmt.Fprintf(&b, "    [%s] %s %s  (%s)\n",
-				f.RuleID, sevTag(f.Severity), f.Title, loc)
-			fmt.Fprintf(&b, "        %s\n", styleDim.Render(wrapAt(f.Explanation, 86)))
-			fmt.Fprintf(&b, "        %s %s\n", styleDim.Render("fix:"), f.SuggestedFix)
+			writeFinding(f)
 		}
 	}
 	for _, s := range result.Surfaces {
@@ -302,6 +317,25 @@ func (r *Renderer) Render(result models.ScanResult) string {
 	sort.Strings(rest)
 	for _, name := range rest {
 		emit(name)
+	}
+
+	if len(byToolTest) > 0 {
+		b.WriteString("\n" + styleHeader.Render("Test-path findings (not scored)") + "\n")
+		var testNames []string
+		for name := range byToolTest {
+			testNames = append(testNames, name)
+		}
+		sort.Strings(testNames)
+		for _, name := range testNames {
+			header := name
+			if name == "" {
+				header = "(repo-wide)"
+			}
+			fmt.Fprintf(&b, "\n  %s\n", styleHeader.Render(header))
+			for _, f := range byToolTest[name] {
+				writeFinding(f)
+			}
+		}
 	}
 
 	return b.String()

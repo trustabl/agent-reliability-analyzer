@@ -499,6 +499,32 @@ rules:
 #       Fires when SkillDef.Description contains any listed substring,
 #       matched case-insensitively.
 #
+#   skill_text_matches:
+#     fields: [name, description, body]     # subset of these three
+#     terms: [term, term, ...]
+#     require_context: [term, term, ...]    # optional
+#     exclude_context: [term, term, ...]    # optional
+#       Sentence-scoped alternative to the three raw-substring predicates
+#       above, added to fix confirmed false positives in CSKILL-080/081 that
+#       a bare substring match can't distinguish (a term appearing inside an
+#       unrelated word, or a data class merely being NAMED rather than
+#       actually handled). Splits each named field into sentences (on
+#       . ! ? / newline / markdown list-item or heading starts) and matches
+#       terms at word boundaries, with the last word of a multi-word term
+#       allowed one inflection (-s/-es/-ed/-ing; "sign" also matches
+#       "signs"/"signed"/"signing" but not "design"/"assign"/"signal", and a
+#       trailing "e" is dropped before -ed/-ing so "store" matches "storing").
+#       For the name field "-"/"_" are word separators (a slug: "encrypt-
+#       helper" matches "encrypt"); for description/body "-" is a word
+#       character (prose: "case-sensitive" does NOT match "sensitive"). A
+#       sentence fires when it matches a term in terms AND (require_context is
+#       empty, or the sentence ALSO matches a require_context term) AND the
+#       sentence matches no exclude_context term. The literal abbreviations
+#       "e.g." and "i.e." survive the period-based sentence split (they're
+#       normalized before splitting) so they can be used as exclude_context
+#       phrases. This predicate does not change the three raw-substring
+#       predicates above — CSKILL-082..087 keep using those unmodified.
+#
 #
 # ━━━ REPO-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # (used only in scope: repo rules; match runs once per scan)
@@ -589,3 +615,24 @@ rules:
 #       sets disallowed_tools=[] or disallowed_tools=None still counts as "set"
 #       — the presence check only requires a non-nil Value, the same tri-state
 #       gap max_turns=None already has. Used by CSDK-205.
+#   repo_claude_options_mode_without_kwarg:
+#     modes: [bypassPermissions, ...]
+#     kwarg: disallowed_tools
+#       Fires when a SINGLE discovered ClaudeAgentOptions(...) construction
+#       both sets permission_mode to one of modes AND does not set kwarg at
+#       that SAME site. This is the per-call-site correlation the two
+#       predicates above lack: repo_claude_options_permission_mode_is and
+#       repo_claude_options_disallowed_tools_missing each scan across every
+#       ClaudeAgentOptions in the repo independently, so a repo with two
+#       options objects — one bypassPermissions with no deny-list, one safe
+#       with a deny-list — silences their combination even though the risky
+#       site is real. Unlike repo_claude_options_disallowed_tools_missing,
+#       Opaque (** unpacking) sites are NOT skipped here: a kwarg hidden
+#       inside the unpacked dict simply reads as absent at that site, since an
+#       unreadable deny-list is not a mitigation this engine can credit.
+#       allowed_tools is deliberately NOT part of this predicate family — per
+#       the Agent SDK's own reference docs, allowed_tools only auto-approves
+#       and does NOT restrict which tools can run, so an empty/narrow
+#       allowed_tools alongside bypassPermissions is the maximally dangerous
+#       shape, not a mitigated one (see docs/decisions/tool-allowlist-scope.md).
+#       Used by CSDK-202/CSDK-206.

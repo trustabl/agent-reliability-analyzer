@@ -98,33 +98,35 @@ type MatchExpr struct {
 	SubagentGrantsTool []string `yaml:"subagent_grants_tool,omitempty"`
 
 	// Skill-scope predicates
-	SkillAllowsUnrestrictedShell            *bool    `yaml:"skill_allows_unrestricted_shell,omitempty"`
-	SkillAllowsTool                         []string `yaml:"skill_allows_tool,omitempty"`
-	SkillAllowsUnrestrictedTool             []string `yaml:"skill_allows_unrestricted_tool,omitempty"`
-	SkillModelInvocable                     *bool    `yaml:"skill_model_invocable,omitempty"`
-	SkillBodyHasDynamicExec                 *bool    `yaml:"skill_body_has_dynamic_exec,omitempty"`
-	SkillDynamicExecTouchesNetworkOrSecrets *bool    `yaml:"skill_dynamic_exec_touches_network_or_secrets,omitempty"`
-	SkillReferencesExternalURL              *bool    `yaml:"skill_references_external_url,omitempty"`
-	SkillBodyHasInjectionMarker             *bool    `yaml:"skill_body_has_injection_marker,omitempty"`
-	SkillBundledScriptNetworkEgress         *bool    `yaml:"skill_bundled_script_network_egress,omitempty"`
-	SkillBundledScriptReadsSecrets          *bool    `yaml:"skill_bundled_script_reads_secrets,omitempty"`
-	SkillBundledFileHasHardcodedSecret      *bool    `yaml:"skill_bundled_file_has_hardcoded_secret,omitempty"`
-	SkillDescriptionToolMismatch            *bool    `yaml:"skill_description_tool_mismatch,omitempty"`
-	SkillHasDescription                     *bool    `yaml:"skill_has_description,omitempty"`
-	SkillIsAgentSpecific                    *bool    `yaml:"skill_is_agent_specific,omitempty"`
-	SkillHasDuplicateToolRefs               *bool    `yaml:"skill_has_duplicate_tool_refs,omitempty"`
-	SkillBodyHasText                        []string `yaml:"skill_body_has_text,omitempty"`
-	SkillNameHasText                        []string `yaml:"skill_name_has_text,omitempty"`
-	SkillDescriptionHasText                 []string `yaml:"skill_description_has_text,omitempty"`
+	SkillAllowsUnrestrictedShell            *bool               `yaml:"skill_allows_unrestricted_shell,omitempty"`
+	SkillAllowsTool                         []string            `yaml:"skill_allows_tool,omitempty"`
+	SkillAllowsUnrestrictedTool             []string            `yaml:"skill_allows_unrestricted_tool,omitempty"`
+	SkillModelInvocable                     *bool               `yaml:"skill_model_invocable,omitempty"`
+	SkillBodyHasDynamicExec                 *bool               `yaml:"skill_body_has_dynamic_exec,omitempty"`
+	SkillDynamicExecTouchesNetworkOrSecrets *bool               `yaml:"skill_dynamic_exec_touches_network_or_secrets,omitempty"`
+	SkillReferencesExternalURL              *bool               `yaml:"skill_references_external_url,omitempty"`
+	SkillBodyHasInjectionMarker             *bool               `yaml:"skill_body_has_injection_marker,omitempty"`
+	SkillBundledScriptNetworkEgress         *bool               `yaml:"skill_bundled_script_network_egress,omitempty"`
+	SkillBundledScriptReadsSecrets          *bool               `yaml:"skill_bundled_script_reads_secrets,omitempty"`
+	SkillBundledFileHasHardcodedSecret      *bool               `yaml:"skill_bundled_file_has_hardcoded_secret,omitempty"`
+	SkillDescriptionToolMismatch            *bool               `yaml:"skill_description_tool_mismatch,omitempty"`
+	SkillHasDescription                     *bool               `yaml:"skill_has_description,omitempty"`
+	SkillIsAgentSpecific                    *bool               `yaml:"skill_is_agent_specific,omitempty"`
+	SkillHasDuplicateToolRefs               *bool               `yaml:"skill_has_duplicate_tool_refs,omitempty"`
+	SkillBodyHasText                        []string            `yaml:"skill_body_has_text,omitempty"`
+	SkillNameHasText                        []string            `yaml:"skill_name_has_text,omitempty"`
+	SkillDescriptionHasText                 []string            `yaml:"skill_description_has_text,omitempty"`
+	SkillTextMatches                        *SkillTextMatchExpr `yaml:"skill_text_matches,omitempty"`
 
 	// Repo-scope predicates
-	RepoHasSDKInCode                        []string `yaml:"repo_has_sdk_in_code,omitempty"`
-	RepoComponentPresent                    []string `yaml:"repo_component_present,omitempty"`
-	RepoUsesDefaultTracing                  *bool    `yaml:"repo_uses_default_tracing,omitempty"`
-	RepoClaudeDefaultModeIs                 []string `yaml:"repo_claude_default_mode_is,omitempty"`
-	RepoClaudeOptionsPermissionModeIs       []string `yaml:"repo_claude_options_permission_mode_is,omitempty"`
-	RepoClaudeOptionsMaxTurnsMissing        *bool    `yaml:"repo_claude_options_max_turns_missing,omitempty"`
-	RepoClaudeOptionsDisallowedToolsMissing *bool    `yaml:"repo_claude_options_disallowed_tools_missing,omitempty"`
+	RepoHasSDKInCode                        []string                    `yaml:"repo_has_sdk_in_code,omitempty"`
+	RepoComponentPresent                    []string                    `yaml:"repo_component_present,omitempty"`
+	RepoUsesDefaultTracing                  *bool                       `yaml:"repo_uses_default_tracing,omitempty"`
+	RepoClaudeDefaultModeIs                 []string                    `yaml:"repo_claude_default_mode_is,omitempty"`
+	RepoClaudeOptionsPermissionModeIs       []string                    `yaml:"repo_claude_options_permission_mode_is,omitempty"`
+	RepoClaudeOptionsMaxTurnsMissing        *bool                       `yaml:"repo_claude_options_max_turns_missing,omitempty"`
+	RepoClaudeOptionsDisallowedToolsMissing *bool                       `yaml:"repo_claude_options_disallowed_tools_missing,omitempty"`
+	RepoClaudeOptionsModeWithoutKwarg       *ClaudeOptionsModeKwargExpr `yaml:"repo_claude_options_mode_without_kwarg,omitempty"`
 
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
@@ -135,6 +137,51 @@ type MatchExpr struct {
 	RepoObservabilityConsoleOnly     *bool    `yaml:"repo_observability_console_only,omitempty"`
 	RepoObservabilityCapturesContent *bool    `yaml:"repo_observability_captures_content,omitempty"`
 	RepoObservabilityDeclared        *bool    `yaml:"repo_observability_declared,omitempty"`
+}
+
+// SkillTextMatchExpr matches skill text (name/description/body) at
+// sentence granularity, with word-boundary term matching and optional
+// same-sentence context requirements. This is the sentence-scoped
+// alternative to the raw substring predicates (skill_body_has_text,
+// skill_name_has_text, skill_description_has_text) for rules where a bare
+// substring match produces confirmed false positives — CSKILL-080/081.
+//
+// Fields lists which of name/description/body to scan. Terms are matched
+// case-insensitively at word boundaries, allowing the inflection suffixes
+// s/es/ed/ing (so "sign" also matches "signs"/"signed"/"signing" but not
+// "design" or "assign"). For the name field, "-" and "_" count as word
+// separators (name is a kebab/snake slug); for description and body, "-"
+// is a word character, so "case-sensitive" does not match "sensitive".
+//
+// A sentence (split on . ! ? / newline / markdown list-item or heading
+// starts) matches when it contains a Terms hit, AND — if RequireContext is
+// non-empty — also contains a RequireContext hit in the same sentence, AND
+// contains no ExcludeContext hit. RequireContext and ExcludeContext use the
+// same word-boundary/inflection matching as Terms.
+type SkillTextMatchExpr struct {
+	Fields         []string `yaml:"fields"`
+	Terms          []string `yaml:"terms"`
+	RequireContext []string `yaml:"require_context,omitempty"`
+	ExcludeContext []string `yaml:"exclude_context,omitempty"`
+}
+
+// ClaudeOptionsModeKwargExpr matches a single ClaudeAgentOptions(...)
+// construction site whose permission_mode is one of Modes AND which does not
+// set Kwarg. Unlike the separate repo_claude_options_permission_mode_is /
+// repo_claude_options_*_missing predicates — both of which read across every
+// ClaudeAgentOptions in the repo independently — this correlates both facts
+// at the SAME construction site, so a repo with two options objects (one
+// bypassPermissions with no deny-list, one safe with a deny-list) still
+// fires: the repo-wide combination of the two separate predicates would
+// silently go quiet because *some* construction sets the kwarg.
+//
+// Opaque (built with ** unpacking) construction sites are NOT skipped here,
+// unlike repoClaudeOptionsMissingKwarg — a kwarg hidden inside the unpacked
+// dict simply reads as absent, so an unreadable deny-list is correctly
+// treated as no mitigation for this specific site. See predicates.go.
+type ClaudeOptionsModeKwargExpr struct {
+	Modes []string `yaml:"modes"`
+	Kwarg string   `yaml:"kwarg"`
 }
 
 // ToolDecoratorKwargValueExpr matches a decorator kwarg to a specific value.

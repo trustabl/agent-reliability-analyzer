@@ -163,6 +163,23 @@ func resultFromFinding(f models.Finding, ruleIndex *int, useBase bool) Result {
 		r.Kind = "informational"
 	}
 
+	// Origin (models.SurfaceOrigin — see internal/pathclass): surface it as a
+	// property for any consumer that reads raw properties, and additionally as
+	// a first-class result.suppressions entry for OriginTest so GitHub code
+	// scanning and other SARIF 2.1.0-aware consumers exclude it from the
+	// default alert view without the engine ever dropping the result. Mirrors
+	// the same tag-and-de-weight behavior as the human/JSON output — reported,
+	// not scored, never hidden.
+	if f.Origin != "" {
+		r.Properties["origin"] = string(f.Origin)
+	}
+	if f.Origin == models.OriginTest {
+		r.Suppressions = []Suppression{{
+			Kind:          "external",
+			Justification: "test-path file (internal/pathclass); reported but excluded from scoring and the exit-code gate unless --include-test-paths is set",
+		}}
+	}
+
 	return r
 }
 

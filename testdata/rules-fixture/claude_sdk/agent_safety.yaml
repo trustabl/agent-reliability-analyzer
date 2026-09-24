@@ -62,7 +62,7 @@ rules:
       descriptions before passing them down.
 
   - id: CSDK-103
-    title: AgentDefinition sets permissionMode to bypassPermissions
+    title: AgentDefinition sets permissionMode to bypassPermissions with a broad tool set
     severity: high
     confidence: 0.9
     language: python
@@ -70,25 +70,41 @@ rules:
       - claude_agent_definition
     scope: agent
     match:
-      agent_kwarg_value:
-        kwarg: permissionMode
-        value: bypassPermissions
+      all:
+        - agent_kwarg_value:
+            kwarg: permissionMode
+            value: bypassPermissions
+        - any:
+            - agent_kwarg_missing:
+                - tools
+            - agent_grants_builtin_tool:
+                - Bash
+                - Write
+                - Edit
+                - NotebookEdit
+                - WebFetch
+                - WebSearch
+                - Agent
+                - Task
     explanation: >
       This AgentDefinition sets permissionMode="bypassPermissions", which
       disables the SDK's interactive approval gate for every tool the subagent
-      runs. Subagents are dispatched autonomously by a lead agent in response to
-      model-generated task descriptions, so a prompt-injected or mis-scoped task
-      reaches the subagent's tools — including Bash, Write, and Edit — with no
-      human in the loop and no per-call confirmation. This is the single
-      highest-impact Claude-specific misconfiguration: it removes the one control
-      that stands between model output and real side effects.
+      runs, and either omits tools entirely (which inherits every tool
+      available to subagents) or lists a side-effecting or exfiltration-
+      capable one. Unlike allowed_tools on ClaudeAgentOptions, an
+      AgentDefinition's tools list genuinely restricts the subagent — a tool
+      left out isn't in its session at all — so this combination is the
+      actual highest-impact shape: subagents are dispatched autonomously by a
+      lead agent in response to model-generated task descriptions, so a
+      prompt-injected or mis-scoped task reaches Bash, Write, Edit, or similar
+      with no human in the loop and no per-call confirmation.
     fix: >
       Remove permissionMode="bypassPermissions" unless this subagent runs in a
       fully sandboxed, non-interactive context you control (e.g. CI with no
-      secrets or network). If autonomous operation is required, pair it with a
-      PreToolUse hook that allowlists exactly the commands and paths the subagent
-      may touch, and prefer a restrictive mode ("default"/"acceptEdits") scoped
-      to a minimal tool set.
+      secrets or network). If autonomous operation is required, scope tools to
+      the minimal read-only set the subagent actually needs (e.g. Read, Grep,
+      Glob) so bypassPermissions has nothing side-effecting to bypass approval
+      for, and prefer a restrictive mode ("default"/"acceptEdits") otherwise.
 
   - id: CSDK-104
     title: Claude subagent is granted filesystem-write built-ins
@@ -144,7 +160,7 @@ rules:
       validate the task descriptions the lead agent passes down.
 
   - id: CSDK-120
-    title: TypeScript AgentDefinition sets permissionMode to bypassPermissions
+    title: TypeScript AgentDefinition sets permissionMode to bypassPermissions with a broad tool set
     severity: high
     confidence: 0.9
     language: typescript
@@ -152,25 +168,42 @@ rules:
       - claude_agent_definition
     scope: agent
     match:
-      agent_kwarg_value:
-        kwarg: permissionMode
-        value: bypassPermissions
+      all:
+        - agent_kwarg_value:
+            kwarg: permissionMode
+            value: bypassPermissions
+        - any:
+            - agent_kwarg_missing:
+                - tools
+            - agent_grants_builtin_tool:
+                - Bash
+                - Write
+                - Edit
+                - NotebookEdit
+                - WebFetch
+                - WebSearch
+                - Agent
+                - Task
     explanation: >
       This TypeScript AgentDefinition sets permissionMode: "bypassPermissions",
-      which disables the SDK's interactive approval gate for every tool the agent
-      runs. Agents are dispatched autonomously in response to model-generated task
-      descriptions, so a prompt-injected or mis-scoped task reaches the agent's
-      tools — including Bash, Write, and Edit — with no human in the loop and no
-      per-call confirmation. This is the single highest-impact Claude-specific
-      misconfiguration: it removes the one control that stands between model output
-      and real side effects.
+      which disables the SDK's interactive approval gate for every tool the
+      agent runs, and either omits tools entirely (which inherits every tool
+      available to subagents) or lists a side-effecting or exfiltration-
+      capable one. An AgentDefinition's tools field genuinely restricts the
+      agent — a tool left out isn't in its session at all — so this
+      combination is the actual highest-impact shape: agents are dispatched
+      autonomously in response to model-generated task descriptions, so a
+      prompt-injected or mis-scoped task reaches Bash, Write, Edit, or similar
+      with no human in the loop and no per-call confirmation.
     fix: >
       Remove permissionMode: "bypassPermissions" unless this agent runs in a
       fully sandboxed, non-interactive context you control (e.g. CI with no
-      secrets or network). If autonomous operation is required, pass
-      allowedTools or disallowedTools in the AgentDefinition constructor to
-      restrict the tool surface, and prefer a safe default permission mode
-      ("default" or "acceptEdits") scoped to a minimal tool set.
+      secrets or network). If autonomous operation is required, scope tools
+      to the minimal read-only set the agent actually needs (e.g. Read, Grep,
+      Glob) — or pass disallowedTools naming what it must never call — so
+      bypassPermissions has nothing side-effecting to bypass approval for,
+      and prefer a safe default permission mode ("default" or "acceptEdits")
+      otherwise.
 
   - id: CSDK-121
     title: TypeScript AgentDefinition is granted the Bash tool

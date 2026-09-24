@@ -388,7 +388,9 @@ files in the scanned repo. Each run produces a `ScanResult` containing:
 
 - **Findings** — one per rule hit, each with `severity`, `confidence`,
   an `explanation`, a `suggested_fix`, and the location it fired at
-  (tool file/line, agent call site, subagent file, or the manifest).
+  (tool file/line, agent call site, subagent file, or the manifest). A finding
+  in a test-path file carries `"origin": "test"` and is excluded from
+  scoring and the exit code by default — see "Test-path findings" below.
 - **Per-surface readiness scores** (one per discovered tool, agent, subagent,
   or the repo as a whole) and an **overall score** (a breadth-aware,
   badness-weighted mean — weak surfaces pull it down harder, but a single
@@ -487,6 +489,24 @@ terminal (TTY vs pipe, `NO_COLOR`), so the same scan can render with or without
 color. Use `--no-color`, or diff the JSON/SARIF output, when byte-stability
 matters.
 
+### Test-path findings
+
+A finding whose file lives under a test path (`tests/`, `__tests__/`,
+`testdata/`, `test_*.py`, `*_test.go`, `*.spec.ts`, …) is still reported in
+every format — nothing is silently hidden — but by default it is **excluded
+from the readiness score and does not fail the build**: a `WebSearchTool`
+declared in `tests/test_adapter.py` is not the same finding as one shipped in
+a production agent, and scoring them identically made the report
+non-actionable. Each such finding carries `"origin": "test"` in JSON, an
+`origin` property plus a `result.suppressions` entry in SARIF (excluded from
+GitHub code scanning's default alert view, still present in the raw log), and
+renders under a trailing "Test-path findings (not scored)" section in the
+human output instead of mixing into the scored groups above it.
+
+Pass `--include-test-paths` to score and fail on these findings exactly like
+any other — useful if your project ships code that legitimately lives under a
+`tests/`-shaped path.
+
 ### Diagnostics (`--verbose` / `--debug`)
 
 `--verbose` (`-v`) narrates the scan on **stderr**: rule provenance (repo, ref,
@@ -527,7 +547,8 @@ With `--format json`/`sarif` progress is off, so the stderr file is
 diagnostics-only; with `--format human` it also carries the plain `[phase]`
 progress lines.
 
-Exit codes:
+Exit codes (a test-path finding is excluded from this gate unless
+`--include-test-paths` is set — see "Test-path findings" above):
 - `0` — no findings ≥ medium severity (or no findings at all).
 - `1` — at least one finding ≥ medium severity, OR `--strict` with any
   finding present.
@@ -817,6 +838,12 @@ trustabl scan ./repo --license-scan --bom-out bom.json  # findings + BOM with li
 # credential literals (SECRET-LIT-001, high) and scripts that read
 # credential environment variables (SECRET-ENV-001, medium).
 trustabl scan ./repo --secret-scan
+
+# Test-path findings (a tests/ agent, test_*.py, *.spec.ts, …) are always
+# reported but excluded from scoring and the exit code by default — see
+# "Test-path findings" below. --include-test-paths scores and fails on them
+# like any other finding.
+trustabl scan ./repo --include-test-paths
 
 # JSON output for CI piping
 trustabl scan ./repo --format json

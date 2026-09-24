@@ -230,6 +230,24 @@ type AgentComponent struct {
 	Note     string        `json:"note,omitempty"`     // human-readable hint, e.g. "3 tools registered"
 }
 
+// SurfaceOrigin classifies where a finding's file lives on the
+// production-vs-test axis. The zero value (empty string) is production code —
+// the common case stays unmarked so existing JSON consumers see no change.
+// Set by internal/pathclass.Classify from the finding's FilePath; see that
+// package for the path-shape rules. Consumed by scanner.Run to exclude
+// test-origin findings from Surfaces/OverallScore/ProjectedScores, and by
+// cmd/trustabl's exitCode to exclude them from the CI gate, both only when
+// --include-test-paths is not set. Findings are never dropped for this — the
+// tag only changes whether a finding is scored/gated, never whether it is
+// reported.
+type SurfaceOrigin string
+
+const (
+	// OriginTest marks a finding whose file matched a test-path pattern
+	// (a tests/ directory, a test_*.py / *_test.go / *.spec.ts filename, …).
+	OriginTest SurfaceOrigin = "test"
+)
+
 // Finding is one detector hit on one surface (tool, agent, subagent, or repo).
 type Finding struct {
 	RuleID   string           `json:"rule_id"`
@@ -248,6 +266,9 @@ type Finding struct {
 	Explanation  string  `json:"explanation"` // "show your work" per doc §7
 	SuggestedFix string  `json:"suggested_fix"`
 	Confidence   float64 `json:"confidence"` // 0..1
+	// Origin is "" for production code and OriginTest for a finding whose
+	// FilePath matched a test-path pattern. See SurfaceOrigin.
+	Origin SurfaceOrigin `json:"origin,omitempty"`
 }
 
 // SurfaceReadiness is the readiness score for one analyzable surface — a single
