@@ -58,7 +58,10 @@ exposing a `scan` tool backed by the same analysis as `trustabl scan`:
 }
 ```
 
-Registry listing: not listed.
+Trustabl is listed in the official MCP Registry as
+**`io.github.trustabl/agent-reliability-analyzer`**:
+
+https://registry.modelcontextprotocol.io/?q=trustabl
 
 ---
 
