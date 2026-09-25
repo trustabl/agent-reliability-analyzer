@@ -193,10 +193,18 @@ func TestScanTool_VulnScanArg(t *testing.T) {
 	}
 }
 
-// TestScanTool_MissingPath returns an isError tool result, not a protocol
-// error: the model should see a usable message.
-func TestScanTool_MissingPath(t *testing.T) {
-	srv := New(fixtureScan(t), VersionInfo{Version: "test"})
+// TestScanTool_OmittedPathDefaultsToWorkingDirectory pins the behaviour the
+// container package depends on. The image is run with -w on the mounted repo,
+// so "no path" has to mean "the directory I am running in". A caller's own path
+// does not exist inside the container, which is why the schema no longer
+// requires the field.
+func TestScanTool_OmittedPathDefaultsToWorkingDirectory(t *testing.T) {
+	var got ScanRequest
+	srv := New(func(_ context.Context, req ScanRequest) (models.ScanResult, error) {
+		got = req
+		return models.ScanResult{ScanID: "x"}, nil
+	}, VersionInfo{Version: "test"})
+
 	call := mustJSON(t, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      7,
@@ -213,8 +221,44 @@ func TestScanTool_MissingPath(t *testing.T) {
 	if err := json.Unmarshal(resps[0].Result, &tr); err != nil {
 		t.Fatal(err)
 	}
-	if !tr.IsError {
-		t.Error("missing path should produce isError=true")
+	if tr.IsError {
+		t.Fatalf("omitted path should not error: %s", resps[0].Result)
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Path != wd {
+		t.Errorf("path = %q, want the working directory %q", got.Path, wd)
+	}
+}
+
+// TestScanSchema_PathOptionalAndAdvertisesURL guards the two halves of the
+// contract a client reads: path must not be required (or a model is forced to
+// invent one), and the description must name the GitHub-URL form (or the
+// capability stays invisible, which is exactly what happened before).
+func TestScanSchema_PathOptionalAndAdvertisesURL(t *testing.T) {
+	var schema struct {
+		Required   []string                   `json:"required"`
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal([]byte(scanInputSchema), &schema); err != nil {
+		t.Fatalf("scanInputSchema invalid: %v", err)
+	}
+	for _, r := range schema.Required {
+		if r == "path" {
+			t.Error("path must not be required: an omitted path scans the working directory")
+		}
+	}
+	var p struct {
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(schema.Properties["path"], &p); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(p.Description, "github.com") {
+		t.Errorf("path description must advertise the GitHub URL form, got: %q", p.Description)
 	}
 }
 

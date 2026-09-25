@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/trustabl/trustabl/internal/models"
 )
@@ -14,11 +15,15 @@ import (
 // the stable revision the stdio tool surface targets.
 const protocolVersion = "2024-11-05"
 
-// ScanRequest is the input schema for the `scan` tool. Path is required and
-// names a local directory or repository to scan; RulesRef optionally pins the
-// detection-rules branch or tag (mirrors the CLI's --rules-ref). VulnScan opts
-// the call into OSV dependency-vulnerability matching (mirrors --vuln-scan): off
-// by default, so a scan stays offline-capable and fast unless the client asks.
+// ScanRequest is the input schema for the `scan` tool. Path names a local
+// directory or repository to scan; when empty it defaults to the server's own
+// working directory. That default is what makes the container package usable:
+// the image is run with -w on the mounted repo, and a client that sends the
+// host's path would otherwise ask the server to stat a path that does not
+// exist inside the container. RulesRef optionally pins the detection-rules
+// branch or tag (mirrors the CLI's --rules-ref). VulnScan opts the call into
+// OSV dependency-vulnerability matching (mirrors --vuln-scan): off by default,
+// so a scan stays offline-capable and fast unless the client asks.
 type ScanRequest struct {
 	Path     string `json:"path"`
 	RulesRef string `json:"rules_ref,omitempty"`
@@ -158,14 +163,16 @@ func (s *Server) toolsListResult() map[string]any {
 	}
 }
 
-// scanInputSchema is the JSON Schema for the `scan` tool input. path is
-// required; rules_ref and vuln_scan are optional.
+// scanInputSchema is the JSON Schema for the `scan` tool input. Every field is
+// optional: omitting path scans the server's working directory. The path
+// description names the GitHub-URL form explicitly, because a model only offers
+// what the schema advertises — the capability existed before and went unused.
 const scanInputSchema = `{
   "type": "object",
   "properties": {
     "path": {
       "type": "string",
-      "description": "Local directory or repository path to scan."
+      "description": "What to scan: a local directory, or a GitHub repository URL such as https://github.com/owner/repo, which is cloned and scanned. Defaults to the server's working directory when omitted — use the default when the server runs in a container, since a path from the calling machine does not exist inside it."
     },
     "rules_ref": {
       "type": "string",
@@ -176,7 +183,6 @@ const scanInputSchema = `{
       "description": "Match declared dependencies against a pinned OSV snapshot and report known CVEs in 'vulnerabilities' and as findings (default false; fetches the OSV database on first use, then reuses the cache)."
     }
   },
-  "required": ["path"],
   "additionalProperties": false
 }`
 
@@ -217,7 +223,15 @@ func (s *Server) callScan(ctx context.Context, c *conn, id json.RawMessage, args
 		}
 	}
 	if sr.Path == "" {
-		return c.writeResult(id, textResult("scan: 'path' is required", true))
+		// An omitted path means "scan where the server is running". In the
+		// container package that is the mounted repository (the image is run
+		// with -w on it), which is the only path the server can actually see —
+		// the caller's own path does not exist inside the container.
+		wd, err := os.Getwd()
+		if err != nil {
+			return c.writeResult(id, textResult(fmt.Sprintf("scan: no path given and the working directory is unavailable: %v", err), true))
+		}
+		sr.Path = wd
 	}
 
 	result, err := s.scan(ctx, sr)
