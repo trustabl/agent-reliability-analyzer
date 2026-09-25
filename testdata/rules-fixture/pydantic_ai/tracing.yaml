@@ -1,0 +1,55 @@
+policy:
+  id: pydantic_ai_tracing
+  name: Pydantic AI observability configuration
+  category: pydantic_ai
+  description: >
+    Repo-scoped rules covering whether a Pydantic AI project can be observed in
+    production.
+
+rules:
+  - id: PYD-202
+    title: Pydantic AI project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - pydantic_ai
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [pydantic_ai]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project runs Pydantic AI agents but wires no observability backend.
+      Pydantic AI emits OpenTelemetry GenAI spans natively once instrumentation
+      is switched on, so the data is available for free — it is simply not being
+      collected here. Validation retries and tool failures are invisible
+      without it.
+    fix: >
+      Call logfire.configure() then logfire.instrument_pydantic_ai() at startup,
+      or install any OpenTelemetry tracer provider with an OTLP exporter and set
+      instrument=True on your Agent(...) constructions.
+
+  - id: PYD-107
+    title: Agent is not instrumented while the rest of the project is
+    severity: low
+    confidence: 0.7
+    language: python
+    applies_to:
+      - pydantic_ai_agent
+    scope: agent
+    match:
+      all:
+        - repo_has_observability: true
+        - agent_kwarg_missing: [instrument]
+    explanation: >
+      This project wires observability, but this Agent(...) does not set
+      instrument, so its runs are missing from the traces its siblings produce.
+      That gap is worse than having no tracing at all: a dashboard that looks
+      complete silently omits this agent, so its failures are invisible exactly
+      when someone is looking for them.
+    fix: >
+      Set instrument=True on this Agent(...), or call
+      logfire.instrument_pydantic_ai() once at startup to instrument every agent
+      in the process.

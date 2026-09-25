@@ -1489,6 +1489,117 @@ func PredRepoClaudeOptionsDisallowedToolsMissing(inv models.RepoInventory) bool 
 	return repoClaudeOptionsMissingKwarg(inv, "disallowed_tools")
 }
 
+// PredRepoHasObservability reports whether the repo has ANY observability
+// signal — import, init, exporter, or content capture. A declared dependency
+// alone is deliberately not enough: recon's ObsDeps gate the AST pass, they do
+// not stand in for code.
+func PredRepoHasObservability(want bool, inv models.RepoInventory) bool {
+	return (len(inv.ObservabilitySignals) > 0) == want
+}
+
+// directObsDepManifests are the dependency manifests a developer edits by hand.
+// poetry.lock is deliberately excluded: a lock file enumerates the TRANSITIVE
+// closure, so an observability package lands there without anyone choosing it —
+// promoting that to a finding would blame a repo for its framework's
+// dependencies.
+var directObsDepManifests = map[string]bool{
+	"pyproject.toml":   true,
+	"requirements.txt": true,
+	"Pipfile":          true,
+	"package.json":     true,
+}
+
+// PredRepoObservabilityDeclared reports whether an observability package is
+// DECLARED in a hand-edited dependency manifest, whatever the code does with it.
+//
+// This is the one predicate that reads recon output (RepoProfile.ObsDeps) rather
+// than code signals, and it exists for a single distinction: a repo that ships
+// an observability dependency and never wires it is not the same as a repo that
+// never tried. The first believes it has coverage. Pair it with
+// repo_has_observability to separate the two.
+func PredRepoObservabilityDeclared(want bool, p models.RepoProfile) bool {
+	declared := false
+	for _, d := range p.ObsDeps {
+		if directObsDepManifests[d.Source] {
+			declared = true
+			break
+		}
+	}
+	return declared == want
+}
+
+// PredRepoObservabilityInspectable reports whether the repo contains at least
+// one language the observability pass actually parses (Python, TypeScript,
+// JavaScript).
+//
+// This is the honesty guard behind every absence rule. Without it, a Go-only or
+// Rust-only repo produces zero signals for the trivial reason that nothing
+// looked — and "we did not look" would be reported as "you have no
+// observability".
+func PredRepoObservabilityInspectable(want bool, inv models.RepoInventory) bool {
+	m := inv.Manifest
+	inspectable := len(m.PythonFiles) > 0 || len(m.TypeScriptFiles) > 0 || len(m.JavaScriptFiles) > 0
+	return inspectable == want
+}
+
+// PredRepoObservabilityInitialized reports whether instrumentation is actually
+// switched on: an init call or a per-agent instrument kwarg. An import is not
+// initialization — that gap is exactly what OBS-001 fires on.
+func PredRepoObservabilityInitialized(want bool, inv models.RepoInventory) bool {
+	found := false
+	for _, s := range inv.ObservabilitySignals {
+		if s.Kind == models.ObsSignalInit || s.Kind == models.ObsSignalInstrumentKwarg {
+			found = true
+			break
+		}
+	}
+	return found == want
+}
+
+// PredRepoObservabilityVendor reports whether any signal names one of the
+// listed vendors. Lets a rule's fix text speak about the vendor actually in use.
+func PredRepoObservabilityVendor(vendors []string, inv models.RepoInventory) bool {
+	for _, s := range inv.ObservabilitySignals {
+		for _, v := range vendors {
+			if string(s.Vendor) == v {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// PredRepoObservabilityConsoleOnly reports whether the repo constructs span
+// exporters AND every one of them writes to the console. No exporters at all is
+// false — that is the absence case, not the console-only case.
+func PredRepoObservabilityConsoleOnly(want bool, inv models.RepoInventory) bool {
+	var exporters, console int
+	for _, s := range inv.ObservabilitySignals {
+		if s.Kind != models.ObsSignalExporter {
+			continue
+		}
+		exporters++
+		if s.Detail == "console" {
+			console++
+		}
+	}
+	consoleOnly := exporters > 0 && exporters == console
+	return consoleOnly == want
+}
+
+// PredRepoObservabilityCapturesContent reports whether the repo switches on
+// capture of full prompt/response text into a tracing backend.
+func PredRepoObservabilityCapturesContent(want bool, inv models.RepoInventory) bool {
+	found := false
+	for _, s := range inv.ObservabilitySignals {
+		if s.Kind == models.ObsSignalContentCapture {
+			found = true
+			break
+		}
+	}
+	return found == want
+}
+
 // PredRepoClaudeOptionsModeWithoutKwarg fires when a SINGLE discovered
 // ClaudeAgentOptions(...) construction both sets permission_mode to one of
 // e.Modes and does not set e.Kwarg. This correlates the two facts at the

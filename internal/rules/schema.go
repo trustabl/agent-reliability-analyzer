@@ -127,6 +127,16 @@ type MatchExpr struct {
 	RepoClaudeOptionsMaxTurnsMissing        *bool                       `yaml:"repo_claude_options_max_turns_missing,omitempty"`
 	RepoClaudeOptionsDisallowedToolsMissing *bool                       `yaml:"repo_claude_options_disallowed_tools_missing,omitempty"`
 	RepoClaudeOptionsModeWithoutKwarg       *ClaudeOptionsModeKwargExpr `yaml:"repo_claude_options_mode_without_kwarg,omitempty"`
+
+	// Observability predicates. repo_has_observability is ALSO valid at agent
+	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
+	RepoHasObservability             *bool    `yaml:"repo_has_observability,omitempty"`
+	RepoObservabilityInspectable     *bool    `yaml:"repo_observability_inspectable,omitempty"`
+	RepoObservabilityInitialized     *bool    `yaml:"repo_observability_initialized,omitempty"`
+	RepoObservabilityVendor          []string `yaml:"repo_observability_vendor,omitempty"`
+	RepoObservabilityConsoleOnly     *bool    `yaml:"repo_observability_console_only,omitempty"`
+	RepoObservabilityCapturesContent *bool    `yaml:"repo_observability_captures_content,omitempty"`
+	RepoObservabilityDeclared        *bool    `yaml:"repo_observability_declared,omitempty"`
 }
 
 // SkillTextMatchExpr matches skill text (name/description/body) at

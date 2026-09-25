@@ -1,0 +1,56 @@
+policy:
+  id: langchain_tracing
+  name: LangChain observability configuration
+  category: langchain
+  description: >
+    Repo-scoped rules covering whether a LangChain / LangGraph project can be
+    observed in production.
+
+rules:
+  - id: LC-202
+    title: LangChain project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - langchain
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [langchain]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project builds LangChain or LangGraph agents but wires no
+      observability backend — no callback handler, no LangSmith tracing, no
+      OpenTelemetry provider. Chain and graph executions nest many steps, so a
+      wrong answer usually traces to one intermediate step; without a recorded
+      run there is no way to see which one.
+    fix: >
+      Pass a callback handler to your chain or agent — LangSmith's tracer
+      (set LANGSMITH_TRACING), Langfuse's CallbackHandler, or any OpenTelemetry
+      handler — or install a global tracer provider with an OTLP exporter at
+      process start.
+
+  - id: LC-112
+    title: Agent has no callbacks while the rest of the project is instrumented
+    severity: low
+    confidence: 0.7
+    language: python
+    applies_to:
+      - langchain_agent
+      - langchain_agent_executor
+      - langchain_state_graph
+    scope: agent
+    match:
+      all:
+        - repo_has_observability: true
+        - agent_kwarg_missing: [callbacks]
+    explanation: >
+      This project wires observability, but this agent is constructed with no
+      callbacks, so its executions never reach the handler its siblings report
+      through. The resulting trace view looks complete while silently omitting
+      this agent's runs.
+    fix: >
+      Pass the project's handler in this constructor — callbacks=[handler] — or
+      configure a global handler so every chain and agent inherits it.

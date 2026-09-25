@@ -76,6 +76,11 @@ const (
 	// not an SDK import, so this category is loaded unconditionally (like
 	// openshell) rather than gated on SDKsDetected.
 	CategoryClaudeSkill DetectorCategory = "claude_skill"
+	// CategoryObservability covers cross-SDK observability quality rules
+	// (OBS-*). Unlike the SDK categories it is not gated on one SDK: its rules
+	// list every SDK token in applies_to because their text is vendor-framed
+	// (Langfuse, OpenTelemetry) rather than SDK-framed.
+	CategoryObservability DetectorCategory = "observability"
 )
 
 // display order. It is the single source of truth for category membership:
@@ -86,7 +91,7 @@ const (
 var AllCategories = []DetectorCategory{
 	CategoryClaudeSDK, CategoryOpenAISDK, CategoryOpenShell, CategoryGoogleADK,
 	CategoryMCP, CategoryLangChain, CategoryCrewAI, CategoryPydanticAI,
-	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill,
+	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill, CategoryObservability,
 }
 
 // ValidCategory reports whether c is a category this build recognizes. The rule
@@ -353,6 +358,66 @@ type SDKDep struct {
 	Confidence float64 `json:"confidence"`
 }
 
+// ObservabilityVendor identifies an agent-observability backend or
+// instrumentation library. Closed enum. It is ALSO the Phase 2 emitter
+// taxonomy — the runtime trace layer maps each emitter's dialect onto these
+// values, so a new vendor is added here once and serves both phases.
+type ObservabilityVendor string
+
+const (
+	VendorOTel          ObservabilityVendor = "otel"
+	VendorOpenLLMetry   ObservabilityVendor = "openllmetry"
+	VendorOpenInference ObservabilityVendor = "openinference"
+	VendorLangfuse      ObservabilityVendor = "langfuse"
+	VendorLangSmith     ObservabilityVendor = "langsmith"
+	VendorLogfire       ObservabilityVendor = "logfire"
+	VendorBraintrust    ObservabilityVendor = "braintrust"
+	VendorWeave         ObservabilityVendor = "weave"
+	VendorAgentOps      ObservabilityVendor = "agentops"
+	VendorMLflow        ObservabilityVendor = "mlflow"
+	VendorDatadogLLMObs ObservabilityVendor = "datadog_llmobs"
+	VendorNative        ObservabilityVendor = "native"
+)
+
+// ObsSignalKind classifies the STRENGTH of an observability signal. The
+// import-vs-init split is the point of the whole model: an import proves the
+// package is present, only an init proves traces have somewhere to go.
+type ObsSignalKind string
+
+const (
+	ObsSignalImport          ObsSignalKind = "import"
+	ObsSignalInit            ObsSignalKind = "init"
+	ObsSignalExporter        ObsSignalKind = "exporter"
+	ObsSignalContentCapture  ObsSignalKind = "content_capture"
+	ObsSignalInstrumentKwarg ObsSignalKind = "instrument_kwarg"
+)
+
+// ObsDep is one observability package DECLARED in a dependency manifest.
+//
+// It is deliberately NOT folded into RepoProfile.SDKDeps: SDKDeps drives the
+// META-002 "declared but unused in code" drift finding, and an observability
+// package legitimately appears in a manifest while its init lives in a file the
+// pass does not parse. Merging the two would make META-002 fire forever on
+// every repo that declares langfuse.
+type ObsDep struct {
+	Vendor     ObservabilityVendor `json:"vendor"`
+	Source     string              `json:"source"`
+	Confidence float64             `json:"confidence"`
+}
+
+// ObservabilitySignal is one observability fact OBSERVED IN CODE. Detail is a
+// small discriminating token — the imported module, the callee name, the
+// exporter sink, or the kwarg/env var that enables content capture.
+type ObservabilitySignal struct {
+	Vendor    ObservabilityVendor `json:"vendor"`
+	Kind      ObsSignalKind       `json:"kind"`
+	Detail    string              `json:"detail,omitempty"`
+	File      string              `json:"file"`
+	StartLine int                 `json:"start_line"`
+	EndLine   int                 `json:"end_line"`
+	Language  Language            `json:"language"`
+}
+
 // DepRef is one dependency declared in a repo manifest — the agent-path
 // supply-chain BOM (Story TR-278; supersedes the skill-only BOM of TR-221). It
 // is pure inventory: Trustabl records what the repo DECLARES, then either hands
@@ -410,9 +475,14 @@ type DepVuln struct {
 
 // RepoProfile is the output of the recon step.
 type RepoProfile struct {
-	Languages []Language   `json:"languages"`
-	SDKDeps   []SDKDep     `json:"sdk_deps"`
-	Manifest  ScanManifest `json:"manifest"`
+	Languages []Language `json:"languages"`
+	SDKDeps   []SDKDep   `json:"sdk_deps"`
+	// ObsDeps are observability packages DECLARED in a dependency manifest.
+	// Recon-only: they gate whether the AST observability pass runs, and never
+	// stand in for an observed code signal. Kept out of SDKDeps on purpose —
+	// see the ObsDep doc comment.
+	ObsDeps  []ObsDep     `json:"obs_deps,omitempty"`
+	Manifest ScanManifest `json:"manifest"`
 }
 
 // RepoInventory is the output of the inventory step.
@@ -441,6 +511,9 @@ type RepoInventory struct {
 	HasShellInvocations bool         `json:"has_shell_invocations"`
 	Manifest            ScanManifest `json:"manifest"` // convenience copy for repo-scope predicates
 	UsesDefaultTracing  bool         `json:"uses_default_tracing"`
+	// ObservabilitySignals are the observability facts OBSERVED IN CODE, sorted
+	// by (File, StartLine, Vendor, Kind) for determinism.
+	ObservabilitySignals []ObservabilitySignal `json:"observability_signals,omitempty"`
 }
 
 // Coverage records how thoroughly the scan actually parsed the repo's source.
@@ -525,37 +598,41 @@ func (o RulesOrigin) Watermark() string {
 
 // ScanResult is the top-level output. JSON-serializable for CI.
 type ScanResult struct {
-	ScanID              string             `json:"scan_id"`
-	Repo                string             `json:"repo"`
-	Languages           []Language         `json:"languages"` // detected by file extension (recon)
-	SDKs                []SDK              `json:"sdks"`      // observed in code (inventory)
-	HasShellInvocations bool               `json:"has_shell_invocations"`
-	Manifest            ScanManifest       `json:"manifest"`
-	Tools               []ToolDef          `json:"tools"`
-	Agents              []AgentDef         `json:"agents"`
-	HostedTools         []HostedToolDef    `json:"hosted_tools"`
-	MCPServers          []MCPServerDef     `json:"mcp_servers"`
-	Subagents           []SubagentDef      `json:"subagents"`
-	Skills              []SkillDef         `json:"skills"`
-	Dependencies        []DepRef           `json:"dependencies"`              // repo-wide declared-dependency BOM (TR-278); not folded into ScanID
-	Vulnerabilities     []DepVuln          `json:"vulnerabilities,omitempty"` // --vuln-scan OSV matches (TR-271); absent on the default path
-	Secrets             []SecretMatch      `json:"secrets,omitempty"`         // --secret-scan hardcoded-credential matches; absent on the default path
-	SlashCommands       []SlashCommandDef  `json:"slash_commands"`
-	PluginManifests     []PluginManifest   `json:"plugin_manifests"`
-	ClaudeSettings      []ClaudeSettings   `json:"claude_settings"`
-	Findings            []Finding          `json:"findings"`
-	Surfaces            []SurfaceReadiness `json:"surfaces"`
-	OverallScore        float64            `json:"overall_score"`
-	ProjectedScores     ProjectedScores    `json:"projected_scores"`
-	RulesSource         string             `json:"rules_source"`                   // repo the rule pack came from
-	RulesVersion        string             `json:"rules_version"`                  // resolved rules commit SHA
-	RulesFromCache      bool               `json:"rules_from_cache"`               // true if rules came from cache (network skipped/unreachable)
-	RulesStale          bool               `json:"rules_stale,omitempty"`          // true if the cached signed bundle's channel statement has expired
-	RulesSchemaVersion  int                `json:"rules_schema_version,omitempty"` // pack manifest's declared schema_version
-	RulesSchemaNewer    bool               `json:"rules_schema_newer,omitempty"`   // pack targets a schema newer than this build supports
-	RulesSkipped        []string           `json:"rules_skipped,omitempty"`        // rule IDs dropped as forward-incompatible (sorted, deduped)
-	RulesOrigin         RulesOrigin        `json:"rules_origin"`                   // provenance of the rules (signed channel / unsigned / custom)
-	Coverage            Coverage           `json:"coverage"`                       // how many source files parsed vs. were skipped
+	ScanID              string          `json:"scan_id"`
+	Repo                string          `json:"repo"`
+	Languages           []Language      `json:"languages"` // detected by file extension (recon)
+	SDKs                []SDK           `json:"sdks"`      // observed in code (inventory)
+	HasShellInvocations bool            `json:"has_shell_invocations"`
+	Manifest            ScanManifest    `json:"manifest"`
+	Tools               []ToolDef       `json:"tools"`
+	Agents              []AgentDef      `json:"agents"`
+	HostedTools         []HostedToolDef `json:"hosted_tools"`
+	MCPServers          []MCPServerDef  `json:"mcp_servers"`
+	Subagents           []SubagentDef   `json:"subagents"`
+	Skills              []SkillDef      `json:"skills"`
+	Dependencies        []DepRef        `json:"dependencies"` // repo-wide declared-dependency BOM (TR-278); not folded into ScanID
+	// Observability reports the instrumentation found in code — the positive
+	// signal, not only the findings. Additive inventory, NOT folded into ScanID
+	// (same treatment as Dependencies).
+	Observability      []ObservabilitySignal `json:"observability,omitempty"`
+	Vulnerabilities    []DepVuln             `json:"vulnerabilities,omitempty"` // --vuln-scan OSV matches (TR-271); absent on the default path
+	Secrets            []SecretMatch         `json:"secrets,omitempty"`         // --secret-scan hardcoded-credential matches; absent on the default path
+	SlashCommands      []SlashCommandDef     `json:"slash_commands"`
+	PluginManifests    []PluginManifest      `json:"plugin_manifests"`
+	ClaudeSettings     []ClaudeSettings      `json:"claude_settings"`
+	Findings           []Finding             `json:"findings"`
+	Surfaces           []SurfaceReadiness    `json:"surfaces"`
+	OverallScore       float64               `json:"overall_score"`
+	ProjectedScores    ProjectedScores       `json:"projected_scores"`
+	RulesSource        string                `json:"rules_source"`                   // repo the rule pack came from
+	RulesVersion       string                `json:"rules_version"`                  // resolved rules commit SHA
+	RulesFromCache     bool                  `json:"rules_from_cache"`               // true if rules came from cache (network skipped/unreachable)
+	RulesStale         bool                  `json:"rules_stale,omitempty"`          // true if the cached signed bundle's channel statement has expired
+	RulesSchemaVersion int                   `json:"rules_schema_version,omitempty"` // pack manifest's declared schema_version
+	RulesSchemaNewer   bool                  `json:"rules_schema_newer,omitempty"`   // pack targets a schema newer than this build supports
+	RulesSkipped       []string              `json:"rules_skipped,omitempty"`        // rule IDs dropped as forward-incompatible (sorted, deduped)
+	RulesOrigin        RulesOrigin           `json:"rules_origin"`                   // provenance of the rules (signed channel / unsigned / custom)
+	Coverage           Coverage              `json:"coverage"`                       // how many source files parsed vs. were skipped
 	// NoAgentSurfaces marks a scan that found nothing to evaluate: no tools,
 	// agents, subagents or skills. Scoring an empty set yields 1.0, which reads
 	// as a perfect result when in fact nothing was checked, so consumers must be

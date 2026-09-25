@@ -1029,3 +1029,66 @@ func TestScanExamples_ADKJS_DiscoveryCounts(t *testing.T) {
 		t.Errorf("expected ADK-109 to fire on the description-less TS LlmAgents in this corpus; got findings=%v", res.Findings)
 	}
 }
+
+// obsScanRepo writes one Python file into a temp repo and scans it.
+func obsScanRepo(t *testing.T, src string) models.ScanResult {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "app.py"), []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	return res
+}
+
+func TestScan_ReportsObservabilitySignals(t *testing.T) {
+	res := obsScanRepo(t, `import langfuse
+from langfuse.callback import CallbackHandler
+
+handler = CallbackHandler()
+`)
+	if len(res.Observability) == 0 {
+		t.Fatal("ScanResult.Observability is empty; want the langfuse signals")
+	}
+	var sawInit bool
+	for _, s := range res.Observability {
+		if s.Vendor == models.VendorLangfuse && s.Kind == models.ObsSignalInit {
+			sawInit = true
+		}
+	}
+	if !sawInit {
+		t.Fatalf("no langfuse init signal in %+v", res.Observability)
+	}
+}
+
+// An import with no init must stay an import. This is the distinction OBS-001
+// fires on, asserted end to end rather than only at the discovery layer.
+func TestScan_ObservabilityImportedButNotInitialized(t *testing.T) {
+	res := obsScanRepo(t, `import langfuse
+
+def handler():
+    return 1
+`)
+	if len(res.Observability) == 0 {
+		t.Fatal("want an import signal")
+	}
+	for _, s := range res.Observability {
+		if s.Kind == models.ObsSignalInit {
+			t.Fatalf("an import alone must not produce an init signal: %+v", s)
+		}
+	}
+}
+
+func TestScan_NoObservabilityAtAll(t *testing.T) {
+	res := obsScanRepo(t, `import os
+
+def handler():
+    return os.getcwd()
+`)
+	if len(res.Observability) != 0 {
+		t.Fatalf("want no signals, got %+v", res.Observability)
+	}
+}

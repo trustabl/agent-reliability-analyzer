@@ -1,0 +1,32 @@
+policy:
+  id: mcp_tracing
+  name: MCP server observability configuration
+  category: mcp
+  description: >
+    Repo-scoped rules covering whether an MCP server can be observed in
+    production.
+
+rules:
+  - id: MCP-202
+    title: MCP server wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [mcp]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project implements an MCP server but wires no observability backend.
+      An MCP server runs as a separate process driven by a client it does not
+      control, so its failures surface to a user as an unexplained tool error in
+      another application. Without traces on the server side there is nothing to
+      correlate against that report.
+    fix: >
+      Install an OpenTelemetry tracer provider with an OTLP exporter at server
+      start. Do not add stdout logging to a stdio-transport server — stdout is
+      the protocol channel, and loose writes corrupt the JSON-RPC stream.

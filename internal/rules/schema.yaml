@@ -557,6 +557,34 @@ rules:
 #       variable form are covered without dataflow). The match is AST-scoped
 #       (call-function names, call arguments, string literals) — a mention
 #       inside a comment or an unrelated identifier does not count.
+#   repo_has_observability: true | false
+#       Fires when the repo has (or lacks) any observability signal in code —
+#       an import, init, exporter, or content-capture switch. A declared
+#       dependency alone does NOT satisfy it. Valid at repo scope AND at agent
+#       scope, where it gates "this agent is the outlier" rules.
+#   repo_observability_inspectable: true | false
+#       Fires when the repo contains at least one language the observability
+#       pass parses (python, typescript, javascript). Pair it with
+#       repo_has_observability: false so an absence rule cannot fire on a
+#       Go/C#/PHP/Rust repo where nothing was inspected.
+#   repo_observability_initialized: true | false
+#       Fires when instrumentation is actually switched on (an init call or a
+#       per-agent instrument kwarg), not merely imported.
+#   repo_observability_declared: true | false
+#       Fires when an observability package is DECLARED in a hand-edited
+#       dependency manifest (pyproject.toml, requirements.txt, Pipfile,
+#       package.json) — reads RepoProfile.ObsDeps, the only predicate that
+#       reads recon output instead of code signals. poetry.lock is excluded on
+#       purpose: it lists the transitive closure, so a match there proves
+#       nobody's intent. Pair it with repo_has_observability to separate
+#       "shipped a tracing dep and never wired it" from "never tried".
+#   repo_observability_vendor: [langfuse, otel, ...]
+#       Fires when any signal names one of the listed vendors.
+#   repo_observability_console_only: true | false
+#       Fires when span exporters exist AND all of them write to the console.
+#       False when there are no exporters at all.
+#   repo_observability_captures_content: true | false
+#       Fires when the repo switches on capture of full prompt/response text.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads
