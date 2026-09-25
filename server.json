@@ -35,11 +35,6 @@
               "isRequired": true
             }
           }
-        },
-        {
-          "type": "named",
-          "name": "-w",
-          "value": "/workspace"
         }
       ],
       "packageArguments": [

@@ -10,6 +10,13 @@ import (
 	"github.com/trustabl/trustabl/internal/models"
 )
 
+// defaultPathEnv names the directory to scan when a client sends no path. The
+// container image sets it to the mounted repository; nothing else does. It is
+// deliberately opt-in rather than a working-directory fallback, because an MCP
+// client picks the working directory and some launch servers from the user's
+// home, where a default would scan far more than anyone asked for.
+const defaultPathEnv = "TRUSTABL_MCP_DEFAULT_PATH"
+
 // protocolVersion is the MCP protocol revision this server implements. Clients
 // send their own version in initialize; we echo a version we support. This is
 // the stable revision the stdio tool surface targets.
@@ -172,7 +179,7 @@ const scanInputSchema = `{
   "properties": {
     "path": {
       "type": "string",
-      "description": "What to scan: a local directory, or a GitHub repository URL such as https://github.com/owner/repo, which is cloned and scanned. Defaults to the server's working directory when omitted — use the default when the server runs in a container, since a path from the calling machine does not exist inside it."
+      "description": "What to scan: a local directory, or a GitHub repository URL such as https://github.com/owner/repo, which is cloned and scanned. When this server runs as a container it scans the repository mounted into it, so omit this field rather than sending a path from your own machine, which does not exist inside the container."
     },
     "rules_ref": {
       "type": "string",
@@ -223,15 +230,17 @@ func (s *Server) callScan(ctx context.Context, c *conn, id json.RawMessage, args
 		}
 	}
 	if sr.Path == "" {
-		// An omitted path means "scan where the server is running". In the
-		// container package that is the mounted repository (the image is run
-		// with -w on it), which is the only path the server can actually see —
-		// the caller's own path does not exist inside the container.
-		wd, err := os.Getwd()
-		if err != nil {
-			return c.writeResult(id, textResult(fmt.Sprintf("scan: no path given and the working directory is unavailable: %v", err), true))
+		// Only the container image declares a default, via defaultPathEnv. Do
+		// NOT fall back to the process working directory here: MCP clients
+		// choose that themselves and some launch servers from the user's home
+		// directory, so an omitted path would silently walk everything they own.
+		// Outside the image there is no safe guess, so say what to send instead.
+		def := os.Getenv(defaultPathEnv)
+		if def == "" {
+			return c.writeResult(id, textResult(
+				"scan: no 'path' given. Send a local directory, or a GitHub repository URL such as https://github.com/owner/repo.", true))
 		}
-		sr.Path = wd
+		sr.Path = def
 	}
 
 	result, err := s.scan(ctx, sr)

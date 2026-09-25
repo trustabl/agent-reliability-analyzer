@@ -193,12 +193,10 @@ func TestScanTool_VulnScanArg(t *testing.T) {
 	}
 }
 
-// TestScanTool_OmittedPathDefaultsToWorkingDirectory pins the behaviour the
-// container package depends on. The image is run with -w on the mounted repo,
-// so "no path" has to mean "the directory I am running in". A caller's own path
-// does not exist inside the container, which is why the schema no longer
-// requires the field.
-func TestScanTool_OmittedPathDefaultsToWorkingDirectory(t *testing.T) {
+// scanOmittingPath calls the scan tool with no arguments and returns the
+// ScanRequest the server passed through, plus whether the call was an error.
+func scanOmittingPath(t *testing.T) (ScanRequest, bool, json.RawMessage) {
+	t.Helper()
 	var got ScanRequest
 	srv := New(func(_ context.Context, req ScanRequest) (models.ScanResult, error) {
 		got = req
@@ -221,16 +219,41 @@ func TestScanTool_OmittedPathDefaultsToWorkingDirectory(t *testing.T) {
 	if err := json.Unmarshal(resps[0].Result, &tr); err != nil {
 		t.Fatal(err)
 	}
-	if tr.IsError {
-		t.Fatalf("omitted path should not error: %s", resps[0].Result)
-	}
+	return got, tr.IsError, resps[0].Result
+}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+// TestScanTool_OmittedPathUsesContainerDefault covers the container package:
+// the image sets TRUSTABL_MCP_DEFAULT_PATH to the mounted repository, so a
+// client that sends no path scans that rather than failing.
+func TestScanTool_OmittedPathUsesContainerDefault(t *testing.T) {
+	t.Setenv(defaultPathEnv, "/workspace")
+
+	got, isErr, raw := scanOmittingPath(t)
+	if isErr {
+		t.Fatalf("omitted path should use the configured default, got error: %s", raw)
 	}
-	if got.Path != wd {
-		t.Errorf("path = %q, want the working directory %q", got.Path, wd)
+	if got.Path != "/workspace" {
+		t.Errorf("path = %q, want /workspace", got.Path)
+	}
+}
+
+// TestScanTool_OmittedPathWithoutDefaultAsksForOne is the other half, and the
+// more important one. Outside the image there is NO default: MCP clients pick
+// the working directory and some launch servers from the user's home, so
+// falling back to it would silently walk everything they own. The error names
+// the URL form so the model has something useful to send next.
+func TestScanTool_OmittedPathWithoutDefaultAsksForOne(t *testing.T) {
+	t.Setenv(defaultPathEnv, "")
+
+	got, isErr, raw := scanOmittingPath(t)
+	if !isErr {
+		t.Fatalf("omitted path with no configured default must error rather than guess, got: %s", raw)
+	}
+	if got.Path != "" {
+		t.Errorf("scan must not have run, but got path %q", got.Path)
+	}
+	if !strings.Contains(string(raw), "github.com") {
+		t.Errorf("error should point at the URL form, got: %s", raw)
 	}
 }
 
