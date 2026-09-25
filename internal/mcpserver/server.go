@@ -5,20 +5,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/trustabl/trustabl/internal/models"
 )
+
+// defaultPathEnv names the directory to scan when a client sends no path. The
+// container image sets it to the mounted repository; nothing else does. It is
+// deliberately opt-in rather than a working-directory fallback, because an MCP
+// client picks the working directory and some launch servers from the user's
+// home, where a default would scan far more than anyone asked for.
+const defaultPathEnv = "TRUSTABL_MCP_DEFAULT_PATH"
 
 // protocolVersion is the MCP protocol revision this server implements. Clients
 // send their own version in initialize; we echo a version we support. This is
 // the stable revision the stdio tool surface targets.
 const protocolVersion = "2024-11-05"
 
-// ScanRequest is the input schema for the `scan` tool. Path is required and
-// names a local directory or repository to scan; RulesRef optionally pins the
-// detection-rules branch or tag (mirrors the CLI's --rules-ref). VulnScan opts
-// the call into OSV dependency-vulnerability matching (mirrors --vuln-scan): off
-// by default, so a scan stays offline-capable and fast unless the client asks.
+// ScanRequest is the input schema for the `scan` tool. Path names a local
+// directory or repository to scan; when empty it defaults to the server's own
+// working directory. That default is what makes the container package usable:
+// the image is run with -w on the mounted repo, and a client that sends the
+// host's path would otherwise ask the server to stat a path that does not
+// exist inside the container. RulesRef optionally pins the detection-rules
+// branch or tag (mirrors the CLI's --rules-ref). VulnScan opts the call into
+// OSV dependency-vulnerability matching (mirrors --vuln-scan): off by default,
+// so a scan stays offline-capable and fast unless the client asks.
 type ScanRequest struct {
 	Path     string `json:"path"`
 	RulesRef string `json:"rules_ref,omitempty"`
@@ -158,14 +170,16 @@ func (s *Server) toolsListResult() map[string]any {
 	}
 }
 
-// scanInputSchema is the JSON Schema for the `scan` tool input. path is
-// required; rules_ref and vuln_scan are optional.
+// scanInputSchema is the JSON Schema for the `scan` tool input. Every field is
+// optional: omitting path scans the server's working directory. The path
+// description names the GitHub-URL form explicitly, because a model only offers
+// what the schema advertises — the capability existed before and went unused.
 const scanInputSchema = `{
   "type": "object",
   "properties": {
     "path": {
       "type": "string",
-      "description": "Local directory or repository path to scan."
+      "description": "What to scan: a local directory, or a GitHub repository URL such as https://github.com/owner/repo, which is cloned and scanned. When this server runs as a container it scans the repository mounted into it, so omit this field rather than sending a path from your own machine, which does not exist inside the container."
     },
     "rules_ref": {
       "type": "string",
@@ -176,7 +190,6 @@ const scanInputSchema = `{
       "description": "Match declared dependencies against a pinned OSV snapshot and report known CVEs in 'vulnerabilities' and as findings (default false; fetches the OSV database on first use, then reuses the cache)."
     }
   },
-  "required": ["path"],
   "additionalProperties": false
 }`
 
@@ -217,7 +230,17 @@ func (s *Server) callScan(ctx context.Context, c *conn, id json.RawMessage, args
 		}
 	}
 	if sr.Path == "" {
-		return c.writeResult(id, textResult("scan: 'path' is required", true))
+		// Only the container image declares a default, via defaultPathEnv. Do
+		// NOT fall back to the process working directory here: MCP clients
+		// choose that themselves and some launch servers from the user's home
+		// directory, so an omitted path would silently walk everything they own.
+		// Outside the image there is no safe guess, so say what to send instead.
+		def := os.Getenv(defaultPathEnv)
+		if def == "" {
+			return c.writeResult(id, textResult(
+				"scan: no 'path' given. Send a local directory, or a GitHub repository URL such as https://github.com/owner/repo.", true))
+		}
+		sr.Path = def
 	}
 
 	result, err := s.scan(ctx, sr)

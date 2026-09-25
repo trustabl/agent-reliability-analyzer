@@ -193,10 +193,16 @@ func TestScanTool_VulnScanArg(t *testing.T) {
 	}
 }
 
-// TestScanTool_MissingPath returns an isError tool result, not a protocol
-// error: the model should see a usable message.
-func TestScanTool_MissingPath(t *testing.T) {
-	srv := New(fixtureScan(t), VersionInfo{Version: "test"})
+// scanOmittingPath calls the scan tool with no arguments and returns the
+// ScanRequest the server passed through, plus whether the call was an error.
+func scanOmittingPath(t *testing.T) (ScanRequest, bool, json.RawMessage) {
+	t.Helper()
+	var got ScanRequest
+	srv := New(func(_ context.Context, req ScanRequest) (models.ScanResult, error) {
+		got = req
+		return models.ScanResult{ScanID: "x"}, nil
+	}, VersionInfo{Version: "test"})
+
 	call := mustJSON(t, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      7,
@@ -213,8 +219,69 @@ func TestScanTool_MissingPath(t *testing.T) {
 	if err := json.Unmarshal(resps[0].Result, &tr); err != nil {
 		t.Fatal(err)
 	}
-	if !tr.IsError {
-		t.Error("missing path should produce isError=true")
+	return got, tr.IsError, resps[0].Result
+}
+
+// TestScanTool_OmittedPathUsesContainerDefault covers the container package:
+// the image sets TRUSTABL_MCP_DEFAULT_PATH to the mounted repository, so a
+// client that sends no path scans that rather than failing.
+func TestScanTool_OmittedPathUsesContainerDefault(t *testing.T) {
+	t.Setenv(defaultPathEnv, "/workspace")
+
+	got, isErr, raw := scanOmittingPath(t)
+	if isErr {
+		t.Fatalf("omitted path should use the configured default, got error: %s", raw)
+	}
+	if got.Path != "/workspace" {
+		t.Errorf("path = %q, want /workspace", got.Path)
+	}
+}
+
+// TestScanTool_OmittedPathWithoutDefaultAsksForOne is the other half, and the
+// more important one. Outside the image there is NO default: MCP clients pick
+// the working directory and some launch servers from the user's home, so
+// falling back to it would silently walk everything they own. The error names
+// the URL form so the model has something useful to send next.
+func TestScanTool_OmittedPathWithoutDefaultAsksForOne(t *testing.T) {
+	t.Setenv(defaultPathEnv, "")
+
+	got, isErr, raw := scanOmittingPath(t)
+	if !isErr {
+		t.Fatalf("omitted path with no configured default must error rather than guess, got: %s", raw)
+	}
+	if got.Path != "" {
+		t.Errorf("scan must not have run, but got path %q", got.Path)
+	}
+	if !strings.Contains(string(raw), "github.com") {
+		t.Errorf("error should point at the URL form, got: %s", raw)
+	}
+}
+
+// TestScanSchema_PathOptionalAndAdvertisesURL guards the two halves of the
+// contract a client reads: path must not be required (or a model is forced to
+// invent one), and the description must name the GitHub-URL form (or the
+// capability stays invisible, which is exactly what happened before).
+func TestScanSchema_PathOptionalAndAdvertisesURL(t *testing.T) {
+	var schema struct {
+		Required   []string                   `json:"required"`
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal([]byte(scanInputSchema), &schema); err != nil {
+		t.Fatalf("scanInputSchema invalid: %v", err)
+	}
+	for _, r := range schema.Required {
+		if r == "path" {
+			t.Error("path must not be required: an omitted path scans the working directory")
+		}
+	}
+	var p struct {
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(schema.Properties["path"], &p); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(p.Description, "github.com") {
+		t.Errorf("path description must advertise the GitHub URL form, got: %q", p.Description)
 	}
 }
 

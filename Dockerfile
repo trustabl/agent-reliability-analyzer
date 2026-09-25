@@ -10,4 +10,9 @@ COPY $TARGETPLATFORM/trustabl /usr/local/bin/trustabl
 # image and matching it against `name` in server.json. Without it, publishing
 # fails with "Registry validation failed for package". Keep the two in sync.
 LABEL io.modelcontextprotocol.server.name="io.github.trustabl/agent-reliability-analyzer"
+# Where callers mount the repository, and what `trustabl mcp` scans when a
+# client sends no path. Only the image sets this: outside a container there is
+# no safe default, since MCP clients choose the working directory themselves.
+WORKDIR /workspace
+ENV TRUSTABL_MCP_DEFAULT_PATH=/workspace
 ENTRYPOINT ["/usr/local/bin/trustabl"]
