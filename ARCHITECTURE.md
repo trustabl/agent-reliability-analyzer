@@ -1146,6 +1146,8 @@ Shipped rules (one row per YAML rule entry):
 | OAI-019  | tool     | openai_sdk | medium   | `openai_sdk/idempotency.yaml`      | TypeScript mutating tool has no idempotency key                                       |
 | OAI-022  | tool     | openai_sdk | low      | `openai_sdk/tool_definition.yaml`  | TypeScript tool has no description                                                    |
 | OAI-024  | tool     | openai_sdk | medium   | `openai_sdk/network.yaml`          | TypeScript tool builds outbound URL from a non-literal value                          |
+| OAI-030  | tool     | openai_sdk | high     | `openai_sdk/side_effect_bounds.yaml` | Side-effecting tool lets the model choose the recipient or amount with no visible bound |
+| OAI-031  | tool     | openai_sdk | high     | `openai_sdk/side_effect_bounds.yaml` | TypeScript side-effecting tool lets the model choose the recipient or amount with no visible bound |
 | OAI-101  | agent    | openai_sdk | high     | `openai_sdk/agent_safety.yaml`     | Agent has no input_guardrails AND wires shell or filesystem-touching tools            |
 | OAI-102  | agent    | openai_sdk | high     | `openai_sdk/agent_safety.yaml`     | Agent uses tool_use_behavior="stop_on_first_tool"                                     |
 | OAI-103  | agent    | openai_sdk | high     | `openai_sdk/agent_safety.yaml`     | tool_choice="required" combined with reset_tool_choice=False                          |
@@ -1198,6 +1200,7 @@ Shipped rules (one row per YAML rule entry):
 | MCP-012  | tool     | mcp        | high     | `mcp/shell_safety.yaml`            | TypeScript MCP tool spawns a subprocess                                               |
 | MCP-013  | tool     | mcp        | high     | `mcp/ssrf.yaml`                    | TypeScript MCP tool fetches a caller-controlled URL (SSRF)                            |
 | MCP-014  | tool     | mcp        | high     | `mcp/code_execution.yaml`          | TypeScript MCP tool evaluates dynamic code (eval / new Function)                      |
+| MCP-030  | tool     | mcp        | high     | `mcp/side_effect_bounds.yaml`      | Side-effecting tool lets the model choose the recipient or amount with no visible bound |
 | LC-001   | tool     | langchain  | low      | `langchain/tool_definition.yaml`   | LangChain tool has no description                                                     |
 | LC-002   | tool     | langchain  | medium   | `langchain/tool_definition.yaml`   | LangChain tool parameters are not type-annotated                                      |
 | LC-003   | tool     | langchain  | high     | `langchain/shell_safety.yaml`      | LangChain tool body spawns a subprocess                                               |
@@ -1209,6 +1212,7 @@ Shipped rules (one row per YAML rule entry):
 | LC-012   | tool     | langchain  | high     | `langchain/code_execution.yaml`    | TypeScript LangChain tool evaluates dynamic code                                      |
 | LC-013   | tool     | langchain  | high     | `langchain/ssrf.yaml`              | TypeScript LangChain tool fetches a caller-controlled URL (SSRF)                      |
 | LC-014   | tool     | langchain  | medium   | `langchain/tool_behavior.yaml`     | TypeScript LangChain tool returns output directly (`returnDirect`)                    |
+| LC-025   | tool     | langchain  | high     | `langchain/side_effect_bounds.yaml` | Side-effecting tool lets the model choose the recipient or amount with no visible bound |
 | LC-101   | agent    | langchain  | high     | `langchain/agent_safety.yaml`      | LangChain agent wires a code-execution or shell built-in tool                         |
 | LC-102   | agent    | langchain  | medium   | `langchain/agent_safety.yaml`      | LangChain AgentExecutor has no max_iterations limit                                   |
 | LC-111   | agent    | langchain  | medium   | `langchain/agent_safety.yaml`      | TypeScript LangChain AgentExecutor has no maxIterations limit                         |
@@ -1222,6 +1226,19 @@ Shipped rules (one row per YAML rule entry):
 > longer double-fire). The `mcp` category is accepted by the loader's
 > category allow-list (`internal/rules/loader.go`); `SDKMCP` already routed to
 > the `mcp` category via `LoadFor`, so no other wiring changed.
+
+> **This table is a known-incomplete index, not the enumeration of shipped
+> rules.** It predates several rule packs (Pydantic AI has none listed here,
+> and the OpenAI/MCP/LangChain sections above are missing dozens of rules
+> shipped since this table was last fully reconciled) — re-derive the true
+> count with `grep -rhoE '^\s*-\s*id:\s*\S+' testdata/rules-fixture/*/*.yaml
+> | wc -l` rather than counting rows here, and treat
+> [`COVERAGE.md`](COVERAGE.md)'s per-SDK rule-ID lists as the more current
+> reference. PYD-014 (added alongside OAI-030/031, MCP-030, and LC-025 — see
+> `openai_sdk/side_effect_bounds.yaml` and siblings) is intentionally not
+> added as an isolated row here, since no other Pydantic AI row exists to
+> anchor it. Backfilling this table fully is tracked as separate cleanup, not
+> part of any single rule change.
 
 ### Step 4c — Origin classification ([internal/pathclass/](internal/pathclass/))
 

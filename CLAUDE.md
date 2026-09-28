@@ -350,25 +350,29 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **Rulebook status (2026-09-09):** the fixture and production both carry
-> **210** rules across ten SDK categories (`autogen`, `claude_sdk`,
+> **Rulebook status (2026-09-28):** the fixture and production both carry
+> **282** rules across ten SDK categories (`autogen`, `claude_sdk`,
 > `claude_skill`, `crewai`, `google_adk`, `langchain`, `mcp`, `openai_sdk`,
-> `pydantic_ai`, `vercel_ai`) — in sync as of **OAI-116** (OpenAI Agents SDK,
-> TypeScript: `hostedMcpTool({...})` with no `allowedTools` allow-list, the TS
-> sibling of OAI-115), which closes the OpenAI Agents SDK half of Class 1 in
-> `docs/decisions/tool-allowlist-scope.md`. The count grew by one rule since
-> the 209 figure implied by the prior note (which itself undercounted —
-> re-derive, don't trust a cached figure) from `grep -rhoE
-> '^\s*-\s*id:\s*\S+' testdata/rules-fixture/*/*.yaml | wc -l`. **Known gap in
-> this note's own claim:** the prior version of this note said
-> `check_rulebook.py` reports 0 warnings against the pack; running it now
-> shows that has drifted — it currently reports 32 pre-existing *errors*
-> (mostly severity/confidence drift between shipped rules and their rationale
-> docs, e.g. `CSDK-103`, `CSDK-204/205`, `LC-101`, plus several
-> documented-but-removed rule IDs) across docs unrelated to OAI-116, none
-> introduced by this update (confirmed via a clean-tree run before this
-> change: 33 errors, one of which — OAI-116 undocumented — this update
-> closes). Fixing those 32 is a separate, not-yet-scoped cleanup.
+> `pydantic_ai`, `vercel_ai`) — in sync as of Batch 1 of the side-effect-bounds
+> rule (competitive-analysis backlog rank 12, P0): **OAI-030/031**, **PYD-014**,
+> **MCP-030**, **LC-025** — a side-effecting tool (send/notify/refund/charge/
+> pay/payout/transfer/issue) with a free-form recipient or amount parameter,
+> no visible bound in the body, and no SDK-native approval gate. Batch 2
+> (crewai, google_adk, autogen, vercel_ai, claude_sdk TS) is a tracked
+> follow-up, not yet done. The count is up from **277**, the figure the prior
+> version of this note recorded (itself already corrected once from a stale
+> 210/209 — re-derive, don't trust a cached figure, from `grep -rhoE
+> '^\s*-\s*id:\s*\S+' testdata/rules-fixture/*/*.yaml | wc -l`).
+> **`check_rulebook.py` gate status:** running
+> `python tools/check_rulebook.py --rules-repo ../trustabl-rules` from the
+> rulebook repo reports **99 pre-existing errors**, none introduced by this
+> batch (confirmed both before writing the four new rationale docs and after —
+> the count did not move; the 5 new rules pass COVERAGE/CONSISTENCY/PLACEMENT
+> cleanly). This is already worse than the 32 the prior version of this note
+> recorded on 2026-09-09, meaning the pre-existing drift grew in the interim
+> from unrelated changes. Fixing it remains a separate, not-yet-scoped
+> cleanup — re-run the gate rather than trusting this number, since it has
+> already drifted twice.
 
 The rule-authoring contract (required fields, ID conventions, per-scope
 `applies_to` values, framing discipline) lives in
