@@ -2,24 +2,12 @@
   <img src="assets/github_banner.jpg" alt="Trustabl — open source AI agent reliability" width="100%">
 </p>
 
-Find and automatically fix guardrail gaps, unsafe tools, missing validation, and
-unbounded loops in Claude Agent SDK, OpenAI Agents SDK, Google ADK, LangChain,
-CrewAI, and MCP agents — before production.
+# Trustabl — find and fix AI agent reliability gaps
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
-  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/v/release/trustabl/agent-reliability-analyzer" alt="Latest release"></a>
-  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/downloads/trustabl/agent-reliability-analyzer/total?label=downloads&color=2ea043" alt="Total downloads"></a>
-  <a href="https://github.com/trustabl/agent-reliability-analyzer/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/trustabl/agent-reliability-analyzer/test.yml?branch=main&amp;label=tests" alt="Tests"></a>
-  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/trustabl/agent-reliability-analyzer" alt="Go version"></a>
-  <br>
-  <a href="https://github.com/trustabl/agent-reliability-rules"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrustabl%2Fagent-reliability-rules%2Fmain%2Fbadges%2Frules.json" alt="Detection rule count"></a>
-  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/SDKs-9-blue" alt="9 SDKs supported"></a>
-  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/languages-7-blue" alt="7 languages supported"></a>
-  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/scopes-5-blue" alt="5 detection scopes"></a>
-  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/surfaces-tools%20%C2%B7%20agents%20%C2%B7%20subagents%20%C2%B7%20skills%20%C2%B7%20plugins-blue" alt="Analyzed surfaces"></a>
-  <a href="README.md#output-modes"><img src="https://img.shields.io/badge/output-human%20%7C%20JSON%20%7C%20SARIF-blue" alt="Output formats"></a>
-</p>
+**Find what will make your AI agent fail — then fix it with one command.**
+
+Deterministic static analysis for agent code, across nine SDKs and seven languages.
+It runs entirely on your machine: no cloud scanner, no account, no code upload, no LLM.
 
 ---
 
@@ -76,9 +64,20 @@ CrewAI, and MCP agents — before production.
 
 ---
 
-# Trustabl — find and fix AI agent reliability gaps
-
-**Find what will make your AI agent fail — then fix it with one command.**
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/v/release/trustabl/agent-reliability-analyzer" alt="Latest release"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/downloads/trustabl/agent-reliability-analyzer/total?label=downloads&color=2ea043" alt="Total downloads"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/trustabl/agent-reliability-analyzer/test.yml?branch=main&amp;label=tests" alt="Tests"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/trustabl/agent-reliability-analyzer" alt="Go version"></a>
+  <br>
+  <a href="https://github.com/trustabl/agent-reliability-rules"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrustabl%2Fagent-reliability-rules%2Fmain%2Fbadges%2Frules.json" alt="Detection rule count"></a>
+  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/SDKs-9-blue" alt="9 SDKs supported"></a>
+  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/languages-7-blue" alt="7 languages supported"></a>
+  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/scopes-5-blue" alt="5 detection scopes"></a>
+  <a href="COVERAGE.md"><img src="https://img.shields.io/badge/surfaces-tools%20%C2%B7%20agents%20%C2%B7%20subagents%20%C2%B7%20skills%20%C2%B7%20plugins-blue" alt="Analyzed surfaces"></a>
+  <a href="README.md#output-modes"><img src="https://img.shields.io/badge/output-human%20%7C%20JSON%20%7C%20SARIF-blue" alt="Output formats"></a>
+</p>
 
 Trustabl scans an agent repository for the gaps that break agents in production:
 tool descriptions too vague for a model to know when to use them, missing retry
