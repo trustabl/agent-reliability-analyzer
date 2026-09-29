@@ -1,0 +1,31 @@
+policy:
+  id: google_adk_tracing
+  name: Google ADK observability configuration
+  category: google_adk
+  description: >
+    Repo-scoped rules covering whether a Google ADK project can be observed in
+    production.
+
+rules:
+  - id: ADK-202
+    title: Google ADK project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - google_adk
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [google_adk]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project defines Google ADK agents but wires no observability backend.
+      ADK composes sequential, parallel, and loop agents whose control flow is
+      decided at runtime, so the executed path is not evident from the source;
+      without traces there is no record of which branch ran.
+    fix: >
+      Install an OpenTelemetry tracer provider with an OTLP exporter at process
+      start, or initialize a vendor SDK (OpenLLMetry's Traceloop.init(),
+      Phoenix's register()) before constructing your agents.

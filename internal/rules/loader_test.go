@@ -6,6 +6,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/trustabl/trustabl/internal/models"
 	"github.com/trustabl/trustabl/internal/rules"
 )
 
@@ -479,5 +480,14 @@ rules:
 	}
 	if len(skipped) != 0 {
 		t.Fatalf("LoadLenient skipped = %v, want none (mappings files are not rules)", skipped)
+	}
+}
+
+// The observability category carries the cross-SDK OBS-* quality rules. It is
+// not gated on one SDK: those rules list every SDK token in applies_to because
+// their text is vendor-framed rather than SDK-framed.
+func TestLoader_AcceptsObservabilityCategory(t *testing.T) {
+	if !models.ValidCategory(models.CategoryObservability) {
+		t.Fatal("observability must be a recognized category")
 	}
 }

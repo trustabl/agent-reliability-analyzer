@@ -1,0 +1,35 @@
+policy:
+  id: claude_sdk_tracing
+  name: Claude Agent SDK observability configuration
+  category: claude_sdk
+  description: >
+    Repo-scoped rules covering whether a Claude Agent SDK project can be
+    observed in production.
+
+rules:
+  - id: CSDK-208
+    title: Claude Agent SDK project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - claude_sdk
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [claude_agent_sdk]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project runs Claude Agent SDK agents but wires no observability
+      backend. No OpenTelemetry provider and no third-party instrumentation
+      (Langfuse, Logfire, Braintrust, Phoenix, Weave, AgentOps) appears in the
+      parsed source. A subagent that picks the wrong tool, a permission mode
+      that is broader than intended, or a run that silently exhausts its turns
+      leaves no trace to inspect afterwards.
+    fix: >
+      Install an OpenTelemetry tracer provider at process start
+      (opentelemetry.trace.set_tracer_provider(...)) with an OTLP exporter
+      pointed at your collector, or initialize a vendor SDK —
+      logfire.configure(), Langfuse's CallbackHandler, or
+      braintrust.init_logger() — before the first query() call.

@@ -3476,6 +3476,304 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
 		models.RepoInventory{SDKsDetected: []models.SDK{models.SDKLangChain}},
 		false},
+	// ─── Observability absence (repo-scoped) ─────────────────────────────────
+	{"OAI-203 fires when an OpenAI Agents repo wires no observability", "OAI-203",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"OAI-203 silent when observability is present", "OAI-203",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"CSDK-208 fires when a Claude SDK repo wires no observability", "CSDK-208",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKClaudeAgentSDK},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"CSDK-208 silent when observability is present", "CSDK-208",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKClaudeAgentSDK},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"LC-202 fires when a LangChain repo wires no observability", "LC-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKLangChain},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"LC-202 silent when observability is present", "LC-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKLangChain},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"PYD-202 fires when a Pydantic AI repo wires no observability", "PYD-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKPydanticAI},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"PYD-202 silent when observability is present", "PYD-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKPydanticAI},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"VAI-201 fires when a Vercel AI repo wires no observability", "VAI-201",
+		models.RepoProfile{Languages: []models.Language{models.LanguageTypeScript}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKVercelAI},
+			Manifest:     models.ScanManifest{TypeScriptFiles: []string{"app.ts"}},
+		},
+		true},
+	{"VAI-201 silent when observability is present", "VAI-201",
+		models.RepoProfile{Languages: []models.Language{models.LanguageTypeScript}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKVercelAI},
+			Manifest:     models.ScanManifest{TypeScriptFiles: []string{"app.ts"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"CREW-202 fires when a CrewAI repo wires no observability", "CREW-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKCrewAI},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"CREW-202 silent when observability is present", "CREW-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKCrewAI},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"ADK-202 fires when a Google ADK repo wires no observability", "ADK-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKGoogleADK},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"ADK-202 silent when observability is present", "ADK-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKGoogleADK},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"AG2-202 fires when an AutoGen repo wires no observability", "AG2-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKAutoGen},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"AG2-202 silent when observability is present", "AG2-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKAutoGen},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"MCP-202 fires when an MCP repo wires no observability", "MCP-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKMCP},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"MCP-202 silent when observability is present", "MCP-202",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKMCP},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	// ─── Observability quality (OBS-*) ───────────────────────────────────────
+	{"OBS-001 fires when instrumentation is imported but never initialized", "OBS-001",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalImport},
+			},
+		},
+		true},
+	{"OBS-001 silent when initialized", "OBS-001",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalImport},
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"OBS-002 fires when the only exporter is the console", "OBS-002",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalExporter, Detail: "console"},
+			},
+		},
+		true},
+	{"OBS-002 silent when an OTLP exporter is also present", "OBS-002",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalExporter, Detail: "console"},
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalExporter, Detail: "otlp"},
+			},
+		},
+		false},
+	// Exporter detection is Python-only (tsObservabilitySignals never emits
+	// ObsSignalExporter). language: python keeps the rule from firing on a
+	// TS-only repo even given a hand-constructed signal that TS discovery
+	// itself could never actually produce.
+	{"OBS-002 silent on a TypeScript-only repo (language gate)", "OBS-002",
+		models.RepoProfile{Languages: []models.Language{models.LanguageTypeScript}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKVercelAI},
+			Manifest:     models.ScanManifest{TypeScriptFiles: []string{"app.ts"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalExporter, Detail: "console"},
+			},
+		},
+		false},
+	{"OBS-005 fires when a declared observability dep is never wired", "OBS-005",
+		models.RepoProfile{
+			Languages: []models.Language{models.LanguagePython},
+			ObsDeps:   []models.ObsDep{{Vendor: models.VendorLangfuse, Source: "requirements.txt", Confidence: 0.9}},
+		},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		true},
+	{"OBS-005 silent when the declared dep is actually imported", "OBS-005",
+		models.RepoProfile{
+			Languages: []models.Language{models.LanguagePython},
+			ObsDeps:   []models.ObsDep{{Vendor: models.VendorLangfuse, Source: "requirements.txt", Confidence: 0.9}},
+		},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalImport},
+			},
+		},
+		false},
+	{"OBS-005 silent when the dep appears only in a lock file", "OBS-005",
+		models.RepoProfile{
+			Languages: []models.Language{models.LanguagePython},
+			ObsDeps:   []models.ObsDep{{Vendor: models.VendorOTel, Source: "poetry.lock", Confidence: 0.9}},
+		},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		false},
+	// Mutual exclusion with the absence rules: a declared-but-unwired dep is
+	// OBS-005 at medium, NOT "this project wires no observability" at low.
+	{"OAI-203 silent when the dep is declared (OBS-005 owns that case)", "OAI-203",
+		models.RepoProfile{
+			Languages: []models.Language{models.LanguagePython},
+			ObsDeps:   []models.ObsDep{{Vendor: models.VendorLangfuse, Source: "requirements.txt", Confidence: 0.9}},
+		},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+		},
+		false},
+	{"OBS-003 fires when tracing captures message content", "OBS-003",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalContentCapture, Detail: "include_content"},
+			},
+		},
+		true},
+	{"OBS-003 silent with no content-capture switch", "OBS-003",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{PythonFiles: []string{"app.py"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	// Content-capture detection is Python-only (tsObservabilitySignals never
+	// emits ObsSignalContentCapture — Vercel's experimental_telemetry is not
+	// wired yet). language: python keeps the rule honest on a TS-only repo.
+	{"OBS-003 silent on a TypeScript-only repo (language gate)", "OBS-003",
+		models.RepoProfile{Languages: []models.Language{models.LanguageTypeScript}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKVercelAI},
+			Manifest:     models.ScanManifest{TypeScriptFiles: []string{"app.ts"}},
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalContentCapture, Detail: "include_content"},
+			},
+		},
+		false},
+	// The inspectable gate: a Go-only repo produces no signals because nothing
+	// looked, which must NOT read as "you have no observability".
+	{"OAI-203 silent on an uninspectable (Go-only) repo", "OAI-203",
+		models.RepoProfile{Languages: []models.Language{models.LanguageGo}},
+		models.RepoInventory{
+			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+			Manifest:     models.ScanManifest{GoFiles: []string{"main.go"}},
+		},
+		false},
 }
 
 // optionsWithPermissionMode builds a ClaudeAgentOptionsDef whose captured
@@ -3811,6 +4109,100 @@ var policyAgentRuleCases = []policyAgentCase{
 				"max_iterations": {Value: &models.Expr{Kind: models.ExprLiteralInt, Text: "5"}},
 			}}},
 		models.RepoInventory{}, false},
+
+	// ─── Observability outliers (agent-scoped) ───────────────────────────────
+	// Gated on repo_has_observability: true, so the finding reads "this agent is
+	// the outlier" rather than repeating the repo-scope absence complaint once
+	// per agent.
+	{"PYD-107 fires when an instrumented repo has an uninstrumented agent", "PYD-107",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLogfire, Kind: models.ObsSignalInit},
+			},
+		},
+		true},
+	{"PYD-107 silent when the agent sets instrument", "PYD-107",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"instrument": {Value: &models.Expr{Kind: models.ExprLiteralBool, Text: "True"}},
+			}},
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLogfire, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"PYD-107 silent when the repo has no observability at all", "PYD-107",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+		},
+		models.RepoInventory{},
+		false},
+	{"LC-112 fires when an instrumented repo has an agent with no callbacks", "LC-112",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		true},
+	{"LC-112 silent when callbacks are wired", "LC-112",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"callbacks": {Value: &models.Expr{Kind: models.ExprList, Text: "[handler]"}},
+			}},
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"LC-112 silent when the repo has no observability at all", "LC-112",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+		},
+		models.RepoInventory{},
+		false},
+	{"VAI-101 fires when an instrumented repo has a call with no telemetry", "VAI-101",
+		models.AgentDef{
+			SDK: models.SDKVercelAI, Class: "GenerateText", Language: models.LanguageTypeScript,
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalInit},
+			},
+		},
+		true},
+	{"VAI-101 silent when experimental_telemetry is set", "VAI-101",
+		models.AgentDef{
+			SDK: models.SDKVercelAI, Class: "GenerateText", Language: models.LanguageTypeScript,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"experimental_telemetry": {Children: map[string]*models.KwargTree{
+					"isEnabled": {Value: &models.Expr{Kind: models.ExprLiteralBool, Text: "true"}},
+				}},
+			}},
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorOTel, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"VAI-101 silent when the repo has no observability at all", "VAI-101",
+		models.AgentDef{
+			SDK: models.SDKVercelAI, Class: "GenerateText", Language: models.LanguageTypeScript,
+		},
+		models.RepoInventory{},
+		false},
 
 	{"LC-111 fires when TS AgentExecutor has no maxIterations", "LC-111",
 		models.AgentDef{SDK: models.SDKLangChain, Class: "AgentExecutor", Language: models.LanguageTypeScript},
