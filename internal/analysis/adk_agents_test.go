@@ -121,6 +121,36 @@ a = LlmAgent(**cfg)
 	}
 }
 
+// FunctionTool's own keyword arguments (ADK's per-tool options, notably
+// require_confirmation) land in ToolDef.Config so kwarg predicates can read
+// them; a bare FunctionTool(fn) leaves Config empty.
+func TestDiscoverADKTools_FunctionToolKwargsCaptured(t *testing.T) {
+	src := `from google.adk.tools import FunctionTool
+
+def send_email(to: str) -> str:
+    """Send an email."""
+    return "ok"
+
+def get_status(x: str) -> str:
+    """Status."""
+    return x
+
+gated = FunctionTool(send_email, require_confirmation=True)
+plain = FunctionTool(get_status)
+`
+	pf := parsePyFile(t, "main.py", src)
+	byName := map[string]models.ToolDef{}
+	for _, td := range analysis.DiscoverADKTools([]analysis.ParsedFile{pf}) {
+		byName[td.Name] = td
+	}
+	if got := byName["send_email"].Config["require_confirmation"]; got != "True" {
+		t.Errorf("send_email Config[require_confirmation]: got %q, want %q", got, "True")
+	}
+	if n := len(byName["get_status"].Config); n != 0 {
+		t.Errorf("get_status Config: got %d entries, want 0", n)
+	}
+}
+
 func TestDiscoverADKTools_FunctionToolWrapping(t *testing.T) {
 	src := `from google.adk.agents import LlmAgent
 from google.adk.tools import FunctionTool

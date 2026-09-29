@@ -1,0 +1,110 @@
+policy:
+  id: claude_sdk_side_effect_bounds
+  name: Claude Agent SDK unbounded side-effect parameters
+  category: claude_sdk
+  description: >
+    Rules that flag a side-effecting Claude Agent SDK (TypeScript) tool
+    (send/notify/refund/charge/...) whose recipient or amount parameter is
+    free-form model input with no visible bound — no allow-list constraining who
+    a message can go to, no cap or enum constraining how much money moves. This
+    is a different failure mode from CSDK-016 (idempotency): a duplicate call
+    repeats an action within a bound the caller already accepted, while an
+    unbounded recipient or amount lets a single call move further than the
+    caller intended.
+
+rules:
+  - id: CSDK-023
+    title: TypeScript side-effecting tool lets the model choose the recipient or amount with no visible bound
+    severity: high
+    confidence: 0.5
+    language: typescript
+    applies_to:
+      - claude_sdk_tool
+    scope: tool
+    match:
+      all:
+        - any:
+            - all:
+                - name_has_prefix:
+                    - send
+                    - notify
+                - param_name_matches:
+                    contains:
+                      - recipient
+                    exact:
+                      - to
+                      - cc
+                      - bcc
+                      - email
+                      - emailAddress
+                      - toEmail
+                      - toAddress
+                      - phone
+                      - phoneNumber
+                      - toNumber
+            - all:
+                - name_has_prefix:
+                    - refund
+                    - charge
+                    - payout
+                    - transfer
+                    - issue
+                - param_name_matches:
+                    contains:
+                      - amount
+                    exact:
+                      - total
+                      - price
+                    suffixes:
+                      - cents
+        - not:
+            has_body_text:
+              - ".max("
+              - ".lte("
+              - ".lt("
+              - "maximum"
+              - "z.enum("
+              - "nativeEnum("
+              - "\"enum\""
+              - "enum:"
+              - "MAX_"
+              - "_MAX"
+              - "maxAmount"
+              - "_LIMIT"
+              - "Limit"
+              - "ALLOWED"
+              - "allowedDomains"
+              - "AllowList"
+              - "allowList"
+              - "WHITELIST"
+              - "whitelist"
+              - "endsWith(\"@"
+              - "endsWith('@"
+    explanation: >
+      This Claude Agent SDK tool, created with tool(name, description, schema,
+      handler), has a name that signals a send/notify or a refund/charge/pay side
+      effect, and its schema takes a free-form recipient or amount parameter with
+      no visible bound: no allow-list constraining who the message reaches, and no
+      cap, max, or enum constraining how much money moves. A model steered by
+      prompt injection, a misread task, or another tool's poisoned output can pass
+      any address or any amount to this call. This is a distinct failure from
+      CSDK-016 (idempotency): a duplicate call repeats an action inside a bound
+      the caller already accepted; this rule is about a single call moving further
+      — a wider blast radius, not a repeated one. There is no tool-level approval
+      gate to check for: permission prompts are configured on the query() options
+      (canUseTool, permissionMode), not on the tool, so this rule cannot see them
+      and a tool that is otherwise gated there still fires. Parameter names are
+      read from an inline object-literal schema (the third argument); a
+      z.object(...) schema is not inspected. The Python @tool(...) shape is not
+      covered for the same reason CSDK-006 has the same blind spot: its handler
+      takes a single args parameter.
+    fix: >
+      Do not let the model supply the recipient or the amount unconstrained.
+      Derive the recipient from trusted context rather than a model parameter, or
+      constrain it with a zod allow-list / domain check validated before the call
+      executes. Cap the amount with a zod bound (z.number().max(...)) or an enum
+      AND enforce the same cap server-side, since a static bound in the schema can
+      be bypassed by a differently-shaped call. For anything above a low,
+      pre-approved threshold, route the call through a canUseTool callback on
+      query() that requires a human to approve the specific recipient or amount
+      before the side effect runs.
