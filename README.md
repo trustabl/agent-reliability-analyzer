@@ -26,7 +26,7 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
 
 ---
 
-<h3 align="center">Trustabl Partners</h3>
+<h2 align="center">Trustabl Partners</h2>
 <p align="center">
   <sub>One engine, seven front doors. Install it from the catalogue you already use.</sub>
 </p>
