@@ -26,7 +26,7 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
 
 ---
 
-<h3 align="center">Trustabl, where you already work</h3>
+<h3 align="center">Trustabl Partners</h3>
 <p align="center">
   <sub>One engine, seven front doors. Install it from the catalogue you already use.</sub>
 </p>
@@ -77,6 +77,7 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
   </sub>
 </p>
 
+---
 
 Trustabl scans an agent repository for the gaps that break agents in production:
 tool descriptions too vague for a model to know when to use them, missing retry
