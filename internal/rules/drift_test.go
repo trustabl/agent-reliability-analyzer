@@ -50,13 +50,28 @@ func reflectedPredicateNames(t *testing.T) map[string]bool {
 	return KnownPredicateKeys()
 }
 
+// dualScopePredicates are the predicates deliberately valid at more than one
+// scope. A predicate belongs here ONLY when every Evaluate* method that accepts
+// it genuinely receives the data it reads — repo_has_observability reads the
+// RepoInventory, which EvaluateAgent already takes — and when a rule author
+// needs the same fact at both scopes. The agent-scope observability rules
+// (PYD-107, LC-112, VAI-101) gate on repo_has_observability so they fire only
+// when the repo IS instrumented, making the finding "this agent is the outlier"
+// instead of repeating the repo-scope complaint once per agent.
+//
+// Default to single-scope. Adding an entry here widens where a predicate can be
+// written in YAML, so it needs the same scrutiny as a new predicate.
+var dualScopePredicates = map[string]bool{
+	"repo_has_observability": true,
+}
+
 func TestPredicatesByScope_MirrorsStruct(t *testing.T) {
 	want := reflectedPredicateNames(t)
 	got := map[string]bool{}
 	for scope, preds := range predicatesByScope {
 		for name := range preds {
-			if got[name] {
-				t.Errorf("predicate %q appears in more than one scope (must be scoped to exactly one)", name)
+			if got[name] && !dualScopePredicates[name] {
+				t.Errorf("predicate %q appears in more than one scope (must be scoped to exactly one, or be listed in dualScopePredicates)", name)
 			}
 			got[name] = true
 			_ = scope

@@ -285,8 +285,8 @@ func findingFromRule(r RuleDef, scope models.Scope, filePath string, startLine, 
 }
 
 // LoadFor returns a Registry containing only policy packs whose category matches
-// one of the observed SDKs. openshell rules are always loaded.
-// If sdks is empty, only openshell rules are returned.
+// one of the observed SDKs, plus the categories that are not SDK-gated at all.
+// If sdks is empty, only those ungated categories are returned.
 func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, error) {
 	wanted := map[string]bool{
 		"openshell": true,
@@ -294,6 +294,13 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 		// claude_skill pack loads unconditionally (like openshell). Its rules
 		// only fire when the repo actually declares skills.
 		"claude_skill": true,
+		// Observability is a cross-SDK category, not an SDK: its rules are
+		// vendor-framed (Langfuse, OpenTelemetry) and list every SDK token in
+		// applies_to. Gating it on SDKsDetected would drop the pack entirely and
+		// OBS-001..003 could never fire. Loading it unconditionally is safe —
+		// each rule still gates on its own applies_to and on observability
+		// predicates that are false in a repo with no signals.
+		"observability": true,
 	}
 	for _, sdk := range sdks {
 		switch sdk {

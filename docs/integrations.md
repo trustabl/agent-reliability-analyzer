@@ -14,15 +14,33 @@ listing lives.
 
 ---
 
+## Where Trustabl is listed
+
+The directories Trustabl is published in, and the ones a submission is open
+with. Anything not on this list has no entry yet.
+
+| Directory | Status | Since |
+|---|---|---|
+| [MCP Registry](https://registry.modelcontextprotocol.io/?q=trustabl) | **Listed** | 24 Sep 2026 |
+| [Claude Directory](https://claude.ai/directory) | **Listed** | 29 Sep 2026 |
+| [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=trustabl.trustabl) | **Listed** | 11 Sep 2026 |
+| [Cursor](https://cursor.directory/plugins/trustabl) | **Listed** | 11 Aug 2026 |
+| [GitHub Marketplace](https://github.com/marketplace/actions/trustabl-fix-agent-reliability-issues) | **Listed** | — |
+| [GitLab CI/CD Catalog](https://gitlab.com/explore/catalog/trustabl-ai/components) | **Listed** | — |
+| [Bitbucket Pipes](https://bitbucket.org/hoolisoftware/trustabl-pipe) | **Listed** | 18 Aug 2026 |
+| [in-toto](https://github.com/in-toto/friends/pull/122) | Submitted | 28 Sep 2026 |
+
+---
+
 ## Agent frameworks
 
-Every framework below is covered by the rule packs today. The order is the order
-we are pursuing an official listing in each ecosystem's own directory.
+Every framework below is covered by the rule packs today. The listing column says
+whether that ecosystem's own directory carries an entry for Trustabl.
 
 | # | Ecosystem | What Trustabl checks | Listing |
 |---|---|---|---|
 | 1 | **Google ADK** | Agents, tools, skills, plugins and callbacks | Not listed |
-| 2 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | Not listed |
+| 2 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
 | 3 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Not listed |
 | 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | Not listed |
 | 5 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | Not listed |
@@ -58,7 +76,7 @@ exposing a `scan` tool backed by the same analysis as `trustabl scan`:
 }
 ```
 
-Registry listing: not listed.
+Registry listing: **[io.github.trustabl/agent-reliability-analyzer](https://registry.modelcontextprotocol.io/?q=trustabl)**, live since 24 September 2026.
 
 ---
 
@@ -66,7 +84,7 @@ Registry listing: not listed.
 
 | Ecosystem | Relationship | Listing |
 |---|---|---|
-| **in-toto** | Trustabl emits a signed scan attestation; in-toto makes it verifiable across the supply chain, so a verifier can prove an agent was checked against a known ruleset before it shipped | Not listed |
+| **in-toto** | Trustabl emits a signed scan attestation; in-toto makes it verifiable across the supply chain, so a verifier can prove an agent was checked against a known ruleset before it shipped | [Submitted](https://github.com/in-toto/friends/pull/122) |
 | **NVIDIA OpenShell** | Trustabl derives least-privilege policy from agent code, identity and required endpoints; OpenShell enforces it at runtime | Not listed |
 
 See [`attestation.md`](attestation.md) for the attestation format.

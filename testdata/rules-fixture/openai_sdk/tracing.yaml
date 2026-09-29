@@ -29,3 +29,33 @@ rules:
       in the environment) OR register a custom trace processor via
       agents.tracing.add_trace_processor(...) that redacts sensitive fields
       before they leave the process.
+
+  - id: OAI-203
+    title: OpenAI Agents SDK project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - openai_agents
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [openai_agents]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project runs OpenAI Agents SDK agents but wires no observability
+      backend: no OpenTelemetry provider, no Langfuse, Logfire, Phoenix,
+      Braintrust, Weave, or AgentOps instrumentation appears anywhere in the
+      parsed source. When an agent misbehaves in production — a tool loop, a
+      silent guardrail trip, a cost spike — there is no trace to read, so the
+      only evidence is whatever the application happened to log. Agent runs are
+      non-deterministic, which makes after-the-fact reconstruction from logs
+      alone unreliable.
+    fix: >
+      Wire a trace backend. The SDK traces natively: register a processor with
+      agents.tracing.add_trace_processor(...) to ship spans to your collector,
+      or install an OpenTelemetry provider
+      (opentelemetry.trace.set_tracer_provider(...)) with an OTLP exporter. If
+      you already run a vendor — Langfuse, Logfire, Braintrust, Phoenix —
+      initialize its SDK at process start.

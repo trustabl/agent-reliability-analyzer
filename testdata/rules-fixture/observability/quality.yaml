@@ -1,0 +1,156 @@
+policy:
+  id: observability_quality
+  name: Agent observability quality
+  category: observability
+  description: >
+    Cross-SDK rules covering observability that is present but not working.
+    These rules are framed around the observability VENDOR rather than the agent
+    SDK — the failure and its fix are identical whichever SDK declared the
+    agent — so they list every SDK token in applies_to instead of shipping nine
+    byte-identical copies. See the rulebook rationale doc for the defense of
+    that widening.
+
+rules:
+  - id: OBS-001
+    title: Observability instrumentation is imported but never initialized
+    severity: medium
+    confidence: 0.7
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_has_observability: true
+        - repo_observability_initialized: false
+    explanation: >
+      An observability package is imported in this repo, but no call that
+      activates it appears anywhere in the parsed source — no tracer provider is
+      set, no vendor client is constructed, no instrumentor is started. Spans are
+      created and then dropped, so the dashboard stays empty while the code and
+      the dependency manifest both suggest tracing is in place. This reads as
+      working observability right up to the incident where it is needed.
+    fix: >
+      Initialize the instrumentation once at process start, before the first
+      agent run: set an OpenTelemetry tracer provider with an exporter, or call
+      the vendor's init entry point (logfire.configure(), Traceloop.init(),
+      agentops.init(), braintrust.init_logger(), Langfuse's CallbackHandler).
+      Verify by checking that a test run produces at least one span in the
+      backend.
+
+  - id: OBS-002
+    title: The only span exporter writes to the console
+    severity: low
+    confidence: 0.6
+    # Python-only: the exporter-construction walk that backs
+    # repo_observability_console_only (pyObservabilitySignals) has no TS/JS
+    # counterpart yet (tsObservabilitySignals only collects import/init). A
+    # pure TS/JS repo has zero exporter signals, so the predicate can never
+    # observe a console-only exporter there — language: python keeps the rule
+    # from advertising coverage on repos it cannot actually inspect. See the
+    # rulebook rationale doc's known-gaps section.
+    language: python
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      repo_observability_console_only: true
+    explanation: >
+      Every span exporter constructed in this repo writes to the console. Traces
+      reach stdout and nothing else, so there is no queryable history: nobody can
+      search last week's runs, compare a regression against a baseline, or alert
+      on an error rate. On a stdio-transport MCP server the same writes also
+      share the JSON-RPC channel and can corrupt the protocol stream.
+    fix: >
+      Add a network exporter alongside the console one — an OTLP exporter
+      pointed at your collector or vendor endpoint. Keep the console exporter for
+      local development only, selected by an environment check rather than
+      shipped as the sole sink.
+
+  - id: OBS-003
+    title: Tracing captures full prompt and response content
+    severity: medium
+    confidence: 0.8
+    # Python-only: the content-capture walk that backs
+    # repo_observability_captures_content (pyObservabilitySignals) has no
+    # TS/JS counterpart yet — Vercel's experimental_telemetry.recordInputs and
+    # equivalents are not detected on the TS side. language: python keeps the
+    # rule from advertising coverage on repos it cannot actually inspect. See
+    # the rulebook rationale doc's known-gaps section.
+    language: python
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      repo_observability_captures_content: true
+    explanation: >
+      This repo switches on capture of full message content, so every prompt and
+      completion is sent to the tracing backend verbatim. Agent prompts routinely
+      carry whatever the user typed, retrieved document text, and tool results —
+      which is how PII, credentials pasted by users, and internal documents end
+      up in a third-party system that was never scoped for them. Trace retention
+      is typically long and access is typically broad.
+    fix: >
+      Turn content capture off in production and keep it for local debugging
+      only. If you need the content, install a span processor that redacts
+      message bodies before export, and confirm your backend's retention and
+      access controls match the sensitivity of what is now flowing into it.
+
+  - id: OBS-005
+    title: An observability dependency is declared but never wired
+    severity: medium
+    confidence: 0.65
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_observability_declared: true
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+    explanation: >
+      An observability package is declared in this project's dependency manifest
+      — it ships in the image and appears in the SBOM — but nothing in the parsed
+      source imports or initializes it. Someone decided this project should be
+      instrumented and the wiring never landed. That is worse than never having
+      tried: the dependency, the lockfile, and the SBOM all attest to tracing
+      that does not exist, so the gap survives review and is discovered during an
+      incident, when the traces are not there to read.
+    fix: >
+      Either wire the dependency you already ship — import it and initialize it
+      once at process start, before the first agent run (logfire.configure(),
+      Traceloop.init(), agentops.init(), braintrust.init_logger(), Langfuse's
+      CallbackHandler, or an OpenTelemetry tracer provider with an exporter) —
+      or remove it from the manifest so the SBOM stops claiming coverage this
+      project does not have.

@@ -1694,3 +1694,136 @@ func TestPredSkillDescriptionToolMismatch_ScopedGrantIsSilent(t *testing.T) {
 		t.Errorf("expected true: Bash(*) is unrestricted and contradicts the read-only claim")
 	}
 }
+
+func TestPredRepoObservability(t *testing.T) {
+	none := models.RepoInventory{
+		Manifest: models.ScanManifest{PythonFiles: []string{"a.py"}},
+	}
+	if rules.PredRepoHasObservability(true, none) {
+		t.Error("empty signals must not satisfy has_observability=true")
+	}
+	if !rules.PredRepoObservabilityInspectable(true, none) {
+		t.Error("a repo with Python files is inspectable")
+	}
+
+	importOnly := none
+	importOnly.ObservabilitySignals = []models.ObservabilitySignal{
+		{Vendor: models.VendorLangfuse, Kind: models.ObsSignalImport},
+	}
+	if !rules.PredRepoHasObservability(true, importOnly) {
+		t.Error("an import signal satisfies has_observability")
+	}
+	if rules.PredRepoObservabilityInitialized(true, importOnly) {
+		t.Error("an import alone must NOT count as initialized")
+	}
+
+	initialized := none
+	initialized.ObservabilitySignals = []models.ObservabilitySignal{
+		{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+	}
+	if !rules.PredRepoObservabilityInitialized(true, initialized) {
+		t.Error("an init signal satisfies initialized")
+	}
+	if !rules.PredRepoObservabilityVendor([]string{"langfuse"}, initialized) {
+		t.Error("vendor predicate must match langfuse")
+	}
+	if rules.PredRepoObservabilityVendor([]string{"otel"}, initialized) {
+		t.Error("vendor predicate must not match an absent vendor")
+	}
+
+	kwarg := none
+	kwarg.ObservabilitySignals = []models.ObservabilitySignal{
+		{Vendor: models.VendorLogfire, Kind: models.ObsSignalInstrumentKwarg},
+	}
+	if !rules.PredRepoObservabilityInitialized(true, kwarg) {
+		t.Error("a per-agent instrument kwarg counts as initialized")
+	}
+}
+
+// A repo in a language the observability pass does not parse must not be read
+// as "has no observability" — nothing looked.
+func TestPredRepoObservabilityInspectable_UninspectableLanguage(t *testing.T) {
+	goOnly := models.RepoInventory{
+		Manifest: models.ScanManifest{GoFiles: []string{"main.go"}},
+	}
+	if rules.PredRepoObservabilityInspectable(true, goOnly) {
+		t.Error("a Go-only repo is NOT inspectable — absence rules must not fire there")
+	}
+	tsOnly := models.RepoInventory{
+		Manifest: models.ScanManifest{TypeScriptFiles: []string{"app.ts"}},
+	}
+	if !rules.PredRepoObservabilityInspectable(true, tsOnly) {
+		t.Error("a TypeScript repo is inspectable")
+	}
+}
+
+func TestPredRepoObservabilityConsoleOnly(t *testing.T) {
+	consoleOnly := models.RepoInventory{
+		ObservabilitySignals: []models.ObservabilitySignal{
+			{Vendor: models.VendorOTel, Kind: models.ObsSignalExporter, Detail: "console"},
+		},
+	}
+	if !rules.PredRepoObservabilityConsoleOnly(true, consoleOnly) {
+		t.Error("a lone console exporter is console-only")
+	}
+	mixed := models.RepoInventory{
+		ObservabilitySignals: []models.ObservabilitySignal{
+			{Vendor: models.VendorOTel, Kind: models.ObsSignalExporter, Detail: "console"},
+			{Vendor: models.VendorOTel, Kind: models.ObsSignalExporter, Detail: "otlp"},
+		},
+	}
+	if rules.PredRepoObservabilityConsoleOnly(true, mixed) {
+		t.Error("console + otlp is NOT console-only")
+	}
+	if rules.PredRepoObservabilityConsoleOnly(true, models.RepoInventory{}) {
+		t.Error("no exporters at all must not read as console-only")
+	}
+}
+
+func TestPredRepoObservabilityDeclared(t *testing.T) {
+	direct := models.RepoProfile{ObsDeps: []models.ObsDep{
+		{Vendor: models.VendorLangfuse, Source: "requirements.txt", Confidence: 0.9},
+	}}
+	if !rules.PredRepoObservabilityDeclared(true, direct) {
+		t.Error("a dep declared in requirements.txt satisfies the predicate")
+	}
+	if rules.PredRepoObservabilityDeclared(true, models.RepoProfile{}) {
+		t.Error("no declared dep must not satisfy the predicate")
+	}
+
+	// The whole point of the direct-manifest filter: a lock file enumerates the
+	// transitive closure, so a hit there is not evidence anyone chose to
+	// instrument. Promoting it would blame a repo for its framework's deps.
+	lockOnly := models.RepoProfile{ObsDeps: []models.ObsDep{
+		{Vendor: models.VendorOTel, Source: "poetry.lock", Confidence: 0.9},
+	}}
+	if rules.PredRepoObservabilityDeclared(true, lockOnly) {
+		t.Error("a poetry.lock-only declaration must NOT count as declared")
+	}
+	if !rules.PredRepoObservabilityDeclared(false, lockOnly) {
+		t.Error("declared:false must hold for a lock-file-only declaration")
+	}
+
+	// A direct declaration still counts when a lock-file entry sits beside it.
+	both := models.RepoProfile{ObsDeps: []models.ObsDep{
+		{Vendor: models.VendorOTel, Source: "poetry.lock"},
+		{Vendor: models.VendorLangfuse, Source: "pyproject.toml"},
+	}}
+	if !rules.PredRepoObservabilityDeclared(true, both) {
+		t.Error("a direct declaration alongside a lock entry still counts")
+	}
+}
+
+func TestPredRepoObservabilityCapturesContent(t *testing.T) {
+	inv := models.RepoInventory{
+		ObservabilitySignals: []models.ObservabilitySignal{
+			{Vendor: models.VendorOTel, Kind: models.ObsSignalContentCapture, Detail: "include_content"},
+		},
+	}
+	if !rules.PredRepoObservabilityCapturesContent(true, inv) {
+		t.Error("a content_capture signal satisfies the predicate")
+	}
+	if rules.PredRepoObservabilityCapturesContent(true, models.RepoInventory{}) {
+		t.Error("no capture signal must not satisfy the predicate")
+	}
+}

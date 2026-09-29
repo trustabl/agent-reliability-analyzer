@@ -1,0 +1,31 @@
+policy:
+  id: autogen_tracing
+  name: AutoGen observability configuration
+  category: autogen
+  description: >
+    Repo-scoped rules covering whether an AutoGen / AG2 project can be observed
+    in production.
+
+rules:
+  - id: AG2-202
+    title: AutoGen project wires no observability
+    severity: low
+    confidence: 0.75
+    applies_to:
+      - autogen
+    scope: repo
+    match:
+      all:
+        - repo_has_sdk_in_code: [autogen]
+        - repo_has_observability: false
+        - repo_observability_inspectable: true
+        - repo_observability_declared: false
+    explanation: >
+      This project defines AutoGen agents but wires no observability backend.
+      Group chats run until a termination condition is met, so a conversation
+      that loops or terminates early burns tokens with no recorded trace to
+      explain why.
+    fix: >
+      Initialize an instrumentation SDK at process start — AgentOps
+      (agentops.init()), OpenLLMetry (Traceloop.init()), or an OpenTelemetry
+      tracer provider with an OTLP exporter — before starting the chat.

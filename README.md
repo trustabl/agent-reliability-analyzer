@@ -2,10 +2,6 @@
   <img src="assets/github_banner.jpg" alt="Trustabl — open source AI agent reliability" width="100%">
 </p>
 
-Find and automatically fix guardrail gaps, unsafe tools, missing validation, and
-unbounded loops in Claude Agent SDK, OpenAI Agents SDK, Google ADK, LangChain,
-CrewAI, and MCP agents — before production.
-
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
   <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/v/release/trustabl/agent-reliability-analyzer" alt="Latest release"></a>
@@ -24,6 +20,64 @@ CrewAI, and MCP agents — before production.
 # Trustabl — find and fix AI agent reliability gaps
 
 **Find what will make your AI agent fail — then fix it with one command.**
+
+Deterministic static analysis for agent code, across nine SDKs and seven languages.
+It runs entirely on your machine: no cloud scanner, no account, no code upload, no LLM.
+
+---
+
+<h3 align="center">Trustabl Partners</h3>
+<p align="center">
+  <sub>One engine, seven front doors. Install it from the catalogue you already use.</sub>
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" width="170">
+      <a href="https://registry.modelcontextprotocol.io/?q=trustabl"><b>MCP Registry</b></a><br>
+      <sub>Scan from any<br>MCP-aware client</sub>
+    </td>
+    <td align="center" width="170">
+      <a href="https://claude.ai/directory"><b>Claude Directory</b></a><br>
+      <sub>Skills, agent and<br>scanner inside Claude</sub>
+    </td>
+    <td align="center" width="170">
+      <a href="https://marketplace.visualstudio.com/items?itemName=trustabl.trustabl"><b>VS Code</b></a><br>
+      <sub>Findings as you<br>write, in the editor</sub>
+    </td>
+    <td align="center" width="170">
+      <a href="https://cursor.directory/plugins/trustabl"><b>Cursor</b></a><br>
+      <sub>Same scan, wired<br>in as an MCP server</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/marketplace/actions/trustabl-fix-agent-reliability-issues"><b>GitHub Actions</b></a><br>
+      <sub>Gate the build<br>on a severity threshold</sub>
+    </td>
+    <td align="center">
+      <a href="https://gitlab.com/explore/catalog/trustabl-ai/components"><b>GitLab CI/CD</b></a><br>
+      <sub>Published component<br>in the catalogue</sub>
+    </td>
+    <td align="center">
+      <a href="https://bitbucket.org/hoolisoftware/trustabl-pipe"><b>Bitbucket</b></a><br>
+      <sub>Official pipe, no<br>install step needed</sub>
+    </td>
+    <td align="center">
+      <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><b>CLI</b></a><br>
+      <sub>Homebrew, Scoop,<br>Docker or a binary</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <sub>
+    Every one of these runs the same deterministic scan on your own machine.<br>
+    See <a href="docs/integrations.md">ecosystem integrations</a> for which agent SDKs are covered.
+  </sub>
+</p>
+
+---
 
 Trustabl scans an agent repository for the gaps that break agents in production:
 tool descriptions too vague for a model to know when to use them, missing retry
@@ -113,6 +167,7 @@ The failures are rarely exotic. They are the same handful of gaps, over and over
 - An agent holding shell tools with **no input guardrails**
 - A tool making an HTTP call with **no timeout**, hanging the whole run
 - **Untyped tool parameters**, so the model guesses and guesses wrong
+- **No observability wired at all**, so the first three have no trace to read
 - A tool description so vague the model calls the wrong tool — 56% of MCP tool
   descriptions fail to state their purpose clearly, and 97.1% carry at least one
   description defect (Hasan et al., *MCP Tool Descriptions Are Smelly!*,
@@ -397,6 +452,15 @@ files in the scanned repo. Each run produces a `ScanResult` containing:
 - **The discovered inventory** — tools, agents, hosted tools, MCP
   servers, subagents, skills, slash commands, plugin manifests, and
   Claude settings — surfaced at the top level for CI consumers.
+- **Observability signals** (`observability`) — the instrumentation found in
+  code, one record per fact: the vendor (OpenTelemetry, Langfuse, Logfire,
+  Phoenix/OpenInference, OpenLLMetry, Braintrust, Weave, AgentOps, MLflow,
+  Datadog LLM Observability, LangSmith) and whether it is merely **imported** or
+  actually **initialized**, with the file and line. That distinction is the
+  point: a repo that imports a tracing SDK and never starts it looks
+  instrumented in its manifest and produces no traces at all. Detected
+  statically in Python and TypeScript/JavaScript only — Trustabl does not ingest
+  runtime traces.
 
 ### The summary's tool surface, broken out
 
@@ -870,7 +934,7 @@ trustabl rules pull
 
 # Validate a local rule-pack directory against this build's schema (CI gate
 # for the agent-reliability-rules repo — strict-loads every pack, fails on the first error)
-trustabl rules validate ./trustabl-rules
+trustabl rules validate ./agent-reliability-rules
 
 # Use a custom rules repo, or pin a specific released ruleset (env: TRUSTABL_RULES_REPO).
 # Default pulls the latest reviewed rules from agent-reliability-rules main; pin a tag for stability.
