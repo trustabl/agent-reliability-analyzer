@@ -26,9 +26,20 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
 
 ---
 
-<h2 align="center">Trustabl Partners</h2>
+<h3 align="center">Trustabl Partners</h3>
 <p align="center">
-  <sub>One engine, seven front doors. Install it from the catalogue you already use.</sub>
+  <b>Published in eight catalogues. Install it from the one you already use.</b>
+</p>
+
+<p align="center">
+  <a href="https://registry.modelcontextprotocol.io/?q=trustabl"><img src="https://img.shields.io/badge/MCP_Registry-0B1220?style=for-the-badge&logo=modelcontextprotocol&logoColor=white" alt="MCP Registry"></a>
+  <a href="https://claude.ai/directory"><img src="https://img.shields.io/badge/Claude_Directory-D97757?style=for-the-badge&logo=anthropic&logoColor=white" alt="Claude Directory"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=trustabl.trustabl"><img src="https://img.shields.io/badge/VS_Code-007ACC?style=for-the-badge" alt="VS Code"></a>
+  <a href="https://cursor.directory/plugins/trustabl"><img src="https://img.shields.io/badge/Cursor-000000?style=for-the-badge&logo=cursor&logoColor=white" alt="Cursor"></a>
+  <a href="https://github.com/marketplace/actions/trustabl-fix-agent-reliability-issues"><img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions"></a>
+  <a href="https://gitlab.com/explore/catalog/trustabl-ai/components"><img src="https://img.shields.io/badge/GitLab_CI%2FCD-FC6D26?style=for-the-badge&logo=gitlab&logoColor=white" alt="GitLab CI%2FCD"></a>
+  <a href="https://bitbucket.org/hoolisoftware/trustabl-pipe"><img src="https://img.shields.io/badge/Bitbucket_Pipes-0052CC?style=for-the-badge&logo=bitbucket&logoColor=white" alt="Bitbucket Pipes"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/badge/Homebrew_%C2%B7_Scoop_%C2%B7_Docker-111111?style=for-the-badge&logo=docker&logoColor=white" alt="Homebrew %C2%B7 Scoop %C2%B7 Docker"></a>
 </p>
 
 <table align="center">
