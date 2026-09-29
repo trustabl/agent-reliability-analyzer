@@ -1,0 +1,213 @@
+policy:
+  id: openai_sdk_side_effect_bounds
+  name: OpenAI Agents SDK unbounded side-effect parameters
+  category: openai_sdk
+  description: >
+    Rules that flag a side-effecting OpenAI Agents SDK tool (send/notify/
+    refund/charge/...) whose recipient or amount parameter is free-form model
+    input with no visible bound — no allow-list constraining who a message can
+    go to, no cap or enum constraining how much money moves. This is a
+    different failure mode from OAI-009/019 (idempotency): a duplicate call
+    repeats an action within a bound the caller already accepted, while an
+    unbounded recipient or amount lets a single call move further than the
+    caller intended. Retry/duplication is OAI-009/019's job; volume is
+    OAI-101/104's job (max_turns).
+
+rules:
+  - id: OAI-030
+    title: Side-effecting tool lets the model choose the recipient or amount with no visible bound
+    severity: high
+    confidence: 0.5
+    language: python
+    applies_to:
+      - openai_tool
+    scope: tool
+    match:
+      all:
+        - any:
+            - all:
+                - name_has_prefix:
+                    - send_
+                    - notify_
+                - param_name_matches:
+                    contains:
+                      - recipient
+                    exact:
+                      - to
+                      - cc
+                      - bcc
+                      - email
+                      - email_address
+                      - phone
+                      - phone_number
+                      - to_email
+                      - to_address
+                      - to_number
+            - all:
+                - name_has_prefix:
+                    - refund_
+                    - charge_
+                    - pay_
+                    - payout_
+                    - transfer_
+                    - issue_
+                - param_name_matches:
+                    contains:
+                      - amount
+                    exact:
+                      - total
+                      - price
+                    suffixes:
+                      - cents
+        - not:
+            has_body_text:
+              - "(le="
+              - " le="
+              - "(lt="
+              - " lt="
+              - "conint("
+              - "condecimal("
+              - "confloat("
+              - "Literal["
+              - "MAX_"
+              - "_MAX"
+              - "_LIMIT"
+              - "_limit"
+              - "ALLOWED"
+              - "allowed_"
+              - "ALLOWLIST"
+              - "allow_list"
+              - "WHITELIST"
+              - "whitelist"
+              - "endswith(\"@"
+              - "endswith('@"
+        - any:
+            - not:
+                tool_decorator_kwarg_present:
+                  - needs_approval
+            - tool_decorator_kwarg_value:
+                kwarg: needs_approval
+                value: "False"
+    explanation: >
+      This @function_tool's name signals a send/notify or a refund/charge/pay
+      side effect, and it takes a free-form recipient or amount parameter with
+      no visible bound: no allow-list constraining who the message reaches, no
+      cap, range, or enum constraining how much money moves, and no
+      needs_approval gate. A model steered by prompt injection, by its own
+      misreading of the task, or by an upstream tool's poisoned output can
+      pass any address or any amount to this call, and the tool will act on
+      it. This is a distinct failure from OAI-009/019 (idempotency): a
+      duplicate call repeats an action inside a bound the caller already
+      accepted; this rule is about a single call moving further — a wider
+      blast radius, not a repeated one. Passing needs_approval=True or a
+      per-call approval callable is a gate and silences this rule, exactly as
+      it does for OAI-014.
+    fix: >
+      Do not let the model supply the recipient or the amount unconstrained.
+      Derive the recipient from trusted context (the authenticated user's
+      on-file address, a ticket's assignee) rather than a model parameter, or
+      constrain it to an allow-list / domain allow-list validated before the
+      call executes. Cap the amount with a schema bound (Annotated[int,
+      Field(le=...)], conint(le=...), or a plain range check) AND enforce the
+      same cap server-side, since a static bound can be bypassed by a
+      differently-shaped call. For anything above a low, pre-approved
+      threshold, pass needs_approval=True and route the approval through a
+      human.
+
+  - id: OAI-031
+    title: TypeScript side-effecting tool lets the model choose the recipient or amount with no visible bound
+    severity: high
+    confidence: 0.5
+    language: typescript
+    applies_to:
+      - openai_tool
+    scope: tool
+    match:
+      all:
+        - any:
+            - all:
+                - name_has_prefix:
+                    - send
+                    - notify
+                - param_name_matches:
+                    contains:
+                      - recipient
+                    exact:
+                      - to
+                      - cc
+                      - bcc
+                      - email
+                      - emailAddress
+                      - toEmail
+                      - toAddress
+                      - phone
+                      - phoneNumber
+                      - toNumber
+            - all:
+                - name_has_prefix:
+                    - refund
+                    - charge
+                    - payout
+                    - transfer
+                    - issue
+                - param_name_matches:
+                    contains:
+                      - amount
+                    exact:
+                      - total
+                      - price
+                    suffixes:
+                      - cents
+        - not:
+            has_body_text:
+              - ".max("
+              - ".lte("
+              - ".lt("
+              - "maximum"
+              - "z.enum("
+              - "nativeEnum("
+              - "\"enum\""
+              - "enum:"
+              - "MAX_"
+              - "_MAX"
+              - "maxAmount"
+              - "_LIMIT"
+              - "Limit"
+              - "ALLOWED"
+              - "allowedDomains"
+              - "AllowList"
+              - "allowList"
+              - "WHITELIST"
+              - "whitelist"
+              - "endsWith(\"@"
+              - "endsWith('@"
+        - any:
+            - not:
+                tool_decorator_kwarg_present:
+                  - needsApproval
+            - tool_decorator_kwarg_value:
+                kwarg: needsApproval
+                value: "false"
+    explanation: >
+      This OpenAI Agents SDK tool authored in TypeScript has a name that
+      signals a send/notify or a refund/charge/pay side effect, and it takes a
+      free-form recipient or amount parameter with no visible bound: no
+      allow-list constraining who the message reaches, no cap, max, or enum
+      constraining how much money moves, and no needsApproval gate. A model
+      steered by prompt injection, by its own misreading of the task, or by an
+      upstream tool's poisoned output can pass any address or any amount to
+      this call. This is a distinct failure from OAI-019 (idempotency): a
+      duplicate call repeats an action inside a bound the caller already
+      accepted; this rule is about a single call moving further. Passing
+      needsApproval: true or a per-call approval function is a gate and
+      silences this rule, the same needsApproval option OAI-014 checks on the
+      Python side of this SDK.
+    fix: >
+      Do not let the model supply the recipient or the amount unconstrained.
+      Derive the recipient from trusted context rather than a model
+      parameter, or constrain it with a zod allow-list / domain check
+      validated before the call executes. Cap the amount with a zod bound
+      (z.number().max(...)) or an enum AND enforce the same cap server-side,
+      since a static bound in the schema can be bypassed by a differently-
+      shaped call. For anything above a low, pre-approved threshold, set
+      needsApproval: true and route the approval through a human.

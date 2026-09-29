@@ -350,43 +350,66 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **Rulebook status (2026-09-21):** the fixture and production both carry
-> **292** rules across **eleven** categories — the ten SDK categories
-> (`autogen`, `claude_sdk`, `claude_skill`, `crewai`, `google_adk`, `langchain`,
-> `mcp`, `openai_sdk`, `pydantic_ai`, `vercel_ai`) plus the new cross-SDK
-> **`observability`** category. In sync as of the 16 agent-observability rules
-> (nine repo-scope absence rules, three agent-scope outlier rules,
-> `OBS-001..003`, and `OBS-005`), `schema_version` **18**. `OBS-005` and its
-> backing `repo_observability_declared` predicate are a deliberate 16th-rule /
-> 7th-predicate addition beyond the 15 rules / 6 predicates the design doc
-> originally scoped — confirmed intentional, not drift. Re-derive both counts, never trust
-> the figure in this note:
-> `grep -rhoE '^\s*-\s*id:\s*\S+' testdata/rules-fixture/*/*.yaml | wc -l`
-> and the same over `../agent-reliability-rules/*/*.yaml`. Two prior notes were
-> stale when checked: one said **210** and claimed the two were in sync, while
-> production had run ahead to 228 with the fixture at 227 and `LC-103` shipped
-> but untested (now mirrored and covered); the next said **243**, measured
-> before this branch was rebased onto the rules that landed on both mains in
-> the meantime.
+> **Rulebook status (2026-09-29):** the fixture carries **298** rules across
+> **eleven** categories — the ten SDK categories (`autogen`, `claude_sdk`,
+> `claude_skill`, `crewai`, `google_adk`, `langchain`, `mcp`, `openai_sdk`,
+> `pydantic_ai`, `vercel_ai`) plus the cross-SDK **`observability`** category —
+> at `schema_version` **18**. This note combines two workstreams merged
+> together: the 16 agent-observability rules from main and Batch 1 of the
+> side-effect-bounds rule. Re-derive the count, never trust the figure in this
+> note: `grep -rhoE '^\s*-\s*id:\s*\S+' testdata/rules-fixture/*/*.yaml | wc -l`
+> and the same over `../agent-reliability-rules/*/*.yaml`. Earlier notes were
+> repeatedly stale when checked: **210** (claimed in sync while production had
+> run ahead to 228 and `LC-103` was shipped but untested), **243**, **277**,
+> and **292** (main's figure at the time of the observability merge; the merged
+> tree measures 298 = 293 on main + the 5 Batch 1 rules, and the 293-vs-292
+> difference is a recount, not a rule change).
 >
-> **Rulebook gate status:** `check_rulebook.py` reports **97 errors** against
-> the pack, **none** naming any of the 15 new rules. The figure was 50 on
-> 2026-09-17 and 32 before that; the growth is not this work. Of the 65 rule
-> IDs the errors name, **47 did not exist** at the pre-rebase base (`43da0b4`
-> in the rules repo) — they are rules that landed on main without a rationale
-> doc, and the gate runs only in the rulebook repo's CI, which is exactly how
-> rules reach production ungrounded. One of the 18 older ones is a defect this
-> work *revealed*, not caused: `docs/Policy/claude_sdk/repo.md` documents
-> `CSDK-206` and `CSDK-207`, neither of which is shipped. The Claude
-> observability rule initially took `CSDK-206` (derived from the shipped packs,
-> which do not contain it) and was renumbered to **`CSDK-208`** once the
-> collision surfaced — a reminder that the next free ID must be derived from
-> the union of the packs **and** the rulebook. Clearing the 97 is a separate,
-> not-yet-scoped cleanup.
+> **Side-effect bounds (Batch 1, competitive-analysis backlog rank 12, P0):**
+> **OAI-030/031**, **PYD-014**, **MCP-030**, **LC-025** — a side-effecting tool
+> (send/notify/refund/charge/pay/payout/transfer/issue) with a free-form
+> recipient or amount parameter, no visible bound in the body, and no
+> SDK-native approval gate. Batch 2 (crewai, google_adk, autogen, vercel_ai,
+> claude_sdk TS) is a tracked follow-up, not yet done.
+>
+> **Agent observability:** nine repo-scope absence rules, three agent-scope
+> outlier rules, `OBS-001..003`, and `OBS-005`. `OBS-005` and its backing
+> `repo_observability_declared` predicate are a deliberate 16th-rule /
+> 7th-predicate addition beyond the 15 rules / 6 predicates the design doc
+> originally scoped — confirmed intentional, not drift.
+>
+> **Fixture ↔ production sync is NOT currently clean.** The local
+> `../trustabl-rules` checkout (the pre-rename directory name for
+> `agent-reliability-rules`) is on the Batch 1 branch and carries **282**
+> rules; it does not yet contain main's observability packs, so
+> `scripts/check-rules-sync.sh` fails on the nine observability/tracing files
+> plus content drift in `openai_sdk/tracing.yaml`. That rules branch must pick
+> up the rules repo's main before the engine branch is pushed.
+>
+> **Rulebook gate status:** two measurements exist and are **not a trend** —
+> they ran against different packs. On 2026-09-21, `check_rulebook.py`
+> reported **97 errors** against the observability-era pack, **none** naming
+> any of the 15 observability rules; it was 50 on 2026-09-17 and 32 before
+> that. Of the 65 rule IDs those errors named, **47 did not exist** at the
+> pre-rebase base (`43da0b4` in the rules repo) — they are rules that landed
+> on main without a rationale doc, and the gate runs only in the rulebook
+> repo's CI, which is exactly how rules reach production ungrounded. One of
+> the 18 older ones is a defect that work *revealed*, not caused:
+> `docs/Policy/claude_sdk/repo.md` documents `CSDK-206` and `CSDK-207`, neither
+> of which is shipped. The Claude observability rule initially took `CSDK-206`
+> (derived from the shipped packs, which do not contain it) and was renumbered
+> to **`CSDK-208`** once the collision surfaced — a reminder that the next
+> free ID must be derived from the union of the packs **and** the rulebook. On
+> 2026-09-28 the gate reported **99 errors** against the Batch 1 pack, none
+> introduced by the four new rationale docs (the count did not move across
+> them; the 5 new rules pass COVERAGE/CONSISTENCY/PLACEMENT cleanly).
+> Re-run the gate against the merged pack rather than trusting either number.
+> Clearing the backlog is a separate, not-yet-scoped cleanup.
 >
 > **Run the gate with the renamed repo path:**
 > `python3 tools/check_rulebook.py --rules-repo ../agent-reliability-rules` —
-> its default is still the pre-rename `../trustabl-rules`.
+> its default is still the pre-rename `../trustabl-rules` (which is also where
+> the checkout lives on some machines).
 
 The rule-authoring contract (required fields, ID conventions, per-scope
 `applies_to` values, framing discipline) lives in

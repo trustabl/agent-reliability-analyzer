@@ -1,0 +1,110 @@
+policy:
+  id: langchain_side_effect_bounds
+  name: LangChain unbounded side-effect parameters
+  category: langchain
+  description: >
+    Rules that flag a side-effecting LangChain tool (send/notify/refund/
+    charge/...) whose recipient or amount parameter is free-form model input
+    with no visible bound — no allow-list constraining who a message can go
+    to, no cap or enum constraining how much money moves. This is a different
+    failure mode from LC-017 (idempotency): a duplicate call repeats an
+    action within a bound the caller already accepted, while an unbounded
+    recipient or amount lets a single call move further than the caller
+    intended.
+
+rules:
+  - id: LC-025
+    title: Side-effecting tool lets the model choose the recipient or amount with no visible bound
+    severity: high
+    confidence: 0.5
+    language: python
+    applies_to:
+      - langchain_tool
+    scope: tool
+    match:
+      all:
+        - any:
+            - all:
+                - name_has_prefix:
+                    - send_
+                    - notify_
+                - param_name_matches:
+                    contains:
+                      - recipient
+                    exact:
+                      - to
+                      - cc
+                      - bcc
+                      - email
+                      - email_address
+                      - phone
+                      - phone_number
+                      - to_email
+                      - to_address
+                      - to_number
+            - all:
+                - name_has_prefix:
+                    - refund_
+                    - charge_
+                    - pay_
+                    - payout_
+                    - transfer_
+                    - issue_
+                - param_name_matches:
+                    contains:
+                      - amount
+                    exact:
+                      - total
+                      - price
+                    suffixes:
+                      - cents
+        - not:
+            has_body_text:
+              - "(le="
+              - " le="
+              - "(lt="
+              - " lt="
+              - "conint("
+              - "condecimal("
+              - "confloat("
+              - "Literal["
+              - "MAX_"
+              - "_MAX"
+              - "_LIMIT"
+              - "_limit"
+              - "ALLOWED"
+              - "allowed_"
+              - "ALLOWLIST"
+              - "allow_list"
+              - "WHITELIST"
+              - "whitelist"
+              - "endswith(\"@"
+              - "endswith('@"
+              - "interrupt("
+    explanation: >
+      This LangChain tool's name signals a send/notify or a refund/charge/pay
+      side effect, and it takes a free-form recipient or amount parameter
+      with no visible bound: no allow-list constraining who the message
+      reaches, and no cap, range, or enum constraining how much money moves.
+      A ReAct agent's tool arguments come from the model's own reasoning,
+      which prompt injection, a misread task, or an upstream tool's poisoned
+      observation can steer — and that model can pass any address or any
+      amount into this call, with no checkpoint before it executes. This is a
+      distinct failure from LC-017 (idempotency): a duplicate call repeats an
+      action inside a bound the caller already accepted; this rule is about
+      a single call moving further — a wider blast radius, not a repeated
+      one. A tool body that calls LangGraph's interrupt(...) to pause and
+      wait for a human decision before acting is a gate and silences this
+      rule.
+    fix: >
+      Do not let the model supply the recipient or the amount unconstrained.
+      Derive the recipient from trusted context (a value bound to the
+      conversation or the authenticated user) rather than a model parameter,
+      or constrain it to an allow-list / domain allow-list validated before
+      the call executes. Cap the amount with a Pydantic field constraint on
+      the tool's args_schema (Annotated[int, Field(le=...)], conint(le=...))
+      AND enforce the same cap server-side, since a static bound can be
+      bypassed by a differently-shaped call. For anything above a low,
+      pre-approved threshold, call interrupt(...) from inside the tool to
+      require a human to approve the specific recipient or amount before the
+      side effect runs.

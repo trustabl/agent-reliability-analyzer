@@ -726,6 +726,40 @@ def create_order(customer_id: str, amount: float, idempotency_key: str) -> dict:
     return {"ok": True}
 `, wantFires: false},
 
+	// ─── PYD-014 side-effect bounds (recipient / amount, no visible cap) ────
+	{name: "PYD-014 fires on send tool with free-form recipient", ruleID: "PYD-014", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: true},
+	{name: "PYD-014 fires on charge tool with free-form amount", ruleID: "PYD-014", kind: models.KindPydanticAITool, src: `
+def charge_card(customer_id: str, amount: float) -> str:
+    """Charge a card."""
+    return "ok"
+`, wantFires: true},
+	{name: "PYD-014 silent when amount has a conint bound", ruleID: "PYD-014", kind: models.KindPydanticAITool, src: `
+def charge_card(customer_id: str, amount: conint(le=50000)) -> str:
+    """Charge a card."""
+    return "ok"
+`, wantFires: false},
+	{name: "PYD-014 silent when the name matches but the param does not", ruleID: "PYD-014", kind: models.KindPydanticAITool, src: `
+def charge_customer(customer_id: str) -> str:
+    """Charge, amount decided server-side."""
+    return "ok"
+`, wantFires: false},
+	{name: "PYD-014 silent when requires_approval=True gates the call", ruleID: "PYD-014", kind: models.KindPydanticAITool, toolConfig: map[string]string{"requires_approval": "True"}, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: false},
+	// Explicit requires_approval=False is exactly as un-gated as omitting the
+	// kwarg.
+	{name: "PYD-014 fires when requires_approval=False explicitly", ruleID: "PYD-014", kind: models.KindPydanticAITool, toolConfig: map[string]string{"requires_approval": "False"}, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: true},
+
 	// ─── CSDK-001 missing docstring ─────────────────────────────────────────
 	{name: "CSDK-001 fires on missing docstring", ruleID: "CSDK-001", kind: models.KindClaudeSDKTool, src: `
 def fetch_data(x: str) -> dict:
@@ -1103,6 +1137,68 @@ def create_order(customer_id: str, amount: float, idempotency_key: str) -> dict:
 `,
 		toolConfig: nil, wantFires: false},
 
+	// ─── OAI-030 side-effect bounds (recipient / amount, no visible cap) ────
+	{name: "OAI-030 fires on send tool with free-form recipient", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def send_email(to: str, subject: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`,
+		toolConfig: nil, wantFires: true},
+	{name: "OAI-030 fires on refund tool with free-form amount", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    return "ok"
+`,
+		toolConfig: nil, wantFires: true},
+	{name: "OAI-030 silent when amount has a Field(le=) bound", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def refund_payment(charge_id: str, amount: int = Field(le=50000)) -> str:
+    """Refund a payment."""
+    return "ok"
+`,
+		toolConfig: nil, wantFires: false},
+	{name: "OAI-030 silent when body enforces a MAX_ constant", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    if amount > MAX_REFUND_CENTS:
+        raise ValueError("too much")
+    return "ok"
+`,
+		toolConfig: nil, wantFires: false},
+	{name: "OAI-030 silent when amount is not a model-supplied param", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def charge_customer(customer_id: str) -> str:
+    """Charge, amount decided server-side."""
+    return "ok"
+`,
+		toolConfig: nil, wantFires: false},
+	{name: "OAI-030 silent on a non-mutating tool name", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def get_user_data(user_id: str) -> dict:
+    """Get user data."""
+    return {}
+`,
+		toolConfig: nil, wantFires: false},
+	{name: "OAI-030 silent with an allow-list check in the body", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def notify_channel(recipient: str, message: str) -> str:
+    """Notify a channel."""
+    if recipient not in ALLOWED_CHANNELS:
+        raise ValueError("bad recipient")
+    return "ok"
+`,
+		toolConfig: nil, wantFires: false},
+	{name: "OAI-030 silent when needs_approval=True gates the call", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def send_email(to: str, subject: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`,
+		toolConfig: map[string]string{"needs_approval": "True"}, wantFires: false},
+	// Explicit needs_approval=False is exactly as un-gated as omitting the
+	// kwarg, mirroring OAI-014's treatment of the same kwarg.
+	{name: "OAI-030 fires when needs_approval=False explicitly", ruleID: "OAI-030", kind: models.KindOpenAITool, src: `
+def send_email(to: str, subject: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`,
+		toolConfig: map[string]string{"needs_approval": "False"}, wantFires: true},
+
 	// ─── OAI-010 print to stdout ─────────────────────────────────────────────
 	{name: "OAI-010 fires on print()", ruleID: "OAI-010", kind: models.KindOpenAITool, src: `
 def fetch(x: str) -> dict:
@@ -1353,6 +1449,41 @@ def create_order(customer_id: str, amount: float) -> dict:
 def create_order(customer_id: str, amount: float, idempotency_key: str) -> dict:
     """Create an order."""
     return {"ok": True}
+`,
+		toolConfig: nil, wantFires: false},
+
+	// ─── MCP-030 side-effect bounds (recipient / amount, no visible cap) ────
+	{name: "MCP-030 fires on notify tool with free-form recipient", ruleID: "MCP-030", kind: models.KindMCPTool, src: `
+def notify_user(recipient: str, message: str) -> str:
+    """Notify a user."""
+    return "ok"
+`,
+		toolConfig: nil, wantFires: true},
+	{name: "MCP-030 fires on refund tool with free-form amount", ruleID: "MCP-030", kind: models.KindMCPTool, src: `
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    return "ok"
+`,
+		toolConfig: nil, wantFires: true},
+	{name: "MCP-030 silent when amount has an allow-list bound", ruleID: "MCP-030", kind: models.KindMCPTool, src: `
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    if amount > MAX_REFUND_CENTS:
+        raise ValueError("too much")
+    return "ok"
+`,
+		toolConfig: nil, wantFires: false},
+	{name: "MCP-030 silent when the handler elicits confirmation", ruleID: "MCP-030", kind: models.KindMCPTool, src: `
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    ctx.elicit("confirm this refund?")
+    return "ok"
+`,
+		toolConfig: nil, wantFires: false},
+	{name: "MCP-030 silent when the name matches but the param does not", ruleID: "MCP-030", kind: models.KindMCPTool, src: `
+def charge_customer(customer_id: str) -> str:
+    """Charge, amount decided server-side."""
+    return "ok"
 `,
 		toolConfig: nil, wantFires: false},
 
@@ -1862,6 +1993,45 @@ def calc(expr: str) -> int:
 			"export const t = tool({ name: \"get_status\", description: \"f\", parameters: {}, execute: async () => {\n" +
 			"  return 1;\n" +
 			"} });\n",
+	},
+
+	// ── OAI-031: TS side-effect bounds (recipient / amount, no visible cap) ──
+	{
+		name: "OAI-031 fires on send tool with free-form recipient", ruleID: "OAI-031",
+		kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"@openai/agents\";\nimport { z } from \"zod\";\n" +
+			"export const t = tool({ name: \"send_email\", description: \"Send\", parameters: z.object({ to: z.string(), body: z.string() }), execute: async ({ to, body }) => \"ok\" });\n",
+	},
+	{
+		name: "OAI-031 fires on charge tool with free-form amount", ruleID: "OAI-031",
+		kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"@openai/agents\";\nimport { z } from \"zod\";\n" +
+			"export const t = tool({ name: \"charge_customer\", description: \"Charge\", parameters: z.object({ amount: z.number() }), execute: async ({ amount }) => \"ok\" });\n",
+	},
+	{
+		name: "OAI-031 silent when the amount has a zod .max() bound", ruleID: "OAI-031",
+		kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"@openai/agents\";\nimport { z } from \"zod\";\n" +
+			"export const t = tool({ name: \"charge_customer\", description: \"Charge\", parameters: z.object({ amount: z.number().max(500) }), execute: async ({ amount }) => \"ok\" });\n",
+	},
+	{
+		name: "OAI-031 silent when the name matches but the param does not (payload, not a money verb)", ruleID: "OAI-031",
+		kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"@openai/agents\";\nimport { z } from \"zod\";\n" +
+			"export const t = tool({ name: \"payload_transform\", description: \"x\", parameters: z.object({ amount: z.number() }), execute: async ({ amount }) => \"ok\" });\n",
+	},
+	{
+		name: "OAI-031 silent when needsApproval: true gates the call", ruleID: "OAI-031",
+		kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"@openai/agents\";\nimport { z } from \"zod\";\n" +
+			"export const t = tool({ name: \"send_email\", description: \"Send\", parameters: z.object({ to: z.string(), body: z.string() }), needsApproval: true, execute: async ({ to, body }) => \"ok\" });\n",
+	},
+	// Explicit needsApproval: false is exactly as un-gated as omitting it.
+	{
+		name: "OAI-031 fires when needsApproval: false explicitly", ruleID: "OAI-031",
+		kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"@openai/agents\";\nimport { z } from \"zod\";\n" +
+			"export const t = tool({ name: \"send_email\", description: \"Send\", parameters: z.object({ to: z.string(), body: z.string() }), needsApproval: false, execute: async ({ to, body }) => \"ok\" });\n",
 	},
 
 	// ── OAI-022: TS tool has no description ──
@@ -2388,6 +2558,36 @@ def refund_payment(charge_id: str, amount_cents: int, idempotency_key: str) -> d
 def get_payment(charge_id: str) -> dict:
     """Get a charge."""
     return {"ok": True}
+`, wantFires: false},
+
+	// ─── LC-025 side-effect bounds (recipient / amount, no visible cap) ────
+	{name: "LC-025 fires on send tool with free-form recipient", ruleID: "LC-025", kind: models.KindLangChainTool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: true},
+	{name: "LC-025 fires on charge tool with free-form amount", ruleID: "LC-025", kind: models.KindLangChainTool, src: `
+def charge_card(customer_id: str, amount_cents: int) -> str:
+    """Charge a card."""
+    return "ok"
+`, wantFires: true},
+	{name: "LC-025 silent when amount has an ALLOWED bound", ruleID: "LC-025", kind: models.KindLangChainTool, src: `
+def charge_card(customer_id: str, amount_cents: int) -> str:
+    """Charge a card."""
+    if amount_cents > ALLOWED_MAX_CENTS:
+        raise ValueError("too much")
+    return "ok"
+`, wantFires: false},
+	{name: "LC-025 silent when the tool calls interrupt() for approval", ruleID: "LC-025", kind: models.KindLangChainTool, src: `
+def charge_card(customer_id: str, amount_cents: int) -> str:
+    """Charge a card."""
+    interrupt("confirm this charge?")
+    return "ok"
+`, wantFires: false},
+	{name: "LC-025 silent when the name matches but the param does not", ruleID: "LC-025", kind: models.KindLangChainTool, src: `
+def charge_customer(customer_id: str) -> str:
+    """Charge, amount decided server-side."""
+    return "ok"
 `, wantFires: false},
 
 	// ─── PYD-010 / PYD-011: Pydantic AI description quality ─────────────────
