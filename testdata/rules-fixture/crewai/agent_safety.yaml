@@ -114,3 +114,30 @@ rules:
       with max_execution_time= so a slow or stalled run is bounded in wall-clock
       seconds as well as in iterations, and the agent cannot hold the crew open
       indefinitely.
+
+  - id: CREW-111
+    title: CrewAI agent has no max_execution_time wall-clock limit
+    severity: low
+    confidence: 0.6
+    language: python
+    applies_to:
+      - crewai_agent
+    scope: agent
+    match:
+      all:
+        - agent_kwarg_missing:
+            - max_execution_time
+        - not:
+            agent_kwarg_present:
+              - config
+    explanation: >
+      This Agent sets no max_execution_time, so nothing bounds how many seconds
+      one task may run. max_iter caps the number of reasoning steps, but a single
+      step that blocks on a slow tool, a stalled network call or a very long model
+      response is not counted by it. A stuck agent holds the crew open, keeps its
+      tools and credentials live, and can run up cost without ever reaching an
+      iteration limit.
+    fix: >
+      Pass max_execution_time= (seconds) to Agent, sized to the task, and pair it
+      with max_iter=. Give every tool that calls out its own timeout as well, so
+      the agent-level limit is a backstop rather than the only bound.

@@ -124,3 +124,25 @@ rules:
       refuses internal addresses. Treat each response body as untrusted input —
       keep it out of the system prompt and do not let it widen the agent's tool
       permissions.
+
+  - id: LC-113
+    title: LangChain AgentExecutor has no explicit max_execution_time limit
+    severity: low
+    confidence: 0.6
+    language: python
+    applies_to:
+      - langchain_agent_executor
+    scope: agent
+    match:
+      agent_kwarg_missing:
+        - max_execution_time
+    explanation: >
+      This AgentExecutor sets no max_execution_time, so nothing bounds how many
+      seconds a run may take. max_iterations caps the number of tool round-trips,
+      but one iteration that blocks on a slow tool or a stalled model call is not
+      counted by it, so the run can hang or stretch well past any latency budget
+      while it holds tools and credentials live.
+    fix: >
+      Pass max_execution_time= (seconds) to AgentExecutor, sized to the task, next
+      to max_iterations=. Set timeouts on the tools it calls too, so the executor
+      limit is a backstop rather than the only bound.

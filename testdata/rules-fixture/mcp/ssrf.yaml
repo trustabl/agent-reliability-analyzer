@@ -18,7 +18,18 @@ rules:
       - mcp_tool
     scope: tool
     match:
-      has_dynamic_url_call: true
+      all:
+        - has_dynamic_url_call: true
+        - not:
+            has_body_text:
+              - ".hostname not in"
+              - ".netloc not in"
+              - "ALLOWED_HOSTS"
+              - "ALLOWED_DOMAINS"
+              - "allowed_hosts"
+              - "allowed_domains"
+              - "HOST_ALLOWLIST"
+              - "host_allowlist"
     explanation: >
       This MCP tool issues an HTTP request to a URL built from a parameter or an
       interpolated string rather than a fixed literal. Because MCP tool
@@ -33,7 +44,7 @@ rules:
       Constrain the destination to an explicit allow-list of hosts (or a single
       fixed base URL with only a path parameter), reject requests to private,
       loopback, and link-local IP ranges after DNS resolution, and disable
-      redirects to addresses outside the allow-list.
+      redirects to addresses outside the allow-list. Credit is given when the body checks the parsed hostname against a named allow-list; also require https:// and cap or disable redirects (follow_redirects=False / allow_redirects=False).
 
   - id: MCP-013
     title: TypeScript MCP tool fetches a caller-controlled URL (SSRF)
@@ -44,7 +55,23 @@ rules:
       - mcp_tool
     scope: tool
     match:
-      has_dynamic_url_call: true
+      all:
+        - has_dynamic_url_call: true
+        - not:
+            any:
+              - all:
+                  - has_body_text:
+                      - ".hostname"
+                      - ".host"
+                  - has_body_text:
+                      - ".includes("
+                      - ".has("
+              - has_body_text:
+                  - "allowedHosts"
+                  - "allowedDomains"
+                  - "ALLOWED_HOSTS"
+                  - "ALLOWED_DOMAINS"
+                  - "hostAllowlist"
     explanation: >
       This MCP tool handler, authored in TypeScript, issues an HTTP request to a
       URL built from a tool argument or an interpolated string rather than a
@@ -57,4 +84,4 @@ rules:
       Validate the destination before fetching: resolve the host and reject
       private, loopback, and link-local ranges; prefer an allowlist of exact
       hosts, or resolve an opaque ID against a server-side registry and build the
-      URL from the trusted entry.
+      URL from the trusted entry. Credit is given when the body checks new URL(x).hostname/host against an allow-list; also require https: and use redirect: "manual" or cap redirects.
