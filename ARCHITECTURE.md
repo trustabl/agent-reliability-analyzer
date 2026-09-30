@@ -703,8 +703,10 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   `Opaque=true`.
 - **DiscoverADKTools** (`adk_agents.go`) — finds `FunctionTool(symbol)` calls
   and resolves the argument to a same-file top-level function definition. Each
-  resolved match emits a `ToolDef` with `Kind=adk_function_tool`. Cross-module
-  resolution is out of scope.
+  resolved match emits a `ToolDef` with `Kind=adk_function_tool`. The call's
+  keyword arguments (e.g. `require_confirmation=True`) are captured as raw text
+  into `ToolDef.Config`, so `tool_decorator_kwarg_*` predicates can read ADK's
+  per-tool options (ADK-020). Cross-module resolution is out of scope.
 - **DiscoverTSTools** (`ts_discovery.go`) — TS Claude SDK `tool(name,
   description, zodSchema, handler, extras?)` factory calls. Captures `Name`
   (arg 0), `Description` (arg 1), `ParamNames` from the Zod schema top-level
@@ -1179,6 +1181,7 @@ Shipped rules (one row per YAML rule entry):
 | CSDK-120 | agent    | claude_sdk | high     | `claude_sdk/agent_safety.yaml`     | TypeScript AgentDefinition sets permissionMode to bypassPermissions with a broad tool set |
 | CSDK-014 | tool     | claude_sdk | low      | `claude_sdk/tool_definition.yaml`  | TypeScript Claude SDK tool has no description                                         |
 | CSDK-016 | tool     | claude_sdk | medium   | `claude_sdk/idempotency.yaml`      | TypeScript Claude SDK mutating tool has no idempotency key                            |
+| CSDK-023 | tool     | claude_sdk | high     | `claude_sdk/side_effect_bounds.yaml` | TypeScript side-effecting tool lets the model choose the recipient or amount with no visible bound |
 | CSDK-130 | agent    | claude_sdk | high     | `claude_sdk/agent_safety.yaml`     | TypeScript query() main agent is granted the Bash tool                                |
 | CSDK-131 | agent    | claude_sdk | high     | `claude_sdk/agent_safety.yaml`     | TypeScript query() main agent is granted filesystem-write or web-fetch built-ins      |
 | OAI-001  | tool     | openai_sdk | low      | `openai_sdk/tool_definition.yaml`  | Tool function has no docstring                                                        |
@@ -1231,6 +1234,8 @@ Shipped rules (one row per YAML rule entry):
 | ADK-013  | tool     | google_adk | low      | `google_adk/tool_definition.yaml`  | TypeScript FunctionTool has no description                                            |
 | ADK-015  | tool     | google_adk | high     | `google_adk/code_execution.yaml`   | TypeScript FunctionTool body evaluates dynamic code                                   |
 | ADK-016  | tool     | google_adk | high     | `google_adk/ssrf.yaml`             | TypeScript FunctionTool fetches a caller-controlled URL (SSRF)                        |
+| ADK-020  | tool     | google_adk | high     | `google_adk/side_effect_bounds.yaml` | Side-effecting tool lets the model choose the recipient or amount with no visible bound |
+| ADK-021  | tool     | google_adk | high     | `google_adk/side_effect_bounds.yaml` | TypeScript side-effecting tool lets the model choose the recipient or amount with no visible bound |
 | ADK-101  | agent    | google_adk | medium   | `google_adk/agent_safety.yaml`     | LlmAgent has no description                                                           |
 | ADK-102  | agent    | google_adk | high     | `google_adk/agent_safety.yaml`     | Agent with BashTool has no before_tool_callback                                       |
 | ADK-103  | agent    | google_adk | high     | `google_adk/agent_safety.yaml`     | Sub-agent is granted BashTool                                                         |
@@ -1329,8 +1334,19 @@ takes the four slices explicitly (architecture principle: stay honest about
 what scoring depends on) — the filtering happens at the call site. A
 test-fixture agent therefore creates no surface row and its findings do not
 move `OverallScore`; `ScanResult.Tools`/`.Agents`/`.Findings` stay complete
-regardless, since the classification changes what is *scored*, never what is
-*reported*. `NoAgentSurfaces` is computed from the same production-filtered
+regardless — for those, the classification changes what is *scored*, never what
+is *reported*.
+
+`ScanResult.SDKs` is the one reported field that does follow the
+production-only view, because it is a claim about the repository rather than a
+list of what was found. Scanning this repo — a Go repo — reported `sdks:
+[claude_agent_sdk, google_adk, langchain, openai_agents]`, the last three
+entirely on the strength of the Python and TypeScript sample code vendored under
+`testdata/`. `RepoInventory.SDKsDetected` is deliberately NOT narrowed the same
+way: it selects which rule packs load, so filtering it would drop the packs that
+produce test-path findings altogether, deleting findings that are meant to be
+reported and de-weighted. `--include-test-paths` reproduces the previous list
+exactly. `NoAgentSurfaces` is computed from the same production-filtered
 `surfaces` slice as before (`len(surfaces) == 0`) — note that a repo-scoped
 finding (e.g. "uses default tracing") still seeds the repo surface even when
 the SDK usage that triggered it lives only in a test path, since a repo-scoped

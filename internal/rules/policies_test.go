@@ -3288,6 +3288,253 @@ def process_invoice_batch(batch_id: str) -> str:
     """Process one batch of invoices and return a per-invoice result summary."""
     return batch_id
 `, wantFires: false},
+
+	// ─── CREW-014 side-effect bounds (recipient / amount, no visible cap) ────
+	{name: "CREW-014 fires on send tool with free-form recipient", ruleID: "CREW-014", kind: models.KindCrewAITool, src: `
+@tool
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: true},
+	{name: "CREW-014 fires on refund tool with free-form amount", ruleID: "CREW-014", kind: models.KindCrewAITool, src: `
+@tool
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    return "ok"
+`, wantFires: true},
+	{name: "CREW-014 silent when the body enforces a MAX_ cap", ruleID: "CREW-014", kind: models.KindCrewAITool, src: `
+@tool
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    if amount > MAX_REFUND_CENTS:
+        raise ValueError("too much")
+    return "ok"
+`, wantFires: false},
+	{name: "CREW-014 silent with an allow-list check in the body", ruleID: "CREW-014", kind: models.KindCrewAITool, src: `
+@tool
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    if not to.endswith("@example.com"):
+        raise ValueError("outside domain")
+    return "ok"
+`, wantFires: false},
+	{name: "CREW-014 silent when the name matches but the param does not", ruleID: "CREW-014", kind: models.KindCrewAITool, src: `
+@tool
+def charge_customer(customer_id: str) -> str:
+    """Charge, amount decided server-side."""
+    return "ok"
+`, wantFires: false},
+	{name: "CREW-014 silent on a non-mutating tool name", ruleID: "CREW-014", kind: models.KindCrewAITool, src: `
+@tool
+def get_recipient(recipient: str) -> str:
+    """Look up a recipient."""
+    return recipient
+`, wantFires: false},
+
+	// ─── AG2-020 side-effect bounds (recipient / amount, no visible cap) ────
+	{name: "AG2-020 fires on send tool with free-form recipient", ruleID: "AG2-020", kind: models.KindAutoGenTool, src: `
+@user.register_for_llm()
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: true},
+	{name: "AG2-020 fires on refund tool with free-form amount", ruleID: "AG2-020", kind: models.KindAutoGenTool, src: `
+@user.register_for_llm()
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    return "ok"
+`, wantFires: true},
+	{name: "AG2-020 silent when the body enforces a MAX_ cap", ruleID: "AG2-020", kind: models.KindAutoGenTool, src: `
+@user.register_for_llm()
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    if amount > MAX_REFUND_CENTS:
+        raise ValueError("too much")
+    return "ok"
+`, wantFires: false},
+	{name: "AG2-020 silent with an allow-list check in the body", ruleID: "AG2-020", kind: models.KindAutoGenTool, src: `
+@user.register_for_llm()
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    if not to.endswith("@example.com"):
+        raise ValueError("outside domain")
+    return "ok"
+`, wantFires: false},
+	{name: "AG2-020 silent when the name matches but the param does not", ruleID: "AG2-020", kind: models.KindAutoGenTool, src: `
+@user.register_for_llm()
+def charge_customer(customer_id: str) -> str:
+    """Charge, amount decided server-side."""
+    return "ok"
+`, wantFires: false},
+	{name: "AG2-020 silent on a non-mutating tool name", ruleID: "AG2-020", kind: models.KindAutoGenTool, src: `
+@user.register_for_llm()
+def get_recipient(recipient: str) -> str:
+    """Look up a recipient."""
+    return recipient
+`, wantFires: false},
+
+	// ─── ADK-020 side-effect bounds (recipient / amount, no visible cap) ────
+	{name: "ADK-020 fires on send tool with free-form recipient", ruleID: "ADK-020", kind: models.KindADKFunctionTool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: true},
+	{name: "ADK-020 fires on refund tool with free-form amount", ruleID: "ADK-020", kind: models.KindADKFunctionTool, src: `
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    return "ok"
+`, wantFires: true},
+	{name: "ADK-020 silent when the body enforces a MAX_ cap", ruleID: "ADK-020", kind: models.KindADKFunctionTool, src: `
+def refund_payment(charge_id: str, amount: int) -> str:
+    """Refund a payment."""
+    if amount > MAX_REFUND_CENTS:
+        raise ValueError("too much")
+    return "ok"
+`, wantFires: false},
+	{name: "ADK-020 silent with an allow-list check in the body", ruleID: "ADK-020", kind: models.KindADKFunctionTool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    if not to.endswith("@example.com"):
+        raise ValueError("outside domain")
+    return "ok"
+`, wantFires: false},
+	{name: "ADK-020 silent when the name matches but the param does not", ruleID: "ADK-020", kind: models.KindADKFunctionTool, src: `
+def charge_customer(customer_id: str) -> str:
+    """Charge, amount decided server-side."""
+    return "ok"
+`, wantFires: false},
+	{name: "ADK-020 silent on a non-mutating tool name", ruleID: "ADK-020", kind: models.KindADKFunctionTool, src: `
+def get_recipient(recipient: str) -> str:
+    """Look up a recipient."""
+    return recipient
+`, wantFires: false},
+	{name: "ADK-020 silent when require_confirmation=True gates the call", ruleID: "ADK-020", kind: models.KindADKFunctionTool, toolConfig: map[string]string{"require_confirmation": "True"}, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: false},
+	{name: "ADK-020 fires when require_confirmation=False explicitly", ruleID: "ADK-020", kind: models.KindADKFunctionTool, toolConfig: map[string]string{"require_confirmation": "False"}, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return "ok"
+`, wantFires: true},
+	{name: "ADK-020 silent when the function calls request_confirmation()", ruleID: "ADK-020", kind: models.KindADKFunctionTool, src: `
+def refund_payment(charge_id: str, amount: int, tool_context) -> str:
+    """Refund a payment."""
+    tool_context.request_confirmation(hint="approve this refund?")
+    return "ok"
+`, wantFires: false},
+
+	// ─── VAI-019 side-effect bounds (TypeScript, recipient / amount, no visible cap) ────
+	{
+		name: "VAI-019 fires on send tool with free-form recipient", ruleID: "VAI-019",
+		kind: models.KindVercelAITool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"ai\";\n" +
+			"import { z } from \"zod\";\n" +
+			"const sendEmail = tool({ description: \"d\", inputSchema: z.object({ to: z.string(), body: z.string() }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "VAI-019 fires on charge tool with free-form amount", ruleID: "VAI-019",
+		kind: models.KindVercelAITool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"ai\";\n" +
+			"import { z } from \"zod\";\n" +
+			"const chargeCustomer = tool({ description: \"d\", inputSchema: z.object({ amount: z.number() }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "VAI-019 silent when the amount has a zod .max() bound", ruleID: "VAI-019",
+		kind: models.KindVercelAITool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"ai\";\n" +
+			"import { z } from \"zod\";\n" +
+			"const chargeCustomer = tool({ description: \"d\", inputSchema: z.object({ amount: z.number().max(500) }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "VAI-019 silent when the name matches but the param does not (payload, not a money verb)", ruleID: "VAI-019",
+		kind: models.KindVercelAITool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"ai\";\n" +
+			"import { z } from \"zod\";\n" +
+			"const payloadTransform = tool({ description: \"d\", inputSchema: z.object({ amount: z.number() }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "VAI-019 silent when needsApproval: true gates the call", ruleID: "VAI-019",
+		kind: models.KindVercelAITool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"ai\";\n" +
+			"import { z } from \"zod\";\n" +
+			"const sendEmail = tool({ description: \"d\", inputSchema: z.object({ to: z.string(), body: z.string() }), needsApproval: true, execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "VAI-019 fires when needsApproval: false explicitly", ruleID: "VAI-019",
+		kind: models.KindVercelAITool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"ai\";\n" +
+			"import { z } from \"zod\";\n" +
+			"const sendEmail = tool({ description: \"d\", inputSchema: z.object({ to: z.string(), body: z.string() }), needsApproval: false, execute: async (a) => \"ok\" });\n",
+	},
+
+	// ─── ADK-021 side-effect bounds (TypeScript, recipient / amount, no visible cap) ────
+	{
+		name: "ADK-021 fires on send tool with free-form recipient", ruleID: "ADK-021",
+		kind: models.KindADKFunctionTool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { FunctionTool } from \"@google/adk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = new FunctionTool({ name: \"send_email\", description: \"d\", parameters: z.object({ to: z.string(), body: z.string() }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "ADK-021 fires on charge tool with free-form amount", ruleID: "ADK-021",
+		kind: models.KindADKFunctionTool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { FunctionTool } from \"@google/adk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = new FunctionTool({ name: \"charge_customer\", description: \"d\", parameters: z.object({ amount: z.number() }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "ADK-021 silent when the amount has a zod .max() bound", ruleID: "ADK-021",
+		kind: models.KindADKFunctionTool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { FunctionTool } from \"@google/adk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = new FunctionTool({ name: \"charge_customer\", description: \"d\", parameters: z.object({ amount: z.number().max(500) }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "ADK-021 silent when the name matches but the param does not (payload, not a money verb)", ruleID: "ADK-021",
+		kind: models.KindADKFunctionTool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { FunctionTool } from \"@google/adk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = new FunctionTool({ name: \"payload_transform\", description: \"d\", parameters: z.object({ amount: z.number() }), execute: async (a) => \"ok\" });\n",
+	},
+	{
+		name: "ADK-021 silent when execute calls requestConfirmation()", ruleID: "ADK-021",
+		kind: models.KindADKFunctionTool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { FunctionTool } from \"@google/adk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = new FunctionTool({ name: \"refund_payment\", description: \"d\", parameters: z.object({ amount: z.number() }), execute: async (a) => await ctx.requestConfirmation({ hint: \"approve?\" }) });\n",
+	},
+
+	// ─── CSDK-023 side-effect bounds (TypeScript, recipient / amount, no visible cap) ────
+	{
+		name: "CSDK-023 fires on send tool with free-form recipient", ruleID: "CSDK-023",
+		kind: models.KindClaudeSDKTool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = tool(\"send_email\", \"d\", { to: z.string(), body: z.string() }, async (a) => ({ content: [] }));\n",
+	},
+	{
+		name: "CSDK-023 fires on charge tool with free-form amount", ruleID: "CSDK-023",
+		kind: models.KindClaudeSDKTool, lang: models.LanguageTypeScript, wantFires: true,
+		src: "import { tool } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = tool(\"charge_customer\", \"d\", { amount: z.number() }, async (a) => ({ content: [] }));\n",
+	},
+	{
+		name: "CSDK-023 silent when the amount has a zod .max() bound", ruleID: "CSDK-023",
+		kind: models.KindClaudeSDKTool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = tool(\"charge_customer\", \"d\", { amount: z.number().max(500) }, async (a) => ({ content: [] }));\n",
+	},
+	{
+		name: "CSDK-023 silent when the name matches but the param does not (payload, not a money verb)", ruleID: "CSDK-023",
+		kind: models.KindClaudeSDKTool, lang: models.LanguageTypeScript, wantFires: false,
+		src: "import { tool } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"import { z } from \"zod\";\n" +
+			"export const t = tool(\"payload_transform\", \"d\", { amount: z.number() }, async (a) => ({ content: [] }));\n",
+	},
 }
 
 // policyRepoRuleCases covers repo-scoped rules.

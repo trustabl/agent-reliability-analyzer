@@ -352,7 +352,8 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 
 > **P0 remaining-gaps batch (2026-09-30, rules-layer only, `schema_version` stays 18):** +4 rules
 > (**CSDK-114**, **CREW-111**, **LC-113**, **VAI-020**) and an allow-list credit on the 14 SSRF rules,
-> so the fixture now holds **302** rules (re-derive; do not trust this figure). Deliberately
+> layered on top of Batch 2 (already on `main`), so the fixture now holds **308** rules
+> (302 + Batch 2's 6; re-derive, do not trust this figure). Deliberately
 > **not** built, because each needs a new predicate or discovery the batch was barred from adding:
 > OAI/PYD whole-run deadline (a run-call deadline-wrapper fact), Python `max_budget_usd` (a repo-scope
 > predicate like `repo_claude_options_max_turns_missing`), LangGraph no-checkpointer and
@@ -362,7 +363,7 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > loop discovery). Shipping the first two LangGraph rules on existing predicates alone would
 > false-positive on every LangGraph Platform repo, so they were held back rather than degraded.
 >
-> **Rulebook status (2026-09-29):** the fixture carries **298** rules across
+> **Rulebook status (2026-09-29):** the fixture carries **304** rules across
 > **eleven** categories — the ten SDK categories (`autogen`, `claude_sdk`,
 > `claude_skill`, `crewai`, `google_adk`, `langchain`, `mcp`, `openai_sdk`,
 > `pydantic_ai`, `vercel_ai`) plus the cross-SDK **`observability`** category —
@@ -381,8 +382,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > **OAI-030/031**, **PYD-014**, **MCP-030**, **LC-025** — a side-effecting tool
 > (send/notify/refund/charge/pay/payout/transfer/issue) with a free-form
 > recipient or amount parameter, no visible bound in the body, and no
-> SDK-native approval gate. Batch 2 (crewai, google_adk, autogen, vercel_ai,
-> claude_sdk TS) is a tracked follow-up, not yet done.
+> SDK-native approval gate.
+>
+> **Batch 2 (done):** **CREW-014**, **ADK-020/021**, **AG2-020**, **VAI-019**,
+> **CSDK-023** (304 rules = 298 + 6). CrewAI, AutoGen, and Claude TS have no
+> tool-level approval gate to check, and ADK TypeScript has no declarative
+> confirmation option (its gate is a `requestConfirmation(` call in the
+> handler); each is stated in the rule's explanation and in COVERAGE.md.
 >
 > **Agent observability:** nine repo-scope absence rules, three agent-scope
 > outlier rules, `OBS-001..003`, and `OBS-005`. `OBS-005` and its backing
@@ -390,13 +396,10 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > 7th-predicate addition beyond the 15 rules / 6 predicates the design doc
 > originally scoped — confirmed intentional, not drift.
 >
-> **Fixture ↔ production sync is NOT currently clean.** The local
-> `../trustabl-rules` checkout (the pre-rename directory name for
-> `agent-reliability-rules`) is on the Batch 1 branch and carries **282**
-> rules; it does not yet contain main's observability packs, so
-> `scripts/check-rules-sync.sh` fails on the nine observability/tracing files
-> plus content drift in `openai_sdk/tracing.yaml`. That rules branch must pick
-> up the rules repo's main before the engine branch is pushed.
+> **Fixture ↔ production sync:** clean as of Batch 2 —
+> `RULES_REPO=../trustabl-rules scripts/check-rules-sync.sh` passes (304 rules
+> in both trees, both branches cut from the rules repo's main). Re-run it before
+> pushing rather than trusting this note.
 >
 > **Rulebook gate status:** two measurements exist and are **not a trend** —
 > they ran against different packs. On 2026-09-21, `check_rulebook.py`

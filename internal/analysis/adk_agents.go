@@ -197,8 +197,29 @@ func discoverADKToolsInFile(pf ParsedFile) []models.ToolDef {
 			Description:    astutil.FunctionDocstring(fnDef, pf.Source),
 			HasTypedParams: astutil.FunctionHasTypedParams(fnDef, pf.Source),
 			ParamNames:     toolParamNames(fnDef, pf.Source),
+			Config:         functionToolKwargs(args, pf.Source),
 		})
 		return true
 	})
 	return out
+}
+
+// functionToolKwargs collects the keyword arguments of a FunctionTool(...)
+// call (e.g. require_confirmation=True) as raw source text, the same shape
+// extractDecoratorKwargs produces for decorator-based tools, so kwarg
+// predicates can read ADK's per-tool options. Returns nil when there are none.
+func functionToolKwargs(args *sitter.Node, src []byte) map[string]string {
+	var config map[string]string
+	for i := 0; i < int(args.NamedChildCount()); i++ {
+		arg := args.NamedChild(i)
+		if arg.Type() != "keyword_argument" {
+			continue
+		}
+		name := astutil.NodeText(arg.ChildByFieldName("name"), src)
+		if config == nil {
+			config = map[string]string{}
+		}
+		config[name] = astutil.NodeText(arg.ChildByFieldName("value"), src)
+	}
+	return config
 }
