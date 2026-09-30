@@ -1329,8 +1329,19 @@ takes the four slices explicitly (architecture principle: stay honest about
 what scoring depends on) — the filtering happens at the call site. A
 test-fixture agent therefore creates no surface row and its findings do not
 move `OverallScore`; `ScanResult.Tools`/`.Agents`/`.Findings` stay complete
-regardless, since the classification changes what is *scored*, never what is
-*reported*. `NoAgentSurfaces` is computed from the same production-filtered
+regardless — for those, the classification changes what is *scored*, never what
+is *reported*.
+
+`ScanResult.SDKs` is the one reported field that does follow the
+production-only view, because it is a claim about the repository rather than a
+list of what was found. Scanning this repo — a Go repo — reported `sdks:
+[claude_agent_sdk, google_adk, langchain, openai_agents]`, the last three
+entirely on the strength of the Python and TypeScript sample code vendored under
+`testdata/`. `RepoInventory.SDKsDetected` is deliberately NOT narrowed the same
+way: it selects which rule packs load, so filtering it would drop the packs that
+produce test-path findings altogether, deleting findings that are meant to be
+reported and de-weighted. `--include-test-paths` reproduces the previous list
+exactly. `NoAgentSurfaces` is computed from the same production-filtered
 `surfaces` slice as before (`len(surfaces) == 0`) — note that a repo-scoped
 finding (e.g. "uses default tracing") still seeds the repo surface even when
 the SDK usage that triggered it lives only in a test path, since a repo-scoped

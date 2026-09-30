@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/trustabl/trustabl/internal/analysis/astutil"
@@ -70,12 +72,9 @@ func validateSyntax(ctx context.Context, filePath, content string) error {
 // back to the tree-sitter check instead; ok is true otherwise, with err
 // giving the actual verdict (nil = valid).
 func validatePythonCompile(ctx context.Context, content string) (err error, ok bool) {
-	pythonBin := "python3"
-	if _, lookErr := exec.LookPath(pythonBin); lookErr != nil {
-		pythonBin = "python"
-		if _, lookErr := exec.LookPath(pythonBin); lookErr != nil {
-			return nil, false
-		}
+	pythonBin, found := findPython()
+	if !found {
+		return nil, false
 	}
 
 	var stderr bytes.Buffer
@@ -88,3 +87,43 @@ func validatePythonCompile(ctx context.Context, content string) (err error, ok b
 	}
 	return nil, true
 }
+
+// findPython returns the first Python interpreter that is both on PATH and
+// actually runs, resolved once per process.
+//
+// exec.LookPath alone is not enough on Windows. Windows 11 ships App Execution
+// Alias stubs in %LOCALAPPDATA%\Microsoft\WindowsApps, so a python3.exe is
+// present and executable on a machine with no python3 at all; running it prints
+// "Python was not found; run without arguments to install from the Microsoft
+// Store" and exits non-zero. LookPath therefore reported success, the "python"
+// fallback was never tried even where a real interpreter was installed under
+// that name, and every generated Python replacement came back "not valid
+// Python" — authoritatively, because validatePythonCompile returns ok = true
+// with that verdict rather than falling through to the tree-sitter check.
+//
+// Probing with an empty program is the cheapest thing that separates the two:
+// a real interpreter compiles nothing and exits 0, the stub cannot. It runs on
+// its own short context, not the caller's, so a cancelled or nearly-expired
+// enrichment context cannot poison the cached answer for the whole process.
+func findPython() (string, bool) {
+	pythonOnce.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for _, bin := range []string{"python3", "python"} {
+			if _, err := exec.LookPath(bin); err != nil {
+				continue
+			}
+			if exec.CommandContext(ctx, bin, "-c", "").Run() == nil {
+				pythonBin, pythonFound = bin, true
+				return
+			}
+		}
+	})
+	return pythonBin, pythonFound
+}
+
+var (
+	pythonOnce  sync.Once
+	pythonBin   string
+	pythonFound bool
+)
