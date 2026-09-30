@@ -25,7 +25,28 @@ to follow Semantic Versioning once it reaches 1.0.
   is now part of a scan's identity by design; baselines pinned to old IDs must
   be re-captured once.
 
+- **The reported SDK list now describes the repository, not its test data.**
+  `ScanResult.SDKs` (the `sdks` field, the `SDKs:` summary line, and the
+  `sdks_detected` telemetry property) is derived from production surfaces only.
+  Scanning a repo that vendors sample agent code under `testdata/` previously
+  reported that sample code's SDKs as the repo's own — a Go repo reporting
+  `google_adk`, `langchain` and `openai_agents` off its own fixtures. **This
+  narrows `sdks` for any repo with vendored samples**, and shifts the
+  `sdks_detected` telemetry series accordingly; pass `--include-test-paths` to
+  restore the previous list. Findings, tools and agents are unaffected and stay
+  complete. Rule-pack selection is unaffected: `SDKsDetected` is still derived
+  from everything discovered, so test-path findings are still produced and
+  reported.
+
 ### Fixed
+
+- **`trustabl enrich` no longer rejects every generated Python fix on Windows.**
+  Windows 11 ships App Execution Alias stubs, so `python3` resolves and runs
+  even where no python3 is installed, printing "Python was not found" and
+  exiting non-zero. The interpreter lookup trusted that resolution, never tried
+  the `python` fallback, and reported the stub's failure as an authoritative
+  "not valid Python" verdict instead of falling back to the tree-sitter check.
+  Candidates are now probed with an empty program before use.
 
 - **Attestation now works with cosign v3.** cosign v3 removed the
   `--tlog-upload` flag (it defaults `--use-signing-config=true`), which broke the
