@@ -540,6 +540,11 @@ func Run(cfg Config) (models.ScanResult, error) {
 	// complaint this classification exists to fix. --include-test-paths
 	// reproduces the pre-classification behavior exactly by scoring everything.
 	scoreTools, scoreAgents, scoreSubagents, scoreSkills, scoreFindings := tools, inventory.Agents, inventory.Subagents, inventory.Skills, findings
+	// Same production-only view, for the two repo-scope Claude surfaces. They
+	// do not feed Score, but they do feed the SDK list this scan reports (see
+	// reportedSDKs below), and a .claude/settings.json vendored as scanner
+	// test data is not evidence that this repo is a Claude Agent SDK repo.
+	scoreSettings, scoreAgentOptions := inventory.ClaudeSettings, inventory.ClaudeAgentOptions
 	if !cfg.IncludeTestPaths {
 		scoreTools = nil
 		for _, t := range tools {
@@ -571,7 +576,30 @@ func Run(cfg Config) (models.ScanResult, error) {
 				scoreFindings = append(scoreFindings, f)
 			}
 		}
+		scoreSettings = nil
+		for _, c := range inventory.ClaudeSettings {
+			if pathclass.Classify(c.FilePath) != models.OriginTest {
+				scoreSettings = append(scoreSettings, c)
+			}
+		}
+		scoreAgentOptions = nil
+		for _, o := range inventory.ClaudeAgentOptions {
+			if pathclass.Classify(o.FilePath) != models.OriginTest {
+				scoreAgentOptions = append(scoreAgentOptions, o)
+			}
+		}
 	}
+	// The SDK list the report states is a claim about this repository, so it is
+	// derived from production surfaces only. inventory.SDKsDetected stays as
+	// discovered and is NOT narrowed: it selects which rule packs load, and
+	// narrowing it would drop the packs that produce test-path findings
+	// altogether — those are meant to be reported and de-weighted, not
+	// deleted. Without this split a Go repo that vendors Python fixtures
+	// reports sdks: [google_adk, langchain, openai_agents] on the strength of
+	// its own test corpus. --include-test-paths restores the old behaviour,
+	// because the score* slices are then unfiltered.
+	reportedSDKs := deriveSDKsDetected(scoreTools, scoreAgents, scoreSubagents, scoreSettings, scoreAgentOptions)
+
 	surfaces, overall := analysis.Score(scoreTools, scoreAgents, scoreSubagents, scoreSkills, scoreFindings)
 	projected := analysis.Project(scoreTools, scoreAgents, scoreSubagents, scoreSkills, scoreFindings)
 
@@ -603,7 +631,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 		ScanID:              scanID(idLabel, profile.Manifest, cfg.RulesVersion, rules.SupportedSchemaVersion, cfg.RulesOrigin.Tag(), vulnDBVersion),
 		Repo:                repoLabel,
 		Languages:           profile.Languages,
-		SDKs:                inventory.SDKsDetected,
+		SDKs:                reportedSDKs,
 		HasShellInvocations: inventory.HasShellInvocations,
 		Manifest:            profile.Manifest,
 		Tools:               tools,
