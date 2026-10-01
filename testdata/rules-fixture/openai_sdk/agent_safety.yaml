@@ -222,3 +222,34 @@ rules:
       wire it via `inputGuardrails: [...]` on the `Agent({...})` constructor. Pin
       MCP servers to trusted endpoints and treat web and file results as untrusted
       data.
+
+  - id: OAI-120
+    title: OpenAI Agents SDK run call has no wall-clock timeout
+    severity: low
+    confidence: 0.55
+    language: python
+    applies_to:
+      - openai_agent
+      - openai_sandbox_agent
+    scope: agent
+    match:
+      agent_run_call_wall_clock_timeout_missing: true
+    explanation: >
+      No Runner.run/run_sync/run_streamed call that executes this agent is
+      wrapped in a wall-clock timeout (asyncio.wait_for, asyncio.timeout, or
+      anyio.move_on_after / fail_after). max_turns caps how many turns the loop
+      takes, but it does not bound how long ONE turn can block: a stalled
+      model request or a slow tool call hangs the run indefinitely, holding
+      the worker, its tool credentials, and any open sandbox while it waits.
+      This is distinct from OAI-112 (step count); a run can be well under
+      max_turns and still never return. The check is structural — a timeout
+      elsewhere in the file that does not enclose the call is not credited —
+      and a timeout applied by the caller of the function that contains the
+      call is not visible here.
+    fix: >
+      Wrap the call: await asyncio.wait_for(Runner.run(agent, input,
+      max_turns=...), timeout=...) or run it inside async with
+      asyncio.timeout(...): sized to the task. Handle the resulting
+      TimeoutError as a failed run rather than retrying blindly, and set
+      timeouts on the tools the agent calls so the outer deadline is a
+      backstop rather than the only bound.

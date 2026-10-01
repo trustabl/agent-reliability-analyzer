@@ -75,6 +75,7 @@ against. Pick values from the table for the scope you're targeting.
 | `mcp_tool`           | `@server.tool`, `@mcp.tool`, `.register_tool` |
 | `shell_invocation`   | Bare function that calls `subprocess.*` etc. (no rules currently target this — OSH-* moved to a closed-source project) |
 | `adk_function_tool`  | `FunctionTool(fn)` wrapping a Python function (Google ADK) |
+| `langgraph_node`     | Plain function registered via `<builder>.add_node(...)` in a LangGraph graph (not a `@tool`) |
 
 **`scope: agent`** — receives an `AgentDef`; `applies_to` is matched against
 `AgentDef.Class` + `AgentDef.SDK`:
@@ -108,6 +109,7 @@ SDK enum values used by the `repo_has_sdk_in_code` predicate:
 | `pydantic_ai`      | Pydantic AI                          |
 | `vercel_ai`        | Vercel AI SDK (TypeScript)           |
 | `autogen`          | AutoGen / AG2                        |
+| `raw_llm_sdk`      | Bare `anthropic` / `openai` client usage (no agent framework); category `raw_llm_sdk` loads unconditionally, the rule's own predicate gates |
 
 Repo-scope rules typically combine `applies_to` with a `repo_has_sdk_in_code`
 predicate to narrow firing to repos that actually use the SDK in code (e.g.

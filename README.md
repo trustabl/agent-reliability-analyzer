@@ -1083,6 +1083,7 @@ trustabl forge --policy claude_skill
 | `vercel_ai` | Vercel AI SDK (TypeScript) |
 | `autogen` | AutoGen / AG2 (Python) |
 | `claude_skill` | Claude Code skills (`SKILL.md`) |
+| `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework) |
 | `openshell` | Shell-invocation tools (no rules in the current pack) |
 
 Multiple categories are comma-separated: `--policy openai_sdk,mcp`.

@@ -1,0 +1,73 @@
+policy:
+  id: raw_llm_sdk_tool_output_trust
+  name: Raw LLM SDK tool output trust
+  category: raw_llm_sdk
+  description: >
+    Rules for repos that drive the bare Anthropic or OpenAI Python client in a
+    hand-written tool-calling loop (not an agent framework). The pack loads for
+    every scan — bare client usage has no SDK enum entry — so each rule's own
+    predicate does the gating. The detection is a narrow, same-function
+    heuristic, not a general safety check; see each rule's explanation.
+
+rules:
+  - id: RAW-001
+    title: Anthropic tool-loop output is built into a dynamic system prompt
+    severity: medium
+    confidence: 0.5
+    language: python
+    applies_to:
+      - raw_llm_sdk
+    scope: repo
+    match:
+      repo_raw_anthropic_tool_output_in_system: true
+    explanation: >
+      In at least one function, a manual tool-use loop calls
+      client.messages.create(..., tools=...) and passes a system= prompt that
+      is built at runtime from a value derived from the model's own tool_use
+      input or from the result of executing that tool. System text carries
+      instruction authority; tool output is data that a web page, file, or API
+      response can shape. Folding it into system= lets that content issue
+      instructions the model treats as the operator's, which is a direct
+      prompt-injection path. This is a narrow heuristic: it follows names
+      assigned within ONE function and cannot see flow across functions or
+      files, helper-built prompts, or attribute targets, so it will miss
+      real cases; a dynamic system prompt that only interpolates a date or
+      username is not flagged.
+    fix: >
+      Keep system= static (or built only from trusted configuration). Return
+      the tool's output to the model as a tool_result content block in the
+      next user message, keyed by the tool_use_id, so the model receives it as
+      data. Validate or truncate untrusted output before returning it, and
+      never concatenate it into system text.
+
+  - id: RAW-002
+    title: OpenAI tool-loop output is built into a dynamic system message
+    severity: medium
+    confidence: 0.5
+    language: python
+    applies_to:
+      - raw_llm_sdk
+    scope: repo
+    match:
+      repo_raw_openai_tool_output_in_system: true
+    explanation: >
+      In at least one function, a manual tool-calling loop calls
+      client.chat.completions.create(..., tools=...) and also builds a
+      {"role": "system", "content": ...} message (or the developer role) whose
+      content is computed at runtime from the model's tool-call arguments or
+      from the result of running that tool. System and developer messages
+      carry instruction authority; a tool's output is data that an attacker
+      can shape through the page, file, or API response it came from.
+      Promoting it into a system message lets that content issue
+      instructions the model treats as the operator's. This is a narrow
+      heuristic: it follows names assigned within ONE function and cannot see
+      flow across functions or files, helper-built messages, or the Responses
+      API, so it will miss real cases; a dynamic system message that only
+      interpolates a date or username is not flagged.
+    fix: >
+      Keep system and developer messages static (or built only from trusted
+      configuration). Return the tool's output as a {"role": "tool",
+      "tool_call_id": ..., "content": ...} message answering the assistant's
+      tool call, so the model receives it as data. Validate or truncate
+      untrusted output before returning it, and never concatenate it into a
+      system message.

@@ -63,6 +63,9 @@ func reflectedPredicateNames(t *testing.T) map[string]bool {
 // written in YAML, so it needs the same scrutiny as a new predicate.
 var dualScopePredicates = map[string]bool{
 	"repo_has_observability": true,
+	// langgraph.json presence is a repo fact LC-114 (agent scope) needs to stay
+	// silent on LangGraph Platform deployments.
+	"repo_langgraph_platform_config_present": true,
 }
 
 func TestPredicatesByScope_MirrorsStruct(t *testing.T) {

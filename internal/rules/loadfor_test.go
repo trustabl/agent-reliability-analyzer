@@ -104,3 +104,21 @@ func TestLoadFor_LoadsObservabilityPackUnconditionally(t *testing.T) {
 		t.Fatal("OBS-001 did not fire: the observability pack was not loaded by LoadFor")
 	}
 }
+
+// raw_llm_sdk (bare anthropic/openai client usage) has no SDK enum entry, so it
+// must load unconditionally — even with no SDK detected at all — and let each
+// rule's own predicate do the gating (like observability).
+func TestLoadFor_LoadsRawLLMSDKPackUnconditionally(t *testing.T) {
+	reg, _, err := rules.LoadFor(fixtureFS(t), nil)
+	if err != nil {
+		t.Fatalf("LoadFor: %v", err)
+	}
+	profile := models.RepoProfile{Languages: []models.Language{models.LanguagePython}}
+	fired := map[string]bool{}
+	for _, f := range reg.Run(profile, models.RepoInventory{RawAnthropicToolOutputInSystemPrompt: true}, nil, nil) {
+		fired[f.RuleID] = true
+	}
+	if !fired["RAW-001"] || fired["RAW-002"] {
+		t.Fatalf("want RAW-001 only with no SDK detected, got %v", fired)
+	}
+}

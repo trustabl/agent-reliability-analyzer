@@ -32,7 +32,8 @@ policy:
 
   category: claude_sdk                      # REQUIRED. Inherited by every rule in this file. Allowed:
                                             #   claude_sdk | openai_sdk | openshell | google_adk | mcp |
-                                            #   langchain | crewai | pydantic_ai | vercel_ai | autogen | claude_skill.
+                                            #   langchain | crewai | pydantic_ai | vercel_ai | autogen | claude_skill |
+                                            #   observability | raw_llm_sdk.
 
   description: >                            # REQUIRED. Multi-line ok. Describe the policy's intent.
     Rules that govern outbound network calls made from inside agent tools.
@@ -89,7 +90,7 @@ rules:
                                             #           applies_to accepts: claude_sdk_tool, openai_tool,
                                             #           mcp_tool, adk_function_tool, shell_invocation, unknown,
                                             #           langchain_tool, crewai_tool, pydantic_ai_tool,
-                                            #           vercel_ai_tool, autogen_tool.
+                                            #           vercel_ai_tool, autogen_tool, langgraph_node.
                                             #   agent — fires per AgentDef (Agent/SandboxAgent/AgentDefinition/
                                             #           ADK/query() constructor call). applies_to accepts:
                                             #           openai_agent, openai_sandbox_agent,
@@ -107,7 +108,8 @@ rules:
                                             #           claude_skill.
                                             #   repo  — fires once per scan. applies_to accepts:
                                             #           claude_sdk, openai_agents, google_adk, openshell, mcp,
-                                            #           langchain, crewai, pydantic_ai, vercel_ai, autogen.
+                                            #           langchain, crewai, pydantic_ai, vercel_ai, autogen,
+                                            #           raw_llm_sdk (bare anthropic/openai client usage).
                                             # (Authoritative per-scope applies_to set: internal/rules/loader.go
                                             #  appliesToByScope — the lists here are a human summary of it.)
 
@@ -377,6 +379,30 @@ rules:
 #       (True) or a private-IP-allowing download ('allow-local'). Silent
 #       when the field is empty (kwarg absent or False).
 #
+#   agent_run_call_wall_clock_timeout_missing: true | false
+#       OpenAI Agents SDK and Pydantic AI only. Fires when this agent has at
+#       least one resolvable run call (Runner.run-family / <agent>.run-family,
+#       same-file, non-opaque) and NONE of them sit structurally inside an
+#       asyncio.wait_for(...) argument or an asyncio.timeout / anyio.move_on_after
+#       / anyio.fail_after `with` block (AgentRunCallDef.WallClockTimeoutWrapped).
+#       An unrelated timeout elsewhere in the file is not credited. Silent when
+#       no run call resolves. Complements max_turns / usage_limits, which bound
+#       step count and spend but not how long one step can block.
+#
+#   agent_kwargs_observed: true | false
+#       True iff discovery resolved this agent's call site: kwargs were captured
+#       (non-nil) and the call was not opaque (** unpacking). Pair with
+#       agent_kwarg_missing so an absence rule fires only when the call was
+#       genuinely seen to lack the key, not when it was never linked at all
+#       (e.g. a chained StateGraph(...).compile() with no named variable, or a
+#       compiled graph that is used as a subgraph).
+#
+#   repo_langgraph_platform_config_present: true | false
+#       DUAL-SCOPE (valid at agent and repo scope, like repo_has_observability).
+#       True when the repo ships a langgraph.json at any depth
+#       (RepoInventory.Manifest.JSONFiles) — LangGraph Platform then injects its
+#       own checkpointer. Used by LC-114 to stay silent on Platform deployments.
+#
 #
 # ━━━ SUBAGENT-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # (used only in scope: subagent rules)
@@ -585,6 +611,16 @@ rules:
 #       False when there are no exporters at all.
 #   repo_observability_captures_content: true | false
 #       Fires when the repo switches on capture of full prompt/response text.
+#   repo_raw_anthropic_tool_output_in_system: true | false
+#       Fires when a function drives the bare `anthropic` client in a manual
+#       tool-use loop (.messages.create(..., tools=...)) and passes a runtime-
+#       built system= prompt referencing a name tainted by the tool-call input
+#       or its result (RepoInventory.RawAnthropicToolOutputInSystemPrompt).
+#       Same-function name-level heuristic. Category raw_llm_sdk.
+#   repo_raw_openai_tool_output_in_system: true | false
+#       Same for the bare `openai` client: .chat.completions.create(...,
+#       tools=...) plus a {"role": "system"|"developer", "content": <dynamic,
+#       tainted>} dict (RepoInventory.RawOpenAIToolOutputInSystemMessage).
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads

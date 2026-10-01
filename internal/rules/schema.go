@@ -93,6 +93,11 @@ type MatchExpr struct {
 	AgentRunCallUsageLimitsMissing *bool                     `yaml:"agent_run_call_usage_limits_missing,omitempty"`
 	AgentMCPServerKwargMissing     *MCPServerKwargExpr       `yaml:"agent_mcp_server_kwarg_missing,omitempty"`
 	AgentFileURLForceDownload      *bool                     `yaml:"agent_file_url_force_download,omitempty"`
+	// AgentRunCallWallClockTimeoutMissing: see PredAgentRunCallWallClockTimeoutMissing.
+	AgentRunCallWallClockTimeoutMissing *bool `yaml:"agent_run_call_wall_clock_timeout_missing,omitempty"`
+	// AgentKwargsObserved is true iff discovery resolved the agent's call site
+	// (kwargs captured, not opaque) — see PredAgentKwargsObserved.
+	AgentKwargsObserved *bool `yaml:"agent_kwargs_observed,omitempty"`
 
 	// Subagent-scope predicates
 	SubagentGrantsTool []string `yaml:"subagent_grants_tool,omitempty"`
@@ -137,6 +142,15 @@ type MatchExpr struct {
 	RepoObservabilityConsoleOnly     *bool    `yaml:"repo_observability_console_only,omitempty"`
 	RepoObservabilityCapturesContent *bool    `yaml:"repo_observability_captures_content,omitempty"`
 	RepoObservabilityDeclared        *bool    `yaml:"repo_observability_declared,omitempty"`
+
+	// RepoLangGraphPlatformConfigPresent is ALSO valid at agent scope (dual-scope,
+	// like repo_has_observability): a langgraph.json means LangGraph Platform
+	// injects its own checkpointer.
+	RepoLangGraphPlatformConfigPresent *bool `yaml:"repo_langgraph_platform_config_present,omitempty"`
+
+	// Raw provider-SDK tool-loop predicates (category raw_llm_sdk).
+	RepoRawAnthropicToolOutputInSystem *bool `yaml:"repo_raw_anthropic_tool_output_in_system,omitempty"`
+	RepoRawOpenAIToolOutputInSystem    *bool `yaml:"repo_raw_openai_tool_output_in_system,omitempty"`
 }
 
 // SkillTextMatchExpr matches skill text (name/description/body) at

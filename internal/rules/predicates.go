@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path"
 	"regexp"
 	"strings"
 
@@ -884,20 +885,49 @@ func PredAgentIsSubagentOfAny(a models.AgentDef, inv models.RepoInventory) bool 
 // with no VarName, or with no matching run call at all, never fires — no
 // resolvable execution site is not evidence that one is missing a cap.
 func agentRunCallMissingKwarg(a models.AgentDef, inv models.RepoInventory, sdk models.SDK, kwarg string) bool {
-	if a.SDK != sdk || a.VarName == "" {
+	return agentRunCallUnsatisfied(a, inv, []models.SDK{sdk}, func(rc models.AgentRunCallDef) bool {
+		node := lookupKwargInTree(rc.Kwargs, kwarg)
+		return node != nil && node.Value != nil
+	})
+}
+
+// agentRunCallUnsatisfied is the shared correlation + silence logic behind the
+// run-call predicates: match this agent's same-SDK, same-file, non-opaque run
+// calls by AgentVarName, and fire only when at least one exists and NONE
+// satisfies the check.
+func agentRunCallUnsatisfied(a models.AgentDef, inv models.RepoInventory, sdks []models.SDK, satisfied func(models.AgentRunCallDef) bool) bool {
+	sdkOK := false
+	for _, s := range sdks {
+		if a.SDK == s {
+			sdkOK = true
+		}
+	}
+	if !sdkOK || a.VarName == "" {
 		return false
 	}
 	matched := false
 	for _, rc := range inv.AgentRunCalls {
-		if rc.SDK != sdk || rc.Opaque || rc.FilePath != a.FilePath || rc.AgentVarName != a.VarName {
+		if rc.SDK != a.SDK || rc.Opaque || rc.FilePath != a.FilePath || rc.AgentVarName != a.VarName {
 			continue
 		}
 		matched = true
-		if node := lookupKwargInTree(rc.Kwargs, kwarg); node != nil && node.Value != nil {
+		if satisfied(rc) {
 			return false
 		}
 	}
 	return matched
+}
+
+// PredAgentRunCallWallClockTimeoutMissing fires when this OpenAI Agents SDK or
+// Pydantic AI agent has a resolvable run call and NONE of its run calls sit
+// inside a wall-clock timeout (asyncio.wait_for / asyncio.timeout /
+// anyio.move_on_after / anyio.fail_after). Same correlation and silence rules
+// as agentRunCallMissingKwarg; the check is the structural
+// AgentRunCallDef.WallClockTimeoutWrapped fact rather than a kwarg.
+func PredAgentRunCallWallClockTimeoutMissing(a models.AgentDef, inv models.RepoInventory) bool {
+	return agentRunCallUnsatisfied(a, inv, []models.SDK{models.SDKOpenAIAgents, models.SDKPydanticAI}, func(rc models.AgentRunCallDef) bool {
+		return rc.WallClockTimeoutWrapped
+	})
 }
 
 // PredAgentRunCallMaxTurnsMissing fires when this OpenAI Agents SDK agent has
@@ -1646,6 +1676,29 @@ func PredRepoClaudeOptionsModeWithoutKwarg(e ClaudeOptionsModeKwargExpr, inv mod
 		kwargNode := lookupKwargInTree(opt.Kwargs, e.Kwarg)
 		if kwargNode == nil || kwargNode.Value == nil {
 			return true // matching mode, no (or unreadable-opaque) kwarg at this site
+		}
+	}
+	return false
+}
+
+// PredAgentKwargsObserved is true iff discovery resolved this agent's call site:
+// its kwargs were captured (non-nil) and the call was not opaque (** unpacking).
+// It separates "resolved, and genuinely has no such key" from "never linked at
+// all" (e.g. a chained StateGraph(...).compile() with no named variable) so an
+// absence rule can stay silent on the latter.
+func PredAgentKwargsObserved(a models.AgentDef) bool {
+	return a.Kwargs != nil && !a.Opaque
+}
+
+// PredRepoLangGraphPlatformConfigPresent reports whether the repo ships a
+// langgraph.json (any depth). A LangGraph Platform deployment injects its own
+// checkpointer, so a compile() with no checkpointer= is intended there. Dual
+// scope: evaluated from the inventory's manifest copy in both EvaluateAgent
+// and EvaluateRepo.
+func PredRepoLangGraphPlatformConfigPresent(inv models.RepoInventory) bool {
+	for _, p := range inv.Manifest.JSONFiles {
+		if path.Base(strings.ReplaceAll(p, "\\", "/")) == "langgraph.json" {
+			return true
 		}
 	}
 	return false

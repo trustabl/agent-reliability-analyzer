@@ -108,3 +108,37 @@ rules:
       pre-approved threshold, call interrupt(...) from inside the tool to
       require a human to approve the specific recipient or amount before the
       side effect runs.
+
+  - id: LC-115
+    title: LangGraph node performs a side effect with no interrupt() gate
+    severity: medium
+    confidence: 0.45
+    language: python
+    applies_to:
+      - langgraph_node
+    scope: tool
+    match:
+      all:
+        - any:
+            - has_shell_call: true
+            - has_code_exec_call: true
+            - has_write_call: true
+            - has_dynamic_url_call: true
+        - not:
+            has_body_text:
+              - "interrupt("
+    explanation: >
+      This function is registered as a LangGraph node (add_node) and its body
+      shells out, executes code, writes to disk, or calls a dynamically built
+      URL. A node is not a tool: it runs automatically every time the graph
+      reaches it, with no tool-call boundary where a human or a guardrail sees
+      the action first, and a retry or a loop edge runs it again. Nothing in
+      the body pauses with interrupt(...) before acting. Confidence is low
+      because this only reads the node's own body: it cannot see an
+      interrupt() earlier in the graph, an interrupt_before= on compile(), or
+      an upstream node that already gates entry into this one.
+    fix: >
+      Call interrupt(...) inside the node, before the side effect, to pause
+      for a human decision (this needs a checkpointer — see LC-114), or compile
+      the graph with interrupt_before=["<node>"]. Alternatively validate the
+      inputs and make the node idempotent so a re-run is harmless.
