@@ -194,3 +194,32 @@ rules:
       total_tokens_limit or input_tokens_limit/output_tokens_limit to bound
       token spend directly. Treat hitting the limit as a signal to surface and
       handle rather than to raise it.
+
+  - id: PYD-108
+    title: Pydantic AI run call has no wall-clock timeout
+    severity: low
+    confidence: 0.55
+    language: python
+    applies_to:
+      - pydantic_ai_agent
+    scope: agent
+    match:
+      agent_run_call_wall_clock_timeout_missing: true
+    explanation: >
+      No run/run_sync/run_stream call that executes this Pydantic AI agent is
+      wrapped in a wall-clock timeout (asyncio.wait_for, asyncio.timeout, or
+      anyio.move_on_after / fail_after). usage_limits caps request count and
+      token spend, but it does not bound how long a single model request or
+      tool call may block: a stalled provider connection or a slow tool hangs
+      the run indefinitely while it holds the worker and its tool
+      credentials. This is distinct from PYD-106 (usage_limits): a run can sit
+      well inside its limits and still never return. The check is structural —
+      a timeout elsewhere in the file that does not enclose the call is not
+      credited — and a timeout applied by the caller of the function
+      containing the call is not visible here.
+    fix: >
+      Wrap the call: await asyncio.wait_for(agent.run(prompt,
+      usage_limits=...), timeout=...) or run it inside async with
+      asyncio.timeout(...): sized to the task. Also set a request timeout via
+      ModelSettings(timeout=...) so an individual model call fails fast, and
+      treat TimeoutError as a failed run rather than retrying blindly.

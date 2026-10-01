@@ -388,7 +388,7 @@ flowchart TD
     end
 
     subgraph S2["Step 2 — Inventory (per-language AST)"]
-        disc["analysis.DiscoverTools<br/>DiscoverAgents<br/>DiscoverGuardrails<br/>DiscoverSessions<br/>DiscoverSubagents<br/>DiscoverSkills<br/>DiscoverDependencies<br/>DiscoverSlashCommands<br/>DiscoverPlugins<br/>DiscoverClaudeSettings<br/>DiscoverADKAgents<br/>DiscoverADKTools<br/>DiscoverClaudeAgentOptions<br/>DiscoverAgentRunCalls<br/>DiscoverObservability<br/>LangChain/CrewAI/AutoGen/PydanticAI (Py)<br/>TS: OpenAI/ADK/LangChain/Vercel/MCP-proper<br/>Go/CSharp/PHP/Rust MCP"]
+        disc["analysis.DiscoverTools<br/>DiscoverAgents<br/>DiscoverGuardrails<br/>DiscoverSessions<br/>DiscoverSubagents<br/>DiscoverSkills<br/>DiscoverDependencies<br/>DiscoverSlashCommands<br/>DiscoverPlugins<br/>DiscoverClaudeSettings<br/>DiscoverADKAgents<br/>DiscoverADKTools<br/>DiscoverClaudeAgentOptions<br/>DiscoverAgentRunCalls<br/>DiscoverLangGraphNodes<br/>DetectRawLLMToolOutputInSystem<br/>DiscoverObservability<br/>LangChain/CrewAI/AutoGen/PydanticAI (Py)<br/>TS: OpenAI/ADK/LangChain/Vercel/MCP-proper<br/>Go/CSharp/PHP/Rust MCP"]
         edges["analysis.ResolveEdges"]
         inv[["RepoInventory<br/>Tools · Agents · Guardrails · Sessions<br/>SDKsDetected · HasShellInvocations · UsesDefaultTracing<br/>ObservabilitySignals<br/>Dependencies (BOM)<br/>MCPServers · Subagents · Skills · SlashCommands<br/>PluginManifests · ClaudeSettings · ClaudeAgentOptions<br/>AgentRunCalls"]]
         disc --> edges --> inv
@@ -690,7 +690,39 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   (`agent_run_call_max_turns_missing`) and PYD-106
   (`agent_run_call_usage_limits_missing`) correlate those calls to a
   same-file `AgentDef.VarName`. Opaque receivers / non-ident agents are
-  skipped, same limitation as other call-capture discoverers.
+  skipped, same limitation as other call-capture discoverers. Each
+  `AgentRunCallDef` also carries `WallClockTimeoutWrapped`, set by a structural
+  ancestor walk (`wallclock_timeout.go`, `nodeHasWallClockTimeoutAncestor`): true
+  when the call sits inside an `asyncio.wait_for(...)` argument or the body of an
+  `asyncio.timeout` / `anyio.move_on_after` / `anyio.fail_after` `with` block in
+  the same function — never a same-file text search. OAI-120 / PYD-108
+  (`agent_run_call_wall_clock_timeout_missing`) share the correlation helper
+  `agentRunCallUnsatisfied` with OAI-112 / PYD-106.
+- **DiscoverLangGraphNodes** (`langgraph_nodes.go`) — a function registered via
+  `<builder>.add_node("name", func)` / `add_node(func)` is not a `@tool` but runs
+  on every graph visit. Same-file, undecorated, top-level functions are emitted
+  as `ToolDef`s of Kind `langgraph_node` (SDK `langchain`) pointing at the
+  `function_definition`, so the existing body predicates (`has_shell_call`,
+  `has_write_call`, …) work unchanged; lambdas / methods / imports are skipped.
+  LC-115 targets this kind. The raw-`StateGraph` pass (`langgraph_graph.go`) now
+  leaves a resolved `compile()` with a non-nil (possibly empty) `Kwargs` tree and
+  marks `compile(**cfg)` `Opaque`; a compiled graph passed to `add_node` (a
+  subgraph) is left unlinked. `agent_kwargs_observed` (`Kwargs != nil && !Opaque`)
+  lets LC-114 tell "resolved, no checkpointer" from "never linked", and
+  `repo_langgraph_platform_config_present` (a `langgraph.json` in
+  `Manifest.JSONFiles`, dual-scope) silences it on LangGraph Platform repos.
+- **DetectRawLLMToolOutputInSystem** (`raw_llm_tool_loops.go`) — per Python file
+  and per function: the bare `anthropic` / `openai` client in a manual tool loop
+  (`.messages.create(…, tools=…)` / `.chat.completions.create(…, tools=…)`) whose
+  runtime-built system prompt (`system=` for Anthropic; a `{"role": "system" |
+  "developer"}` dict for OpenAI) references a name tainted by the model's
+  tool-call arguments (`.input` / `.arguments`) via same-function name-level
+  assignment propagation. Stamped onto `RepoInventory.RawAnthropicToolOutputInSystemPrompt`
+  / `RawOpenAIToolOutputInSystemMessage` and read by RAW-001 / RAW-002. Bare
+  client usage has no SDK enum entry, so these rules live in the
+  `raw_llm_sdk` category, which `rules.LoadFor` loads unconditionally (like
+  `observability`); the predicates do the gating. Narrow by design — no
+  cross-function/file flow, no Responses API.
 - **DiscoverADKAgents** (`adk_agents.go`) — finds `LlmAgent(...)`,
   `SequentialAgent(...)`, `ParallelAgent(...)`, `LoopAgent(...)`,
   `LanggraphAgent(...)`, and the `Agent(...)` alias (normalized to `LlmAgent`
@@ -1572,11 +1604,13 @@ RepoInventory {
     PluginManifests    []PluginManifest
     ClaudeSettings     []ClaudeSettings
     ClaudeAgentOptions []ClaudeAgentOptionsDef  // ClaudeAgentOptions(...) session configs (permission_mode, max_turns, etc.)
-    AgentRunCalls      []AgentRunCallDef        // Runner.run / agent.run call sites (max_turns, usage_limits)
+    AgentRunCalls      []AgentRunCallDef        // Runner.run / agent.run call sites (max_turns, usage_limits, WallClockTimeoutWrapped)
     SDKsDetected        []SDK     // observed in code, PLUS claude_agent_sdk when any markdown subagent OR ClaudeAgentOptions(...) is present (drives the policy-selection step)
     HasShellInvocations bool      // any Python function calling subprocess.* / os.system / os.popen ("openshell" risk surface, not an SDK)
     Manifest            ScanManifest
     UsesDefaultTracing  bool
+    RawAnthropicToolOutputInSystemPrompt bool // raw_llm_sdk: RAW-001
+    RawOpenAIToolOutputInSystemMessage   bool // raw_llm_sdk: RAW-002
     ObservabilitySignals []ObservabilitySignal // vendor + Kind (import/init/exporter/content_capture/instrument_kwarg), sorted by (File, StartLine, Vendor, Kind)
 }
 

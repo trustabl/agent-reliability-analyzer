@@ -785,6 +785,122 @@ Runner.run(agent, run_config=RunConfig(tracing_disabled=True))
 	})
 }
 
+// writeScanRepo writes rel->body files into a temp repo and returns its path.
+func writeScanRepo(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for rel, body := range files {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func scanFires(t *testing.T, files map[string]string, ruleID string) bool {
+	t.Helper()
+	res, err := scanner.Run(scanner.Config{Target: writeScanRepo(t, files), RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scanner.Run: %v", err)
+	}
+	for _, f := range res.Findings {
+		if f.RuleID == ruleID {
+			return true
+		}
+	}
+	return false
+}
+
+// TestScan_LC114_NoCheckpointer runs real source through the full scanner: a
+// builder compiled with no checkpointer fires; a checkpointer, a chained
+// (never-linked) compile, a subgraph, and a langgraph.json all stay silent.
+func TestScan_LC114_NoCheckpointer(t *testing.T) {
+	dep := "[project]\nname = \"f\"\ndependencies = [\"langgraph\"]\n"
+	cases := []struct {
+		name  string
+		files map[string]string
+		want  bool
+	}{
+		{"fires on bare compile()", map[string]string{"pyproject.toml": dep, "g.py": "from langgraph.graph import StateGraph\nb = StateGraph(dict)\napp = b.compile()\n"}, true},
+		{"silent with checkpointer", map[string]string{"pyproject.toml": dep, "g.py": "from langgraph.graph import StateGraph\nb = StateGraph(dict)\napp = b.compile(checkpointer=saver)\n"}, false},
+		{"silent on chained compile", map[string]string{"pyproject.toml": dep, "g.py": "from langgraph.graph import StateGraph\napp = StateGraph(dict).compile()\n"}, false},
+		{"silent on subgraph", map[string]string{"pyproject.toml": dep, "g.py": "from langgraph.graph import StateGraph\ns = StateGraph(dict)\nsub = s.compile(checkpointer=saver)\np = StateGraph(dict)\np.add_node('s', sub)\napp = p.compile(checkpointer=saver)\n"}, false},
+		{"silent with langgraph.json", map[string]string{"pyproject.toml": dep, "langgraph.json": "{}", "g.py": "from langgraph.graph import StateGraph\nb = StateGraph(dict)\napp = b.compile()\n"}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := scanFires(t, c.files, "LC-114"); got != c.want {
+				t.Errorf("LC-114 fired=%v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+// TestScan_LC115_NodeSideEffect: an add_node-registered function that shells
+// out fires; the same function gated by interrupt() is silent.
+func TestScan_LC115_NodeSideEffect(t *testing.T) {
+	dep := "[project]\nname = \"f\"\ndependencies = [\"langgraph\"]\n"
+	body := func(gate string) string {
+		return "import subprocess\nfrom langgraph.graph import StateGraph\nfrom langgraph.types import interrupt\n\n" +
+			"def deploy(state):\n" + gate + "    subprocess.run(['make', 'deploy'])\n    return state\n\n" +
+			"b = StateGraph(dict)\nb.add_node('deploy', deploy)\napp = b.compile(checkpointer=saver)\n"
+	}
+	if !scanFires(t, map[string]string{"pyproject.toml": dep, "g.py": body("")}, "LC-115") {
+		t.Error("LC-115 should fire on an ungated side-effecting node")
+	}
+	if scanFires(t, map[string]string{"pyproject.toml": dep, "g.py": body("    interrupt('ok?')\n")}, "LC-115") {
+		t.Error("LC-115 should stay silent when the node calls interrupt()")
+	}
+}
+
+// TestScan_OAI120_PYD108_WallClock: end-to-end through discovery + predicate.
+func TestScan_OAI120_PYD108_WallClock(t *testing.T) {
+	oaiDep := "[project]\nname = \"f\"\ndependencies = [\"openai-agents\"]\n"
+	oai := func(call string) map[string]string {
+		return map[string]string{"pyproject.toml": oaiDep, "a.py": "import asyncio\nfrom agents import Agent, Runner\n\nagent = Agent(name='x')\n\nasync def main():\n    return " + call + "\n"}
+	}
+	if !scanFires(t, oai("await Runner.run(agent, 'hi')"), "OAI-120") {
+		t.Error("OAI-120 should fire on an unwrapped Runner.run")
+	}
+	if scanFires(t, oai("await asyncio.wait_for(Runner.run(agent, 'hi'), timeout=30)"), "OAI-120") {
+		t.Error("OAI-120 should be silent when wrapped in asyncio.wait_for")
+	}
+	pydDep := "[project]\nname = \"f\"\ndependencies = [\"pydantic-ai\"]\n"
+	pyd := func(call string) map[string]string {
+		return map[string]string{"pyproject.toml": pydDep, "a.py": "import asyncio\nfrom pydantic_ai import Agent\n\nagent = Agent('openai:gpt-4o')\n\nasync def main():\n    return " + call + "\n"}
+	}
+	if !scanFires(t, pyd("await agent.run('hi')"), "PYD-108") {
+		t.Error("PYD-108 should fire on an unwrapped agent.run")
+	}
+	if scanFires(t, pyd("await asyncio.wait_for(agent.run('hi'), timeout=30)"), "PYD-108") {
+		t.Error("PYD-108 should be silent when wrapped in asyncio.wait_for")
+	}
+}
+
+// TestScan_RAW001_RAW002: the raw_llm_sdk pack fires on real source with no
+// agent framework and no declared SDK dependency detected.
+func TestScan_RAW001_RAW002(t *testing.T) {
+	oai := "import json\nfrom openai import OpenAI\nclient = OpenAI()\n\ndef loop(messages, tools):\n    r = client.chat.completions.create(model='m', messages=messages, tools=tools)\n    tc = r.choices[0].message.tool_calls[0]\n    out = run_tool(json.loads(tc.function.arguments))\n    messages.append({'role': 'system', 'content': f'Tool: {out}'})\n"
+	ant := "import anthropic\nclient = anthropic.Anthropic()\n\ndef loop(messages, tools):\n    r = client.messages.create(model='m', max_tokens=1, messages=messages, tools=tools)\n    out = run_tool(r.content[0].input)\n    return client.messages.create(model='m', max_tokens=1, system=f'Tool: {out}', messages=messages, tools=tools)\n"
+	if !scanFires(t, map[string]string{"loop.py": oai}, "RAW-002") {
+		t.Error("RAW-002 should fire on the OpenAI raw tool loop")
+	}
+	if scanFires(t, map[string]string{"loop.py": oai}, "RAW-001") {
+		t.Error("RAW-001 must not fire on OpenAI-only code")
+	}
+	if !scanFires(t, map[string]string{"loop.py": ant}, "RAW-001") {
+		t.Error("RAW-001 should fire on the Anthropic raw tool loop")
+	}
+	static := "from openai import OpenAI\nclient = OpenAI()\n\ndef loop(messages, tools):\n    client.chat.completions.create(model='m', messages=messages, tools=tools)\n    messages.append({'role': 'system', 'content': 'static'})\n"
+	if scanFires(t, map[string]string{"loop.py": static}, "RAW-002") {
+		t.Error("RAW-002 must stay silent on a static system message")
+	}
+}
+
 // TestScanResult_JSONLineRangeFields asserts that every new JSON field path
 // added by the inventory line-attribution work is present in --format json
 // output. This is a "the JSON shape is what we promised" contract test: it

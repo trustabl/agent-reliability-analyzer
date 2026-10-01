@@ -3535,6 +3535,34 @@ def refund_payment(charge_id: str, amount: int, tool_context) -> str:
 			"import { z } from \"zod\";\n" +
 			"export const t = tool(\"payload_transform\", \"d\", { amount: z.number() }, async (a) => ({ content: [] }));\n",
 	},
+
+	// ─── LC-115 LangGraph node side effect with no interrupt() gate ──────────
+	{name: "LC-115 fires on a node that shells out", ruleID: "LC-115", kind: models.KindLangGraphNode, src: `
+import subprocess
+
+def deploy(state):
+    subprocess.run(["make", "deploy"])
+    return state
+`, wantFires: true},
+	{name: "LC-115 fires on a node that writes a file", ruleID: "LC-115", kind: models.KindLangGraphNode, src: `
+def save(state):
+    with open("out.txt", "w") as f:
+        f.write(state["text"])
+    return state
+`, wantFires: true},
+	{name: "LC-115 silent when the node gates the side effect with interrupt()", ruleID: "LC-115", kind: models.KindLangGraphNode, src: `
+import subprocess
+from langgraph.types import interrupt
+
+def deploy(state):
+    interrupt("approve deploy?")
+    subprocess.run(["make", "deploy"])
+    return state
+`, wantFires: false},
+	{name: "LC-115 silent on a pure node", ruleID: "LC-115", kind: models.KindLangGraphNode, src: `
+def summarize(state):
+    return {"summary": state["text"][:100]}
+`, wantFires: false},
 }
 
 // policyRepoRuleCases covers repo-scoped rules.
@@ -4220,6 +4248,24 @@ var policyRepoRuleCases = []policyRepoCase{
 			SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
 			Manifest:     models.ScanManifest{GoFiles: []string{"main.go"}},
 		},
+		false},
+
+	// ─── RAW-001 / RAW-002 raw SDK tool output in a dynamic system prompt ────
+	{"RAW-001 fires when the Anthropic tool-loop anti-pattern was discovered", "RAW-001",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{RawAnthropicToolOutputInSystemPrompt: true},
+		true},
+	{"RAW-001 silent when not discovered (even with the OpenAI flag set)", "RAW-001",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{RawOpenAIToolOutputInSystemMessage: true},
+		false},
+	{"RAW-002 fires when the OpenAI tool-loop anti-pattern was discovered", "RAW-002",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{RawOpenAIToolOutputInSystemMessage: true},
+		true},
+	{"RAW-002 silent when not discovered (even with the Anthropic flag set)", "RAW-002",
+		models.RepoProfile{Languages: []models.Language{models.LanguagePython}},
+		models.RepoInventory{RawAnthropicToolOutputInSystemPrompt: true},
 		false},
 }
 
@@ -6659,6 +6705,73 @@ var policyAgentRuleCases = []policyAgentCase{
 			}},
 		},
 		models.RepoInventory{},
+		false},
+
+	// ─── LC-114 StateGraph compiled with no checkpointer ─────────────────────
+	{"LC-114 fires when a resolved compile() has no checkpointer", "LC-114",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{}}},
+		models.RepoInventory{}, true},
+	{"LC-114 silent when compile() sets a checkpointer", "LC-114",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"checkpointer": {Value: &models.Expr{Kind: models.ExprCall, Text: "MemorySaver()"}},
+			}}},
+		models.RepoInventory{}, false},
+	{"LC-114 silent when compile() was never linked (Kwargs nil)", "LC-114",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython},
+		models.RepoInventory{}, false},
+	{"LC-114 silent when compile() is opaque (**config)", "LC-114",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+			Opaque: true, Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{}}},
+		models.RepoInventory{}, false},
+	{"LC-114 silent on a LangGraph Platform repo (langgraph.json)", "LC-114",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{}}},
+		models.RepoInventory{Manifest: models.ScanManifest{JSONFiles: []string{"services/api/langgraph.json"}}}, false},
+
+	// ─── OAI-120 / PYD-108 no wall-clock timeout on run calls ────────────────
+	{"OAI-120 fires when the Runner.run call is not timeout-wrapped", "OAI-120",
+		models.AgentDef{
+			SDK: models.SDKOpenAIAgents, Class: "Agent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKOpenAIAgents, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent"},
+		}},
+		true},
+	{"OAI-120 silent when the run call is wrapped in a wall-clock timeout", "OAI-120",
+		models.AgentDef{
+			SDK: models.SDKOpenAIAgents, Class: "Agent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKOpenAIAgents, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", WallClockTimeoutWrapped: true},
+		}},
+		false},
+	{"OAI-120 silent when no run call resolves", "OAI-120",
+		models.AgentDef{
+			SDK: models.SDKOpenAIAgents, Class: "Agent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{}, false},
+	{"PYD-108 fires when the agent.run call is not timeout-wrapped", "PYD-108",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKPydanticAI, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent"},
+		}},
+		true},
+	{"PYD-108 silent when the run call is wrapped in a wall-clock timeout", "PYD-108",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKPydanticAI, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", WallClockTimeoutWrapped: true},
+		}},
 		false},
 }
 

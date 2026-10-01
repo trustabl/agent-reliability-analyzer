@@ -72,6 +72,15 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentRunCallUsageLimitsMissing != nil && PredAgentRunCallUsageLimitsMissing(a, inv) != *e.AgentRunCallUsageLimitsMissing {
 		return false
 	}
+	if e.AgentRunCallWallClockTimeoutMissing != nil && PredAgentRunCallWallClockTimeoutMissing(a, inv) != *e.AgentRunCallWallClockTimeoutMissing {
+		return false
+	}
+	if e.AgentKwargsObserved != nil && PredAgentKwargsObserved(a) != *e.AgentKwargsObserved {
+		return false
+	}
+	if e.RepoLangGraphPlatformConfigPresent != nil && PredRepoLangGraphPlatformConfigPresent(inv) != *e.RepoLangGraphPlatformConfigPresent {
+		return false
+	}
 	if e.AgentMCPServerKwargMissing != nil && !PredAgentMCPServerKwargMissing(*e.AgentMCPServerKwargMissing, a) {
 		return false
 	}
@@ -125,6 +134,15 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 		return false
 	}
 	if e.RepoHasObservability != nil && !PredRepoHasObservability(*e.RepoHasObservability, inv) {
+		return false
+	}
+	if e.RepoLangGraphPlatformConfigPresent != nil && PredRepoLangGraphPlatformConfigPresent(inv) != *e.RepoLangGraphPlatformConfigPresent {
+		return false
+	}
+	if e.RepoRawAnthropicToolOutputInSystem != nil && inv.RawAnthropicToolOutputInSystemPrompt != *e.RepoRawAnthropicToolOutputInSystem {
+		return false
+	}
+	if e.RepoRawOpenAIToolOutputInSystem != nil && inv.RawOpenAIToolOutputInSystemMessage != *e.RepoRawOpenAIToolOutputInSystem {
 		return false
 	}
 	if e.RepoObservabilityInspectable != nil && !PredRepoObservabilityInspectable(*e.RepoObservabilityInspectable, inv) {
@@ -428,9 +446,13 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_run_call_max_turns_missing": true, "agent_run_call_usage_limits_missing": true,
 		// Dual-scope: a repo-level fact used to gate agent-scope observability
 		// rules. EvaluateAgent receives the inventory, so this is free.
-		"repo_has_observability":         true,
-		"agent_mcp_server_kwarg_missing": true,
-		"agent_file_url_force_download":  true,
+		"repo_has_observability":                    true,
+		"agent_mcp_server_kwarg_missing":            true,
+		"agent_file_url_force_download":             true,
+		"agent_run_call_wall_clock_timeout_missing": true,
+		"agent_kwargs_observed":                     true,
+		// Dual-scope (see EvaluateAgent): LangGraph Platform injects a checkpointer.
+		"repo_langgraph_platform_config_present": true,
 	},
 	models.ScopeSubagent: {
 		"subagent_grants_tool": true,
@@ -471,6 +493,9 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_observability_vendor":                    true,
 		"repo_observability_console_only":              true,
 		"repo_observability_captures_content":          true,
+		"repo_langgraph_platform_config_present":       true,
+		"repo_raw_anthropic_tool_output_in_system":     true,
+		"repo_raw_openai_tool_output_in_system":        true,
 	},
 }
 
@@ -523,6 +548,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentRunCallUsageLimitsMissing != nil, "agent_run_call_usage_limits_missing")
 	add(e.AgentMCPServerKwargMissing != nil, "agent_mcp_server_kwarg_missing")
 	add(e.AgentFileURLForceDownload != nil, "agent_file_url_force_download")
+	add(e.AgentRunCallWallClockTimeoutMissing != nil, "agent_run_call_wall_clock_timeout_missing")
+	add(e.AgentKwargsObserved != nil, "agent_kwargs_observed")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
 	// Skill scope
@@ -558,6 +585,9 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")
 	add(e.RepoObservabilityDeclared != nil, "repo_observability_declared")
+	add(e.RepoLangGraphPlatformConfigPresent != nil, "repo_langgraph_platform_config_present")
+	add(e.RepoRawAnthropicToolOutputInSystem != nil, "repo_raw_anthropic_tool_output_in_system")
+	add(e.RepoRawOpenAIToolOutputInSystem != nil, "repo_raw_openai_tool_output_in_system")
 	add(len(e.RepoObservabilityVendor) > 0, "repo_observability_vendor")
 	add(e.RepoObservabilityConsoleOnly != nil, "repo_observability_console_only")
 	add(e.RepoObservabilityCapturesContent != nil, "repo_observability_captures_content")

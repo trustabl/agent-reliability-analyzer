@@ -356,4 +356,10 @@ type AgentRunCallDef struct {
 	AgentVarName string     `json:"-"`
 	Kwargs       *KwargTree `json:"-"`
 	Opaque       bool       `json:"opaque,omitempty"`
+	// WallClockTimeoutWrapped is true when the call sits structurally inside an
+	// asyncio.wait_for(...) argument or an asyncio.timeout / anyio.move_on_after /
+	// anyio.fail_after `with` block. max_turns / usage_limits bound step count
+	// and token spend but not how long one step can block; this is the only
+	// wall-clock bound discovery can see. In-memory only.
+	WallClockTimeoutWrapped bool `json:"-"`
 }

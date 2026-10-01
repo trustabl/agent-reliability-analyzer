@@ -81,6 +81,11 @@ const (
 	// list every SDK token in applies_to because their text is vendor-framed
 	// (Langfuse, OpenTelemetry) rather than SDK-framed.
 	CategoryObservability DetectorCategory = "observability"
+	// CategoryRawLLMSDK covers rules about raw provider-client usage (the bare
+	// `anthropic` / `openai` Python SDKs driving a hand-written tool loop), which
+	// is NOT an agent-framework SDK and has no SDK enum entry. Like observability
+	// it loads unconditionally; each rule's own predicate does the real gating.
+	CategoryRawLLMSDK DetectorCategory = "raw_llm_sdk"
 )
 
 // display order. It is the single source of truth for category membership:
@@ -92,6 +97,7 @@ var AllCategories = []DetectorCategory{
 	CategoryClaudeSDK, CategoryOpenAISDK, CategoryOpenShell, CategoryGoogleADK,
 	CategoryMCP, CategoryLangChain, CategoryCrewAI, CategoryPydanticAI,
 	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill, CategoryObservability,
+	CategoryRawLLMSDK,
 }
 
 // ValidCategory reports whether c is a category this build recognizes. The rule
@@ -128,6 +134,12 @@ const (
 	KindPydanticAITool ToolKind = "pydantic_ai_tool"
 	KindVercelAITool   ToolKind = "vercel_ai_tool"
 	KindAutoGenTool    ToolKind = "autogen_tool"
+	// KindLangGraphNode is a plain function registered as a LangGraph graph node
+	// via <builder>.add_node(name, func) / add_node(func). It is not a @tool —
+	// no tool-discovery pass sees it — but it runs automatically on every graph
+	// visit with no tool-call boundary, so the tool-scope body predicates are
+	// applied to it. Discovered by DiscoverLangGraphNodes.
+	KindLangGraphNode ToolKind = "langgraph_node"
 )
 
 // Language identifies the source language of a discovered tool. Rules
@@ -511,6 +523,11 @@ type RepoInventory struct {
 	HasShellInvocations bool         `json:"has_shell_invocations"`
 	Manifest            ScanManifest `json:"manifest"` // convenience copy for repo-scope predicates
 	UsesDefaultTracing  bool         `json:"uses_default_tracing"`
+	// RawAnthropicToolOutputInSystemPrompt / RawOpenAIToolOutputInSystemMessage
+	// are true when a raw-SDK tool loop in one function feeds a tool-call-derived
+	// value into a dynamic system prompt (see DetectRawLLMToolOutputInSystem).
+	RawAnthropicToolOutputInSystemPrompt bool `json:"raw_anthropic_tool_output_in_system_prompt,omitempty"`
+	RawOpenAIToolOutputInSystemMessage   bool `json:"raw_openai_tool_output_in_system_message,omitempty"`
 	// ObservabilitySignals are the observability facts OBSERVED IN CODE, sorted
 	// by (File, StartLine, Vendor, Kind) for determinism.
 	ObservabilitySignals []ObservabilitySignal `json:"observability_signals,omitempty"`

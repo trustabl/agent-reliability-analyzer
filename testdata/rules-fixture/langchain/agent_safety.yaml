@@ -146,3 +146,36 @@ rules:
       Pass max_execution_time= (seconds) to AgentExecutor, sized to the task, next
       to max_iterations=. Set timeouts on the tools it calls too, so the executor
       limit is a backstop rather than the only bound.
+
+  - id: LC-114
+    title: LangGraph StateGraph is compiled with no checkpointer
+    severity: medium
+    confidence: 0.6
+    language: python
+    applies_to:
+      - langchain_state_graph
+    scope: agent
+    match:
+      all:
+        - agent_kwargs_observed: true
+        - agent_kwarg_missing:
+            - checkpointer
+        - repo_langgraph_platform_config_present: false
+    explanation: >
+      This StateGraph is compiled with no checkpointer=, so the graph keeps no
+      persisted run state. A crash, a restart, a deploy, or an interrupt()
+      pause loses everything the run had done — completed steps, tool results,
+      and the pending human-approval point itself — and a retry re-executes
+      side-effecting nodes from the start. interrupt_before / interrupt_after
+      and interrupt() also need a checkpointer to resume, so a graph without
+      one cannot actually pause for approval. The rule stays silent when the
+      repo ships a langgraph.json (LangGraph Platform injects its own
+      checkpointer), and it cannot see a subgraph compiled in another file,
+      which inherits its parent's checkpointer — treat a hit on a subgraph as
+      a false positive.
+    fix: >
+      Pass checkpointer= to .compile(), e.g. builder.compile(checkpointer=
+      PostgresSaver(...)) for production (MemorySaver only for tests), and
+      invoke with a config={"configurable": {"thread_id": ...}}. If this graph
+      runs only on LangGraph Platform, add the langgraph.json the platform
+      expects so the intent is explicit.

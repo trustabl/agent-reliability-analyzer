@@ -175,6 +175,13 @@ func discoverLangGraphGraphsInFile(pf ParsedFile) []models.AgentDef {
 	// `StateGraph(...).add_node(...).compile()` (no intermediate variable) still
 	// yields the agent from the first pass — only its compile kwargs are not
 	// linked, an accepted v1 limitation.
+	//
+	// A resolved compile() ALWAYS leaves a non-nil Kwargs tree — empty when the
+	// call passes no kwargs — so a rule can distinguish "resolved, and genuinely
+	// has no checkpointer=" (empty tree) from "never linked" (nil). A compile
+	// with ** unpacking marks the agent Opaque: a checkpointer may hide in it.
+	emptyLinked := map[int]bool{}   // agents whose Kwargs were created empty here
+	compiledVar := map[string]int{} // compile() result variable -> agent index
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
 		if n.Type() != "call" {
 			return true
@@ -194,8 +201,20 @@ func discoverLangGraphGraphsInFile(pf ParsedFile) []models.AgentDef {
 		if !ok {
 			return true
 		}
-		kwargs, _ := extractCallKwargs(n, pf.Source)
+		if p := n.Parent(); p != nil && p.Type() == "assignment" {
+			if l := p.ChildByFieldName("left"); l != nil && l.Type() == "identifier" {
+				compiledVar[astutil.NodeText(l, pf.Source)] = idx
+			}
+		}
+		kwargs, opaque := extractCallKwargs(n, pf.Source)
+		if opaque {
+			out[idx].Opaque = true
+		}
 		if kwargs == nil {
+			if out[idx].Kwargs == nil {
+				out[idx].Kwargs = &models.KwargTree{Children: map[string]*models.KwargTree{}}
+				emptyLinked[idx] = true
+			}
 			return true
 		}
 		if out[idx].Kwargs == nil {
@@ -205,8 +224,37 @@ func discoverLangGraphGraphsInFile(pf ParsedFile) []models.AgentDef {
 		for k, v := range kwargs.Children {
 			out[idx].Kwargs.Children[k] = v
 		}
+		delete(emptyLinked, idx)
 		return true
 	})
+
+	// A compiled graph passed to <builder>.add_node(...) in the same file is a
+	// SUBGRAPH. A subgraph compiled with no checkpointer is the documented
+	// LangGraph pattern (it inherits the parent graph's), so withhold the
+	// "resolved, no kwargs" mark: restore Kwargs to nil (unobserved).
+	if len(compiledVar) > 0 {
+		astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
+			if n.Type() != "call" {
+				return true
+			}
+			fn := n.ChildByFieldName("function")
+			if fn == nil || fn.Type() != "attribute" ||
+				astutil.NodeText(fn.ChildByFieldName("attribute"), pf.Source) != "add_node" {
+				return true
+			}
+			for i := 0; i < 2; i++ {
+				arg := positionalArgNode(n, i)
+				if arg == nil || arg.Type() != "identifier" {
+					continue
+				}
+				if idx, ok := compiledVar[astutil.NodeText(arg, pf.Source)]; ok && emptyLinked[idx] {
+					out[idx].Kwargs = nil
+					delete(emptyLinked, idx)
+				}
+			}
+			return true
+		})
+	}
 
 	return out
 }

@@ -157,6 +157,8 @@ func buildOpenAIRunCall(n, fn *sitter.Node, pf ParsedFile) (models.AgentRunCallD
 		},
 		Kwargs: kwargs,
 		Opaque: opaque,
+
+		WallClockTimeoutWrapped: nodeHasWallClockTimeoutAncestor(n, pf.Source),
 	}, true
 }
 
@@ -173,5 +175,7 @@ func buildPydanticRunCall(n, obj *sitter.Node, method string, pf ParsedFile) mod
 		},
 		Kwargs: kwargs,
 		Opaque: opaque,
+
+		WallClockTimeoutWrapped: nodeHasWallClockTimeoutAncestor(n, pf.Source),
 	}
 }

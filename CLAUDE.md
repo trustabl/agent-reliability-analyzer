@@ -350,7 +350,18 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **P0 remaining-gaps batch (2026-09-30, rules-layer only, `schema_version` stays 18):** +4 rules
+> **P0 engine batch (2026-10-01, `schema_version` 18 → 19):** built the gaps the batch below deferred, so the fixture
+> now holds **314** rules (308 + 6; re-derive, do not trust this figure): **LC-114** (StateGraph with no
+> checkpointer; `agent_kwargs_observed` + dual-scope `repo_langgraph_platform_config_present`), **LC-115**
+> (`add_node` function with a side effect and no `interrupt(`; new `langgraph_node` ToolKind), **OAI-120** /
+> **PYD-108** (no wall-clock timeout on the run call; `AgentRunCallDef.WallClockTimeoutWrapped`), and
+> **RAW-001** / **RAW-002** (new unconditionally-loaded `raw_llm_sdk` category; narrow same-function heuristic for
+> tool output fed into a dynamic system prompt in a raw `anthropic` / `openai` tool loop). Still **not** built:
+> Python `max_budget_usd`, LangChain.js `maxExecutionTime`, and the broader LangGraph mutating-node-without-HITL case.
+> The rulebook docs for these six live in `../trustabl-rulebook` (new `raw_llm_sdk/tool_output_trust.md` and
+> `langchain/side_effect_bounds.md`).
+>
+> **P0 remaining-gaps batch (2026-09-30, rules-layer only, `schema_version` was 18):** +4 rules
 > (**CSDK-114**, **CREW-111**, **LC-113**, **VAI-020**) and an allow-list credit on the 14 SSRF rules,
 > layered on top of Batch 2 (already on `main`), so the fixture now holds **308** rules
 > (302 + Batch 2's 6; re-derive, do not trust this figure). Deliberately

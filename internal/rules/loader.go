@@ -332,6 +332,7 @@ var appliesToByScope = map[models.Scope][]string{
 		"shell_invocation", "unknown", "adk_function_tool",
 		"langchain_tool",
 		"crewai_tool", "pydantic_ai_tool", "vercel_ai_tool", "autogen_tool",
+		"langgraph_node",
 	},
 	models.ScopeAgent: {
 		"openai_agent", "openai_sandbox_agent", "claude_agent_definition",
@@ -348,6 +349,7 @@ var appliesToByScope = map[models.Scope][]string{
 		"claude_sdk", "openai_agents", "openshell", "mcp", "google_adk",
 		"langchain",
 		"crewai", "pydantic_ai", "vercel_ai", "autogen",
+		"raw_llm_sdk",
 	},
 	models.ScopeSubagent: {"claude_subagent"},
 	models.ScopeSkill:    {"claude_skill"},

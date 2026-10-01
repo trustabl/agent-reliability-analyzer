@@ -221,6 +221,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 	agents = append(agents, analysis.DiscoverPydanticAIAgents(parsed)...)
 	tools = append(tools, analysis.DiscoverADKTools(parsed)...)
 	tools = append(tools, analysis.DiscoverLangChainTools(parsed)...)
+	tools = append(tools, analysis.DiscoverLangGraphNodes(parsed)...)
 	tools = append(tools, analysis.DiscoverAutoGenTools(parsed)...)
 	tools = append(tools, analysis.DiscoverPydanticAITools(parsed)...)
 	guardrails := analysis.DiscoverGuardrails(parsed)
@@ -422,6 +423,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.ClaudeSettings = analysis.DiscoverClaudeSettings(profile.Manifest)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
+	inventory.RawAnthropicToolOutputInSystemPrompt, inventory.RawOpenAIToolOutputInSystemMessage = analysis.DetectRawLLMToolOutputInSystem(parsed)
 	// Markdown subagents are an independent Claude Agent SDK signal: a repo can
 	// ship .claude/agents/*.md (or a flat collection) with no Claude SDK code.
 	// Fold them into SDKsDetected so LoadFor loads the claude_sdk pack (CSDK-110).
@@ -684,7 +686,7 @@ func deriveSDKsDetected(tools []models.ToolDef, agents []models.AgentDef, subage
 			seen[models.SDKMCP] = true
 		case models.KindADKFunctionTool:
 			seen[models.SDKGoogleADK] = true
-		case models.KindLangChainTool:
+		case models.KindLangChainTool, models.KindLangGraphNode:
 			seen[models.SDKLangChain] = true
 		case models.KindCrewAITool:
 			seen[models.SDKCrewAI] = true

@@ -117,6 +117,10 @@ func (d repoRuleDetector) Applies(p models.RepoProfile, inv models.RepoInventory
 			}
 			continue
 		}
+		// "raw_llm_sdk" is likewise not an SDK; the rule's own predicate gates.
+		if k == "raw_llm_sdk" {
+			return true
+		}
 		// The repo-scope applies_to tokens are category labels, which equal
 		// their SDK enum string for every SDK EXCEPT Claude: the token is
 		// `claude_sdk` while the enum is `claude_agent_sdk`. Bridge that one
@@ -301,6 +305,9 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 		// each rule still gates on its own applies_to and on observability
 		// predicates that are false in a repo with no signals.
 		"observability": true,
+		// raw_llm_sdk has no SDK enum entry (bare anthropic/openai client usage is
+		// not an agent framework); its rules gate on their own predicates.
+		"raw_llm_sdk": true,
 	}
 	for _, sdk := range sdks {
 		switch sdk {
