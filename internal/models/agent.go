@@ -340,7 +340,9 @@ type ClaudeAgentOptionsDef struct {
 
 // AgentRunCallDef is one execution call discovered in code that actually runs
 // an agent: a Runner.run/run_sync/run_streamed call (OpenAI Agents SDK) or an
-// <agent>.run/run_sync/run_stream call (Pydantic AI). Execution limits like
+// <agent>.run/run_sync/run_stream call (Pydantic AI), a Runner.run/run_async
+// call resolved to its agent (Google ADK), or an initiate_chat/run-family call
+// (AutoGen / AG2). Execution limits like
 // max_turns or usage_limits are set at this call site, not at the agent's
 // constructor — ClaudeAgentOptionsDef-style construction-site capture can't
 // see them. AgentVarName is the resolved identifier naming the agent this

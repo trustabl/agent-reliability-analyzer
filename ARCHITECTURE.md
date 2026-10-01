@@ -685,7 +685,14 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   Agents SDK: `Runner.run` / `run_sync` / `run_streamed` (object segment
   must be exactly `Runner`, first positional arg is the agent ident).
   Pydantic AI: `<agent>.run` / `run_sync` / `run_stream` (receiver is the
-  agent ident; import-gated to `pydantic_ai`). Each hit is an
+  agent ident; import-gated to `pydantic_ai`). Google ADK: `<runner>.run` /
+  `run_async` where the agent is two hops away — a same-file pre-pass binds each
+  `X = Runner(agent=a, ...)` / `InMemoryRunner(a)` target to its agent ident
+  (the inline `Runner(agent=a).run_async(...)` receiver also resolves; `app=`
+  runners and `run_live` stay unresolved/ignored; import-gated to `google.adk`).
+  AutoGen / AG2: `<agent>.initiate_chat` / `a_initiate_chat` (a record for the
+  receiver *and* the recipient ident) and `<agent>.run` / `a_run` /
+  `run_stream` (import-gated to either AutoGen line). Each hit is an
   `AgentRunCallDef` on `RepoInventory.AgentRunCalls`. OAI-112
   (`agent_run_call_max_turns_missing`) and PYD-106
   (`agent_run_call_usage_limits_missing`) correlate those calls to a
@@ -695,9 +702,13 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   ancestor walk (`wallclock_timeout.go`, `nodeHasWallClockTimeoutAncestor`): true
   when the call sits inside an `asyncio.wait_for(...)` argument or the body of an
   `asyncio.timeout` / `anyio.move_on_after` / `anyio.fail_after` `with` block in
-  the same function — never a same-file text search. OAI-120 / PYD-108
-  (`agent_run_call_wall_clock_timeout_missing`) share the correlation helper
-  `agentRunCallUnsatisfied` with OAI-112 / PYD-106.
+  the same function — never a same-file text search. OAI-120 / PYD-108 /
+  ADK-113 / AG2-021 (`agent_run_call_wall_clock_timeout_missing`) share the
+  correlation helper `agentRunCallUnsatisfied` with OAI-112 / PYD-106; for ADK
+  and AutoGen the predicate additionally credits a non-None `abort_signal` /
+  `cancellation_token` kwarg on the run call (`wallClockCancelKwarg`). The
+  Vercel AI analogue (VAI-020) is a plain agent-kwarg rule over `abortSignal` /
+  `timeout` and needs no run-call record.
 - **DiscoverLangGraphNodes** (`langgraph_nodes.go`) — a function registered via
   `<builder>.add_node("name", func)` / `add_node(func)` is not a `@tool` but runs
   on every graph visit. Same-file, undecorated, top-level functions are emitted
@@ -1604,7 +1615,7 @@ RepoInventory {
     PluginManifests    []PluginManifest
     ClaudeSettings     []ClaudeSettings
     ClaudeAgentOptions []ClaudeAgentOptionsDef  // ClaudeAgentOptions(...) session configs (permission_mode, max_turns, etc.)
-    AgentRunCalls      []AgentRunCallDef        // Runner.run / agent.run call sites (max_turns, usage_limits, WallClockTimeoutWrapped)
+    AgentRunCalls      []AgentRunCallDef        // Runner.run / agent.run / ADK Runner.run_async / AutoGen initiate_chat call sites (max_turns, usage_limits, WallClockTimeoutWrapped)
     SDKsDetected        []SDK     // observed in code, PLUS claude_agent_sdk when any markdown subagent OR ClaudeAgentOptions(...) is present (drives the policy-selection step)
     HasShellInvocations bool      // any Python function calling subprocess.* / os.system / os.popen ("openshell" risk surface, not an SDK)
     Manifest            ScanManifest

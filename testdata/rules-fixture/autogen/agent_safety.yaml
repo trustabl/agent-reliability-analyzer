@@ -167,3 +167,39 @@ rules:
       Set max_consecutive_auto_reply= to a small integer on any code-executing agent
       so the auto-reply loop is bounded, and combine it with human_input_mode and
       Docker so each run is both capped and reviewed.
+
+  - id: AG2-021
+    title: AutoGen chat or run call has no wall-clock timeout
+    severity: low
+    confidence: 0.5
+    language: python
+    applies_to:
+      - autogen_conversable_agent
+      - autogen_user_proxy_agent
+      - autogen_assistant_agent
+      - autogen_group_chat_manager
+      - autogen_code_executor_agent
+    scope: agent
+    match:
+      agent_run_call_wall_clock_timeout_missing: true
+    explanation: >
+      No initiate_chat / a_initiate_chat / run / a_run / run_stream call that
+      involves this agent is wrapped in a wall-clock timeout (asyncio.wait_for,
+      asyncio.timeout, or anyio move_on_after / fail_after) or passes a
+      cancellation_token. max_turns, max_round, and max_consecutive_auto_reply
+      bound how many exchanges happen, but not how long ONE exchange can block: a
+      stalled model request or a slow tool or code-execution step hangs the whole
+      conversation, holding the worker and any executor it has open. This is
+      distinct from those count limits — a chat can stay well inside them and
+      still never return. The synchronous initiate_chat / run cannot be wrapped in
+      an asyncio timeout at all, so they always fire. The check is structural — a
+      timeout elsewhere in the file that does not enclose the call is not credited
+      — and a timeout applied by the caller of the function that contains the call
+      is not visible here.
+    fix: >
+      Use the async entry points and bound them: await asyncio.wait_for(
+      a_initiate_chat(...), timeout=...) or run inside async with asyncio.timeout(
+      ...):, and on the v0.4 line pass cancellation_token= or add a
+      TimeoutTermination to the team. Also set a per-request timeout in llm_config
+      so one model call fails fast, and treat TimeoutError as a failed run rather
+      than retrying blindly.

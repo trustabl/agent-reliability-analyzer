@@ -6620,6 +6620,18 @@ var policyAgentRuleCases = []policyAgentCase{
 			"const r = await generateText({ model: openai(\"gpt-5\"), maxSteps: 5, abortSignal: AbortSignal.timeout(30000), tools: { weather: weatherTool } });\n"),
 		models.RepoInventory{},
 		false},
+	{"VAI-020 silent when the timeout option is set (object form)", "VAI-020",
+		parseTSVercelAgentInline("import { generateText } from \"ai\";\n" +
+			"import { openai } from \"@ai-sdk/openai\";\n" +
+			"const r = await generateText({ model: openai(\"gpt-5\"), maxSteps: 5, timeout: { totalMs: 60000, stepMs: 10000 }, tools: { weather: weatherTool } });\n"),
+		models.RepoInventory{},
+		false},
+	{"VAI-020 silent when the timeout option is set (number form)", "VAI-020",
+		parseTSVercelAgentInline("import { generateText } from \"ai\";\n" +
+			"import { openai } from \"@ai-sdk/openai\";\n" +
+			"const r = await generateText({ model: openai(\"gpt-5\"), maxSteps: 5, timeout: 60000, tools: { weather: weatherTool } });\n"),
+		models.RepoInventory{},
+		false},
 	{"VAI-020 silent when the call sets no loop bound", "VAI-020",
 		parseTSVercelAgentInline("import { generateText } from \"ai\";\n" +
 			"import { openai } from \"@ai-sdk/openai\";\n" +
@@ -6772,6 +6784,85 @@ var policyAgentRuleCases = []policyAgentCase{
 		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
 			{SDK: models.SDKPydanticAI, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", WallClockTimeoutWrapped: true},
 		}},
+		false},
+
+	// ─── ADK-113 / AG2-021 no wall-clock timeout on run calls ────────────────
+	{"ADK-113 fires when the run_async call is not timeout-wrapped", "ADK-113",
+		models.AgentDef{
+			SDK: models.SDKGoogleADK, Class: "LlmAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKGoogleADK, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent"},
+		}},
+		true},
+	{"ADK-113 silent when the run call is wrapped in a wall-clock timeout", "ADK-113",
+		models.AgentDef{
+			SDK: models.SDKGoogleADK, Class: "LlmAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKGoogleADK, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", WallClockTimeoutWrapped: true},
+		}},
+		false},
+	{"ADK-113 silent when run_async passes abort_signal", "ADK-113",
+		models.AgentDef{
+			SDK: models.SDKGoogleADK, Class: "LlmAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKGoogleADK, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{"abort_signal": {Value: &models.Expr{Kind: models.ExprNameRef, Text: "x"}}}}},
+		}},
+		false},
+	{"ADK-113 fires when abort_signal is explicitly None", "ADK-113",
+		models.AgentDef{
+			SDK: models.SDKGoogleADK, Class: "LlmAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKGoogleADK, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{"abort_signal": {Value: &models.Expr{Kind: models.ExprLiteralNone, Text: "None"}}}}},
+		}},
+		true},
+	{"ADK-113 silent when no run call resolves", "ADK-113",
+		models.AgentDef{
+			SDK: models.SDKGoogleADK, Class: "LlmAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{},
+		false},
+	{"AG2-021 fires when the chat call is not timeout-wrapped", "AG2-021",
+		models.AgentDef{
+			SDK: models.SDKAutoGen, Class: "ConversableAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKAutoGen, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent"},
+		}},
+		true},
+	{"AG2-021 silent when the run call is wrapped in a wall-clock timeout", "AG2-021",
+		models.AgentDef{
+			SDK: models.SDKAutoGen, Class: "ConversableAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKAutoGen, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", WallClockTimeoutWrapped: true},
+		}},
+		false},
+	{"AG2-021 silent when run passes cancellation_token", "AG2-021",
+		models.AgentDef{
+			SDK: models.SDKAutoGen, Class: "AssistantAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{
+			{SDK: models.SDKAutoGen, Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent", Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{"cancellation_token": {Value: &models.Expr{Kind: models.ExprNameRef, Text: "x"}}}}},
+		}},
+		false},
+	{"AG2-021 silent when no run call resolves", "AG2-021",
+		models.AgentDef{
+			SDK: models.SDKAutoGen, Class: "ConversableAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "main.py"}, VarName: "agent",
+		},
+		models.RepoInventory{},
 		false},
 }
 

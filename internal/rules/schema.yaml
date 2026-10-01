@@ -380,14 +380,19 @@ rules:
 #       when the field is empty (kwarg absent or False).
 #
 #   agent_run_call_wall_clock_timeout_missing: true | false
-#       OpenAI Agents SDK and Pydantic AI only. Fires when this agent has at
-#       least one resolvable run call (Runner.run-family / <agent>.run-family,
-#       same-file, non-opaque) and NONE of them sit structurally inside an
+#       OpenAI Agents SDK, Pydantic AI, Google ADK and AutoGen only. Fires when
+#       this agent has at least one resolvable run call (Runner.run-family /
+#       <agent>.run-family / ADK Runner.run + run_async resolved to the agent
+#       via Runner(agent=) / InMemoryRunner(agent) / AutoGen initiate_chat
+#       (receiver and recipient) + run-family; same-file, non-opaque) and NONE of
+#       them sit structurally inside an
 #       asyncio.wait_for(...) argument or an asyncio.timeout / anyio.move_on_after
 #       / anyio.fail_after `with` block (AgentRunCallDef.WallClockTimeoutWrapped).
-#       An unrelated timeout elsewhere in the file is not credited. Silent when
-#       no run call resolves. Complements max_turns / usage_limits, which bound
-#       step count and spend but not how long one step can block.
+#       An unrelated timeout elsewhere in the file is not credited. For ADK and
+#       AutoGen a non-None abort_signal / cancellation_token kwarg on the run
+#       call also satisfies it. Silent when no run call resolves. Complements
+#       max_turns / usage_limits, which bound step count and spend but not how
+#       long one step can block.
 #
 #   agent_kwargs_observed: true | false
 #       True iff discovery resolved this agent's call site: kwargs were captured

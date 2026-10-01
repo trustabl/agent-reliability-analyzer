@@ -350,6 +350,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **P0 partial-gaps batch (2026-10-01, no schema change, stays 19):** the fixture now holds **316** rules
+> (314 + 2; re-derive, do not trust this figure). **ADK-113** / **AG2-021** extend the wall-clock-timeout check to Google
+> ADK and AutoGen by widening `agent_run_call_wall_clock_timeout_missing` and `DiscoverAgentRunCalls` (ADK runner → agent
+> resolved via a same-file pre-pass; AutoGen `initiate_chat` yields receiver and recipient); the predicate also credits
+> `abort_signal` / `cancellation_token`. **VAI-020** now credits the Vercel AI native `timeout` option. Deliberately **not**
+> built: a per-run token/cost-cap rule (no enforced run-level token/cost parameter exists in OpenAI Agents, LangChain,
+> ADK, Vercel AI, or CrewAI — `Agent.max_tokens` is declared but never read; AutoGen v0.4 `TokenUsageTermination` needs team
+> discovery) and a general untrusted-tool-output rule (needs inter-procedural taint; see `COVERAGE.md`).
+>
 > **P0 engine batch (2026-10-01, `schema_version` 18 → 19):** built the gaps the batch below deferred, so the fixture
 > now holds **314** rules (308 + 6; re-derive, do not trust this figure): **LC-114** (StateGraph with no
 > checkpointer; `agent_kwargs_observed` + dual-scope `repo_langgraph_platform_config_present`), **LC-115**
