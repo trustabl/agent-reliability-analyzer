@@ -366,3 +366,40 @@ rules:
       task requires them. Scope writes to a dedicated working directory, gate
       them with a PreToolUse hook, and for fetching, allowlist permitted hosts
       and block internal, loopback, and link-local address ranges.
+
+  - id: CSDK-114
+    title: TypeScript query() main agent sets no maxBudgetUsd spend cap
+    severity: low
+    confidence: 0.6
+    language: typescript
+    applies_to:
+      - claude_query_main
+    scope: agent
+    match:
+      all:
+        - agent_kwarg_present:
+            - options.model
+            - options.allowedTools
+            - options.disallowedTools
+            - options.permissionMode
+            - options.maxTurns
+            - options.systemPrompt
+            - options.cwd
+            - options.mcpServers
+            - options.agents
+            - options.hooks
+        - agent_kwarg_missing:
+            - options.maxBudgetUsd
+    explanation: >
+      This `query(...)` call configures the main agent thread with inline
+      `options` but sets no `options.maxBudgetUsd`. The Claude Agent SDK accepts a
+      dollar ceiling on a run and stops the session when it is reached; without
+      one, the only bound on spend is the turn count (if any is set). A
+      prompt-injected or looping session can keep issuing model and tool calls,
+      and a long-context agent burns tokens on every turn, so an unbounded run
+      turns a bad input into an open-ended bill.
+    fix: >
+      Set `maxBudgetUsd` in the `query()` options to a ceiling sized to the task
+      (a few dollars for an interactive agent, less for a batch worker), and pair
+      it with `maxTurns`. Treat the budget as a backstop, not the primary control:
+      also alert on sessions that stop because the cap was hit.

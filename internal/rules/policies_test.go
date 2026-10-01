@@ -4661,6 +4661,19 @@ var policyAgentRuleCases = []policyAgentCase{
 			}}},
 		models.RepoInventory{}, false},
 
+	{"LC-113 fires when AgentExecutor has no max_execution_time", "LC-113",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "AgentExecutor", Language: models.LanguagePython},
+		models.RepoInventory{}, true},
+	{"LC-113 silent when max_execution_time set", "LC-113",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "AgentExecutor", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"max_execution_time": {Value: &models.Expr{Kind: models.ExprLiteralInt, Text: "60"}},
+			}}},
+		models.RepoInventory{}, false},
+	{"LC-113 silent on the TypeScript AgentExecutor", "LC-113",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "AgentExecutor", Language: models.LanguageTypeScript},
+		models.RepoInventory{}, false},
+
 	{"LC-103 fires when agent wires RequestsGetTool", "LC-103",
 		models.AgentDef{
 			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
@@ -4759,6 +4772,24 @@ var policyAgentRuleCases = []policyAgentCase{
 			SDK: models.SDKCrewAI, Class: "Agent", Language: models.LanguagePython,
 			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
 				"max_iter": {Value: &models.Expr{Kind: models.ExprLiteralInt, Text: "5"}},
+			}}},
+		models.RepoInventory{}, false},
+
+	{"CREW-111 fires when Agent has no max_execution_time", "CREW-111",
+		models.AgentDef{SDK: models.SDKCrewAI, Class: "Agent", Language: models.LanguagePython},
+		models.RepoInventory{}, true},
+	{"CREW-111 silent when max_execution_time set", "CREW-111",
+		models.AgentDef{
+			SDK: models.SDKCrewAI, Class: "Agent", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"max_execution_time": {Value: &models.Expr{Kind: models.ExprLiteralInt, Text: "120"}},
+			}}},
+		models.RepoInventory{}, false},
+	{"CREW-111 silent when the agent is built from config=", "CREW-111",
+		models.AgentDef{
+			SDK: models.SDKCrewAI, Class: "Agent", Language: models.LanguagePython,
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"config": {Value: &models.Expr{Kind: models.ExprNameRef, Text: "self.agents_config['researcher']"}},
 			}}},
 		models.RepoInventory{}, false},
 
@@ -6249,6 +6280,29 @@ var policyAgentRuleCases = []policyAgentCase{
 		models.RepoInventory{},
 		false},
 
+	// ─── CSDK-114 query() main agent without maxBudgetUsd ────────────────────
+	{"CSDK-114 fires when inline options set no maxBudgetUsd", "CSDK-114",
+		parseTSAgentInline("import { query } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"const a = query({ prompt: \"y\", options: { allowedTools: [\"Read\"], maxTurns: 5 } });\n"),
+		models.RepoInventory{},
+		true},
+	{"CSDK-114 silent when maxBudgetUsd is set", "CSDK-114",
+		parseTSAgentInline("import { query } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"const a = query({ prompt: \"y\", options: { allowedTools: [\"Read\"], maxBudgetUsd: 2 } });\n"),
+		models.RepoInventory{},
+		false},
+	{"CSDK-114 silent when options is a variable (not inspectable)", "CSDK-114",
+		parseTSAgentInline("import { query } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"const opts = { allowedTools: [\"Read\"] };\n" +
+			"const a = query({ prompt: \"y\", options: opts });\n"),
+		models.RepoInventory{},
+		false},
+	{"CSDK-114 silent when inline options carry none of the known keys", "CSDK-114",
+		parseTSAgentInline("import { query } from \"@anthropic-ai/claude-agent-sdk\";\n" +
+			"const a = query({ prompt: \"y\", options: {} });\n"),
+		models.RepoInventory{},
+		false},
+
 	// ─── OAI-105 TS agent content hosted-tool without inputGuardrails ─────────
 	{"OAI-105 fires on webSearchTool agent with no inputGuardrails", "OAI-105",
 		parseTSOpenAIAgentInline("import { Agent, webSearchTool } from \"@openai/agents\";\n" +
@@ -6505,6 +6559,31 @@ var policyAgentRuleCases = []policyAgentCase{
 		parseTSVercelAgentInline("import { generateText } from \"ai\";\n" +
 			"import { openai } from \"@ai-sdk/openai\";\n" +
 			"const r = await generateText({ model: openai(\"gpt-5\"), maxSteps: 5, tools: { weather: weatherTool } });\n"),
+		models.RepoInventory{},
+		false},
+
+	{"VAI-020 fires on a bounded tool loop with no abortSignal", "VAI-020",
+		parseTSVercelAgentInline("import { generateText } from \"ai\";\n" +
+			"import { openai } from \"@ai-sdk/openai\";\n" +
+			"const r = await generateText({ model: openai(\"gpt-5\"), maxSteps: 5, tools: { weather: weatherTool } });\n"),
+		models.RepoInventory{},
+		true},
+	{"VAI-020 silent when abortSignal is set", "VAI-020",
+		parseTSVercelAgentInline("import { generateText } from \"ai\";\n" +
+			"import { openai } from \"@ai-sdk/openai\";\n" +
+			"const r = await generateText({ model: openai(\"gpt-5\"), maxSteps: 5, abortSignal: AbortSignal.timeout(30000), tools: { weather: weatherTool } });\n"),
+		models.RepoInventory{},
+		false},
+	{"VAI-020 silent when the call sets no loop bound", "VAI-020",
+		parseTSVercelAgentInline("import { generateText } from \"ai\";\n" +
+			"import { openai } from \"@ai-sdk/openai\";\n" +
+			"const r = await generateText({ model: openai(\"gpt-5\"), tools: { weather: weatherTool } });\n"),
+		models.RepoInventory{},
+		false},
+	{"VAI-020 silent on a ToolLoopAgent (signal goes on .generate)", "VAI-020",
+		parseTSVercelAgentInline("import { ToolLoopAgent, stepCountIs } from \"ai\";\n" +
+			"import { openai } from \"@ai-sdk/openai\";\n" +
+			"const a = new ToolLoopAgent({ model: openai(\"gpt-5\"), stopWhen: stepCountIs(5), tools: { weather: weatherTool } });\n"),
 		models.RepoInventory{},
 		false},
 

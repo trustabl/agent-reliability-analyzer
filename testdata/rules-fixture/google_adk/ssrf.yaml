@@ -17,7 +17,18 @@ rules:
       - adk_function_tool
     scope: tool
     match:
-      has_dynamic_url_call: true
+      all:
+        - has_dynamic_url_call: true
+        - not:
+            has_body_text:
+              - ".hostname not in"
+              - ".netloc not in"
+              - "ALLOWED_HOSTS"
+              - "ALLOWED_DOMAINS"
+              - "allowed_hosts"
+              - "allowed_domains"
+              - "HOST_ALLOWLIST"
+              - "host_allowlist"
     explanation: >
       This ADK tool issues an HTTP request to a URL built from a parameter or
       an interpolated string rather than a fixed literal. The model chooses the
@@ -32,7 +43,7 @@ rules:
       URL and accept only the path/query. After DNS resolution, reject private,
       loopback, and link-local ranges, and on GCP block 169.254.169.254 /
       metadata.google.internal explicitly. Disable redirects to addresses
-      outside the allow-list.
+      outside the allow-list. Credit is given when the body checks the parsed hostname against a named allow-list; also require https:// and cap or disable redirects (follow_redirects=False / allow_redirects=False).
 
   - id: ADK-016
     title: TypeScript FunctionTool fetches a caller-controlled URL (SSRF)
@@ -43,7 +54,23 @@ rules:
       - adk_function_tool
     scope: tool
     match:
-      has_dynamic_url_call: true
+      all:
+        - has_dynamic_url_call: true
+        - not:
+            any:
+              - all:
+                  - has_body_text:
+                      - ".hostname"
+                      - ".host"
+                  - has_body_text:
+                      - ".includes("
+                      - ".has("
+              - has_body_text:
+                  - "allowedHosts"
+                  - "allowedDomains"
+                  - "ALLOWED_HOSTS"
+                  - "ALLOWED_DOMAINS"
+                  - "hostAllowlist"
     explanation: >
       This TypeScript FunctionTool issues an HTTP request (`fetch`, `axios`,
       `got`, or `undici`) to a URL built from a tool parameter or an interpolated
@@ -58,4 +85,4 @@ rules:
       URL and accept only a path/query segment from the model. After resolving
       DNS, reject private, loopback, and link-local ranges, and on GCP block
       169.254.169.254 / metadata.google.internal explicitly. Disable redirects to
-      hosts outside the allow-list.
+      hosts outside the allow-list. Credit is given when the body checks new URL(x).hostname/host against an allow-list; also require https: and use redirect: "manual" or cap redirects.

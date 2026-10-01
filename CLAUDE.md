@@ -350,6 +350,19 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **P0 remaining-gaps batch (2026-09-30, rules-layer only, `schema_version` stays 18):** +4 rules
+> (**CSDK-114**, **CREW-111**, **LC-113**, **VAI-020**) and an allow-list credit on the 14 SSRF rules,
+> layered on top of Batch 2 (already on `main`), so the fixture now holds **308** rules
+> (302 + Batch 2's 6; re-derive, do not trust this figure). Deliberately
+> **not** built, because each needs a new predicate or discovery the batch was barred from adding:
+> OAI/PYD whole-run deadline (a run-call deadline-wrapper fact), Python `max_budget_usd` (a repo-scope
+> predicate like `repo_claude_options_max_turns_missing`), LangGraph no-checkpointer and
+> mutating-node-without-HITL (a `langgraph.json` exemption reachable from agent scope, opaque/empty
+> `compile()` handling, an `interrupt()` fact, and user `@tool` edges on `StateGraph`), LangChain.js
+> `maxExecutionTime` (option unverified), and untrusted-tool-output concat (no raw `anthropic`/`openai`
+> loop discovery). Shipping the first two LangGraph rules on existing predicates alone would
+> false-positive on every LangGraph Platform repo, so they were held back rather than degraded.
+>
 > **Rulebook status (2026-09-29):** the fixture carries **304** rules across
 > **eleven** categories — the ten SDK categories (`autogen`, `claude_sdk`,
 > `claude_skill`, `crewai`, `google_adk`, `langchain`, `mcp`, `openai_sdk`,

@@ -114,7 +114,18 @@ rules:
       - openai_tool
     scope: tool
     match:
-      has_dynamic_url_call: true
+      all:
+        - has_dynamic_url_call: true
+        - not:
+            has_body_text:
+              - ".hostname not in"
+              - ".netloc not in"
+              - "ALLOWED_HOSTS"
+              - "ALLOWED_DOMAINS"
+              - "allowed_hosts"
+              - "allowed_domains"
+              - "HOST_ALLOWLIST"
+              - "host_allowlist"
     explanation: >
       An OpenAI Agents SDK tool builds its outbound HTTP URL from a
       non-literal value — typically a tool parameter interpolated into an
@@ -134,7 +145,7 @@ rules:
       server-side registry and build the URL from the registry's trusted
       entry. If the value is meant to be an opaque ID (e.g. a connection_id),
       pass it as a query parameter or path segment of a fixed base URL and
-      reject characters that would let it escape that slot.
+      reject characters that would let it escape that slot. Credit is given when the body checks the parsed hostname against a named allow-list; also require https:// and cap or disable redirects (follow_redirects=False / allow_redirects=False).
 
   - id: OAI-024
     title: TypeScript tool builds outbound URL from a non-literal value
@@ -145,7 +156,23 @@ rules:
       - openai_tool
     scope: tool
     match:
-      has_dynamic_url_call: true
+      all:
+        - has_dynamic_url_call: true
+        - not:
+            any:
+              - all:
+                  - has_body_text:
+                      - ".hostname"
+                      - ".host"
+                  - has_body_text:
+                      - ".includes("
+                      - ".has("
+              - has_body_text:
+                  - "allowedHosts"
+                  - "allowedDomains"
+                  - "ALLOWED_HOSTS"
+                  - "ALLOWED_DOMAINS"
+                  - "hostAllowlist"
     explanation: >
       This OpenAI Agents SDK tool authored in TypeScript constructs its outbound
       HTTP URL from a non-literal value — a template-string substitution, an
@@ -161,4 +188,4 @@ rules:
       an allow-list of permitted hosts and path segments before any HTTP client
       touches it, or resolve an opaque ID against a server-side registry and build
       the URL from the trusted entry. Reject characters that let the value escape
-      its intended path or query slot.
+      its intended path or query slot. Credit is given when the body checks new URL(x).hostname/host against an allow-list; also require https: and use redirect: "manual" or cap redirects.

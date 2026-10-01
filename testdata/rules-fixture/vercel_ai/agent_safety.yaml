@@ -149,3 +149,34 @@ rules:
       and pair it with an output check before retrieved text can influence
       side-effecting tools. For urlContext, constrain candidate URLs to an
       allow-list of hosts rather than passing raw model-supplied links.
+
+  - id: VAI-020
+    title: Vercel AI agent tool loop has no abortSignal deadline
+    severity: low
+    confidence: 0.5
+    language: typescript
+    applies_to:
+      - vercel_ai_agent
+    scope: agent
+    match:
+      all:
+        - agent_class:
+            - GenerateText
+            - StreamText
+        - agent_kwarg_present:
+            - stopWhen
+            - maxSteps
+        - agent_kwarg_missing:
+            - abortSignal
+    explanation: >
+      This generateText / streamText call runs a multi-step tool loop (it sets
+      stopWhen or maxSteps) but passes no abortSignal. The step bound limits how
+      many round-trips happen, not how long they take: one step that waits on a
+      slow tool or a stalled provider response holds the request open with no
+      deadline, and a caller that disconnects cannot cancel the work. The loop
+      keeps its tools live and keeps spending tokens until the provider or the
+      runtime gives up.
+    fix: >
+      Pass abortSignal: AbortSignal.timeout(ms) with a deadline sized to the task,
+      and forward the request's own signal when the loop is served from a route
+      handler so a client disconnect cancels the run. Keep the step bound as well.

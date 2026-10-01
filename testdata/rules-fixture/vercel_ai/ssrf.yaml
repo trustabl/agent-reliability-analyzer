@@ -17,7 +17,23 @@ rules:
       - vercel_ai_tool
     scope: tool
     match:
-      has_dynamic_url_call: true
+      all:
+        - has_dynamic_url_call: true
+        - not:
+            any:
+              - all:
+                  - has_body_text:
+                      - ".hostname"
+                      - ".host"
+                  - has_body_text:
+                      - ".includes("
+                      - ".has("
+              - has_body_text:
+                  - "allowedHosts"
+                  - "allowedDomains"
+                  - "ALLOWED_HOSTS"
+                  - "ALLOWED_DOMAINS"
+                  - "hostAllowlist"
     explanation: >
       This Vercel AI SDK tool's execute() handler issues an outbound HTTP call
       (fetch / axios / got / undici) whose URL is not a constant — it comes from
@@ -32,4 +48,4 @@ rules:
       allow-list of permitted hosts, reject private and link-local IP ranges
       (and redirects into them), and forbid raw model-supplied URLs. Treat any
       retrieved content as untrusted — keep it out of the system prompt and do
-      not let it expand the agent's permissions.
+      not let it expand the agent's permissions. Credit is given when the body checks new URL(x).hostname/host against an allow-list; also require https: and use redirect: "manual" or cap redirects.
