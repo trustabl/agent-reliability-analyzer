@@ -36,15 +36,31 @@ with. Anything not on this list has no entry yet.
 ## Agent frameworks
 
 Every framework below is covered by the rule packs today. The listing column says
-whether that ecosystem's own directory carries an entry for Trustabl.
+whether that ecosystem's own directory carries an entry for Trustabl, in the
+order we are working them.
 
 | # | Ecosystem | What Trustabl checks | Listing |
 |---|---|---|---|
-| 1 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
-| 2 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
-| 3 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Not listed |
-| 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | Not listed |
-| 5 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | Not listed |
+| 1 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
+| 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
+| 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **Next** — see below |
+| 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route today |
+| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | No directory |
+
+**Vercel AI SDK** is the next target. Its registry
+([`content/tools-registry/registry.ts`](https://github.com/vercel/ai/blob/main/content/tools-registry/registry.ts))
+accepts an entry only for a published npm package that an agent calls at
+runtime, so the listing is gated on shipping an AI SDK tool wrapper around the
+scanner first. The route itself is open and documented.
+
+**OpenAI Agents SDK** has one listing mechanism, *tracing integration listings*,
+and its criteria require implementing the Agents SDK tracing interface. The same
+paragraph excludes "generic OpenTelemetry support, or a hooks-only or
+guardrails-only integration". Trustabl never executes an agent, so there is
+nothing for it to trace; this is not a submission we can write our way into.
+
+**Pydantic AI** publishes no third-party directory. `docs/third-party-tools.md`
+covers MCP and LangChain tool *usage* and lists no servers or vendors.
 
 These three are analysed the same way, but their ecosystems publish no
 integrations directory, so there is nowhere to list:
