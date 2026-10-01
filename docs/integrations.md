@@ -29,6 +29,7 @@ with. Anything not on this list has no entry yet.
 | [GitLab CI/CD Catalog](https://gitlab.com/explore/catalog/trustabl-ai/components) | **Listed** | — |
 | [Bitbucket Pipes](https://bitbucket.org/hoolisoftware/trustabl-pipe) | **Listed** | 18 Aug 2026 |
 | [in-toto](https://github.com/in-toto/friends/pull/122) | Submitted | 28 Sep 2026 |
+| [Google ADK](https://github.com/google/adk-docs/pull/2290) | Submitted | 1 Oct 2026 |
 
 ---
 
@@ -39,7 +40,7 @@ whether that ecosystem's own directory carries an entry for Trustabl.
 
 | # | Ecosystem | What Trustabl checks | Listing |
 |---|---|---|---|
-| 1 | **Google ADK** | Agents, tools, skills, plugins and callbacks | Not listed |
+| 1 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
 | 2 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
 | 3 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Not listed |
 | 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | Not listed |
