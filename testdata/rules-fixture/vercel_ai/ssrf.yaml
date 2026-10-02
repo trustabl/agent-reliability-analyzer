@@ -49,3 +49,53 @@ rules:
       (and redirects into them), and forbid raw model-supplied URLs. Treat any
       retrieved content as untrusted — keep it out of the system prompt and do
       not let it expand the agent's permissions. Credit is given when the body checks new URL(x).hostname/host against an allow-list; also require https: and use redirect: "manual" or cap redirects.
+
+  - id: VAI-021
+    title: TypeScript Vercel AI SDK tool fetches an allow-listed host without pinning https://
+    severity: medium
+    confidence: 0.6
+    language: typescript
+    applies_to:
+      - vercel_ai_tool
+    scope: tool
+    match:
+      all:
+        - has_unpinned_scheme_url_call: true
+        - any:
+            - all:
+                - has_body_text:
+                    - ".hostname"
+                    - ".host"
+                - has_body_text:
+                    - ".includes("
+                    - ".has("
+            - has_body_text:
+                - "allowedHosts"
+                - "allowedDomains"
+                - "ALLOWED_HOSTS"
+                - "ALLOWED_DOMAINS"
+                - "hostAllowlist"
+        - not:
+            has_body_text:
+              - ".protocol ==="
+              - ".protocol !=="
+              - ".protocol =="
+              - ".protocol !="
+              - 'startsWith("https://")'
+              - "startsWith('https://')"
+              - 'startsWith("https:")'
+    explanation: >
+      This TypeScript Vercel AI SDK tool checks the destination host against an
+      allow-list (so VAI-003 stays silent) but passes fetch/axios/got a URL
+      that does not begin with a literal https:// prefix and checks no
+      URL protocol. The allow-list bounds where the request can go, not how:
+      an http:// URL for an allowed host is accepted, so credentials and
+      request bodies cross the network in cleartext and anyone on the path
+      can read or rewrite the response, which then re-enters the model's
+      context as trusted tool output. This rule fires only after VAI-003's
+      allow-list credit applies, so the two never fire on the same tool.
+    fix: >
+      Pin the scheme: build the URL from a literal `https://` prefix, or
+      reject any URL whose `new URL(x).protocol` is not "https:" before
+      fetching. Use redirect: "manual" or cap redirects so a redirect cannot
+      downgrade to http://.

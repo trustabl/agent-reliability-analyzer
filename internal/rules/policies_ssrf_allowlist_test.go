@@ -26,23 +26,31 @@ var (
 	tsArrow   = regexp.MustCompile(`=>\s*\{`)
 )
 
-// withGuard injects one statement at the top of the tool body. It reports
-// whether the snippet was changed so a shape the regexes miss fails loudly
-// instead of silently testing the unmodified source.
-func withGuard(t *testing.T, src string, lang models.Language, pyStmt, tsStmt string) string {
-	t.Helper()
+// injectGuard injects one statement at the top of the tool body. ok is false
+// when the snippet has no body the regexes recognize, so a shape they miss
+// fails loudly instead of silently testing the unmodified source.
+func injectGuard(src string, lang models.Language, pyStmt, tsStmt string) (out string, ok bool) {
 	if lang == models.LanguageTypeScript {
 		loc := tsArrow.FindStringIndex(src)
 		if loc == nil {
-			t.Fatalf("no arrow-function body in TS snippet:\n%s", src)
+			return src, false
 		}
-		return src[:loc[1]] + " " + tsStmt + " " + src[loc[1]:]
+		return src[:loc[1]] + " " + tsStmt + " " + src[loc[1]:], true
 	}
 	loc := pyDefLine.FindStringIndex(src)
 	if loc == nil {
-		t.Fatalf("no single-line def in Python snippet:\n%s", src)
+		return src, false
 	}
-	return src[:loc[1]] + "\n    " + pyStmt + src[loc[1]:]
+	return src[:loc[1]] + "\n    " + pyStmt + src[loc[1]:], true
+}
+
+func withGuard(t *testing.T, src string, lang models.Language, pyStmt, tsStmt string) string {
+	t.Helper()
+	out, ok := injectGuard(src, lang, pyStmt, tsStmt)
+	if !ok {
+		t.Fatalf("no function body recognized in %s snippet:\n%s", lang, src)
+	}
+	return out
 }
 
 func TestSSRFAllowListCredit(t *testing.T) {
