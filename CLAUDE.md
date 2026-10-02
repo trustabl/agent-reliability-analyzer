@@ -350,6 +350,8 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **P0 fetch HTTPS-only batch (2026-10-02, `schema_version` 19 → 20):** new tool-scope predicate `has_unpinned_scheme_url_call` and 14 rules (**CSDK-024/025**, **OAI-032/033**, **MCP-031/032**, **ADK-022/023**, **LC-026/027**, **CREW-015**, **PYD-015**, **AG2-022**, **VAI-021**), one per SSRF rule, each firing only once the SSRF sibling's allow-list credit applies and the URL scheme is neither pinned to a literal `https://` nor checked. The fixture now holds **330** rules (316 + 14; re-derive, do not trust this figure). Not built: LangGraph nodes, `raw_llm_sdk`, a Pydantic `WebFetchTool` `allowed_domains` rule (Anthropic-only option). PYD-103's fix text gained an `allowed_domains` caveat. Rulebook docs live in the nine `docs/Policy/*/ssrf.md` files plus `openai_sdk/network.md`.
+>
 > **P0 partial-gaps batch (2026-10-01, no schema change, stays 19):** the fixture now holds **316** rules
 > (314 + 2; re-derive, do not trust this figure). **ADK-113** / **AG2-021** extend the wall-clock-timeout check to Google
 > ADK and AutoGen by widening `agent_run_call_wall_clock_timeout_missing` and `DiscoverAgentRunCalls` (ADK runner → agent

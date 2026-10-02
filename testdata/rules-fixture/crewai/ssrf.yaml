@@ -42,3 +42,49 @@ rules:
       reject private and link-local IP ranges (and redirects into them), and forbid
       raw model-supplied URLs. If the tool only ever talks to one service, hard-code
       the base URL and accept only a path or query from the model. Credit is given when the body checks the parsed hostname against a named allow-list; also require https:// and cap or disable redirects (follow_redirects=False / allow_redirects=False).
+
+  - id: CREW-015
+    title: CrewAI tool fetches an allow-listed host without pinning https://
+    severity: medium
+    confidence: 0.6
+    language: python
+    applies_to:
+      - crewai_tool
+    scope: tool
+    match:
+      all:
+        - has_unpinned_scheme_url_call: true
+        - has_body_text:
+            - ".hostname not in"
+            - ".netloc not in"
+            - "ALLOWED_HOSTS"
+            - "ALLOWED_DOMAINS"
+            - "allowed_hosts"
+            - "allowed_domains"
+            - "HOST_ALLOWLIST"
+            - "host_allowlist"
+        - not:
+            has_body_text:
+              - ".scheme =="
+              - ".scheme !="
+              - ".scheme in"
+              - ".scheme not in"
+              - 'startswith("https://")'
+              - "startswith('https://')"
+    explanation: >
+      This CrewAI tool checks the destination host against an allow-list (so
+      CREW-005 stays silent) but builds its outbound request URL without a literal
+      https:// prefix and without checking the URL scheme. The allow-list
+      bounds where the request can go, not how: a model-supplied or
+      configured value such as http://allowed.example.com is accepted, so
+      credentials in headers and the request body cross the network in
+      cleartext, and anyone on the network path can read or rewrite the
+      response. The rewritten response re-enters the model's context as
+      trusted tool output, a second-order prompt-injection channel. This rule
+      fires only after CREW-005's allow-list credit applies, so the two never
+      fire on the same tool.
+    fix: >
+      Pin the scheme: build the URL from a literal "https://" prefix, or
+      reject any URL whose urlparse(url).scheme is not "https" before the
+      request. Also cap or disable redirects (follow_redirects=False /
+      allow_redirects=False) so a redirect cannot downgrade to http://.

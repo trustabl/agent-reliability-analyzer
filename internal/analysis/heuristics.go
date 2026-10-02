@@ -224,3 +224,49 @@ func IsPathishParam(name string) bool {
 		strings.HasPrefix(lower, "file_") ||
 		strings.HasPrefix(lower, "path_")
 }
+
+// URLArgSchemePinned reports whether a dynamic URL argument starts with a
+// literal https:// prefix, so the scheme is fixed regardless of the value
+// substituted after it. Recognized shapes (Python and TS/JS grammars):
+// an f-string / template string whose text begins "https://", a
+// concatenation or %-format whose leftmost operand does, and a
+// "https://...{}".format(x) call. Anything else (identifier, attribute, call
+// result, http:// prefix) is treated as unpinned. Heuristic: a prefix built on
+// an earlier line and passed by identifier is not seen.
+func URLArgSchemePinned(arg *sitter.Node, src []byte) bool {
+	if arg == nil {
+		return false
+	}
+	switch arg.Type() {
+	case "string", "template_string", "concatenated_string":
+		return literalStartsWithHTTPS(astutil.NodeText(arg, src))
+	case "binary_operator", "binary_expression":
+		return URLArgSchemePinned(arg.ChildByFieldName("left"), src)
+	case "parenthesized_expression":
+		if arg.NamedChildCount() > 0 {
+			return URLArgSchemePinned(arg.NamedChild(0), src)
+		}
+	case "call":
+		fn := arg.ChildByFieldName("function")
+		if fn != nil && fn.Type() == "attribute" {
+			if attr := fn.ChildByFieldName("attribute"); attr != nil && astutil.NodeText(attr, src) == "format" {
+				return URLArgSchemePinned(fn.ChildByFieldName("object"), src)
+			}
+		}
+	}
+	return false
+}
+
+// literalStartsWithHTTPS strips a Python string prefix (f/r/b/u) and the
+// opening quote(s) or backtick, then checks for a case-insensitive "https://".
+func literalStartsWithHTTPS(text string) bool {
+	text = strings.ToLower(text)
+	i := 0
+	for i < len(text) && strings.IndexByte("frbu", text[i]) >= 0 {
+		i++
+	}
+	if i >= len(text) || strings.IndexByte("\"'`", text[i]) < 0 {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimLeft(text[i:], "\"'`"), "https://")
+}

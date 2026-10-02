@@ -53,6 +53,9 @@ type MatchExpr struct {
 	HasPrintCall      *bool `yaml:"has_print_call,omitempty"`
 	HasWriteCall      *bool `yaml:"has_write_call,omitempty"`
 	HasDynamicURLCall *bool `yaml:"has_dynamic_url_call,omitempty"`
+	// HasUnpinnedSchemeURLCall: a dynamic-URL HTTP call whose URL does not start
+	// with a literal https:// prefix (TS: url_scheme_unpinned fact).
+	HasUnpinnedSchemeURLCall *bool `yaml:"has_unpinned_scheme_url_call,omitempty"`
 	// HasHTTPCallWithoutTimeout is TypeScript-only (backed by the http_no_timeout
 	// discovery fact); see PredHasHTTPCallWithoutTimeout.
 	HasHTTPCallWithoutTimeout *bool `yaml:"has_http_call_without_timeout,omitempty"`
