@@ -30,6 +30,7 @@ with. Anything not on this list has no entry yet.
 | [Bitbucket Pipes](https://bitbucket.org/hoolisoftware/trustabl-pipe) | **Listed** | 18 Aug 2026 |
 | [in-toto](https://github.com/in-toto/friends/pull/122) | Submitted | 28 Sep 2026 |
 | [Google ADK](https://github.com/google/adk-docs/pull/2290) | Submitted | 1 Oct 2026 |
+| [npm](https://www.npmjs.com/package/@trustabl/ai-sdk) | **Listed** | 2 Oct 2026 |
 
 ---
 
@@ -43,15 +44,17 @@ order we are working them.
 |---|---|---|---|
 | 1 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
 | 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
-| 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **Next** — see below |
+| 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **In progress** — see below |
 | 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route today |
 | 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | No directory |
 
-**Vercel AI SDK** is the next target. Its registry
+**Vercel AI SDK** is in progress. Its registry
 ([`content/tools-registry/registry.ts`](https://github.com/vercel/ai/blob/main/content/tools-registry/registry.ts))
 accepts an entry only for a published npm package that an agent calls at
-runtime, so the listing is gated on shipping an AI SDK tool wrapper around the
-scanner first. The route itself is open and documented.
+runtime. That package now exists —
+[`@trustabl/ai-sdk`](https://www.npmjs.com/package/@trustabl/ai-sdk), source at
+[trustabl/ai-sdk-tool](https://github.com/trustabl/ai-sdk-tool) — so only the
+registry pull request remains.
 
 **OpenAI Agents SDK** has one listing mechanism, *tracing integration listings*,
 and its criteria require implementing the Agents SDK tracing interface. The same
@@ -61,6 +64,24 @@ nothing for it to trace; this is not a submission we can write our way into.
 
 **Pydantic AI** publishes no third-party directory. `docs/third-party-tools.md`
 covers MCP and LangChain tool *usage* and lists no servers or vendors.
+
+**NVIDIA OpenShell** has no catalogue to list in either, and the one that
+existed is gone: `NVIDIA/OpenShell-Community`, which accepted sandbox images
+and skills, is retired and being archived. The live
+[`NVIDIA/OpenShell`](https://github.com/NVIDIA/OpenShell) repository documents
+extension points — drivers, gateway interceptors, isolation backends,
+supervisor middleware — rather than a partner directory.
+
+The relationship is real regardless, and it is the one target where the
+integration already exists rather than needing to be built:
+[Trustabl Probe](https://github.com/trustabl/trustabl-probe) runs an agent tool
+in an OpenShell sandbox, observes the network destinations it actually reaches,
+and generates a least-privilege OpenShell `network_policies` draft from that
+evidence. That is a working technical integration looking for an audience, not
+a submission looking for a form. Worth pursuing as content and direct outreach.
+
+Checked against the public repositories only. NVIDIA may run a partner
+programme that is not on GitHub.
 
 These three are analysed the same way, but their ecosystems publish no
 integrations directory, so there is nowhere to list:
