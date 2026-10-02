@@ -1208,3 +1208,39 @@ def handler():
 		t.Fatalf("want no signals, got %+v", res.Observability)
 	}
 }
+
+// TestScan_RunCallWallClock_ADKAndAutoGen runs real source through the full
+// scanner: an unwrapped Runner.run_async / initiate_chat fires ADK-113 /
+// AG2-021; an enclosing asyncio.timeout / wait_for (or an abort_signal) is
+// silent. This proves run-call discovery -> predicate -> rule end to end.
+func TestScan_RunCallWallClock_ADKAndAutoGen(t *testing.T) {
+	adkDep := "[project]\nname = \"f\"\ndependencies = [\"google-adk\"]\n"
+	agDep := "[project]\nname = \"f\"\ndependencies = [\"ag2\"]\n"
+	adkHead := "from google.adk.agents import LlmAgent\nfrom google.adk.runners import Runner\nimport asyncio\n" +
+		"root = LlmAgent(name=\"r\", model=\"gemini-2.0-flash\", description=\"d\")\n" +
+		"runner = Runner(agent=root, app_name=\"a\", session_service=svc)\n"
+	cases := []struct {
+		name   string
+		rule   string
+		files  map[string]string
+		wantFn bool
+	}{
+		{"ADK fires on unwrapped run_async", "ADK-113", map[string]string{"pyproject.toml": adkDep,
+			"a.py": adkHead + "async def main():\n    async for ev in runner.run_async(user_id=\"u\", session_id=\"s\"):\n        pass\n"}, true},
+		{"ADK silent inside asyncio.timeout", "ADK-113", map[string]string{"pyproject.toml": adkDep,
+			"a.py": adkHead + "async def main():\n    async with asyncio.timeout(30):\n        async for ev in runner.run_async(user_id=\"u\", session_id=\"s\"):\n            pass\n"}, false},
+		{"ADK silent with abort_signal", "ADK-113", map[string]string{"pyproject.toml": adkDep,
+			"a.py": adkHead + "async def main():\n    async for ev in runner.run_async(user_id=\"u\", session_id=\"s\", abort_signal=stop):\n        pass\n"}, false},
+		{"AutoGen fires on unwrapped initiate_chat", "AG2-021", map[string]string{"pyproject.toml": agDep,
+			"a.py": "from autogen import ConversableAgent\na = ConversableAgent(name=\"a\")\nb = ConversableAgent(name=\"b\")\na.initiate_chat(b, message=\"hi\", max_turns=2)\n"}, true},
+		{"AutoGen silent inside wait_for", "AG2-021", map[string]string{"pyproject.toml": agDep,
+			"a.py": "import asyncio\nfrom autogen import ConversableAgent\na = ConversableAgent(name=\"a\")\nb = ConversableAgent(name=\"b\")\nasync def main():\n    await asyncio.wait_for(a.a_initiate_chat(b, message=\"hi\"), timeout=30)\n"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := scanFires(t, tc.files, tc.rule); got != tc.wantFn {
+				t.Errorf("%s fires = %v, want %v", tc.rule, got, tc.wantFn)
+			}
+		})
+	}
+}

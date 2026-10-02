@@ -918,15 +918,34 @@ func agentRunCallUnsatisfied(a models.AgentDef, inv models.RepoInventory, sdks [
 	return matched
 }
 
-// PredAgentRunCallWallClockTimeoutMissing fires when this OpenAI Agents SDK or
-// Pydantic AI agent has a resolvable run call and NONE of its run calls sit
-// inside a wall-clock timeout (asyncio.wait_for / asyncio.timeout /
-// anyio.move_on_after / anyio.fail_after). Same correlation and silence rules
-// as agentRunCallMissingKwarg; the check is the structural
+// wallClockCancelKwarg is the per-SDK run-call kwarg that carries a caller-
+// controlled cancellation, credited as a deadline hook alongside the structural
+// asyncio timeout: ADK Runner.run_async(abort_signal=) and the AutoGen v0.4
+// agent.run(cancellation_token=). The other SDKs have no such kwarg.
+var wallClockCancelKwarg = map[models.SDK]string{
+	models.SDKGoogleADK: "abort_signal",
+	models.SDKAutoGen:   "cancellation_token",
+}
+
+// PredAgentRunCallWallClockTimeoutMissing fires when this OpenAI Agents SDK,
+// Pydantic AI, Google ADK or AutoGen agent has a resolvable run call and NONE of
+// its run calls sit inside a wall-clock timeout (asyncio.wait_for /
+// asyncio.timeout / anyio.move_on_after / anyio.fail_after) or, for ADK and
+// AutoGen, pass a non-None abort_signal / cancellation_token. Same correlation
+// and silence rules as agentRunCallMissingKwarg; the check is the structural
 // AgentRunCallDef.WallClockTimeoutWrapped fact rather than a kwarg.
 func PredAgentRunCallWallClockTimeoutMissing(a models.AgentDef, inv models.RepoInventory) bool {
-	return agentRunCallUnsatisfied(a, inv, []models.SDK{models.SDKOpenAIAgents, models.SDKPydanticAI}, func(rc models.AgentRunCallDef) bool {
-		return rc.WallClockTimeoutWrapped
+	sdks := []models.SDK{models.SDKOpenAIAgents, models.SDKPydanticAI, models.SDKGoogleADK, models.SDKAutoGen}
+	return agentRunCallUnsatisfied(a, inv, sdks, func(rc models.AgentRunCallDef) bool {
+		if rc.WallClockTimeoutWrapped {
+			return true
+		}
+		if kw := wallClockCancelKwarg[rc.SDK]; kw != "" {
+			if node := lookupKwargInTree(rc.Kwargs, kw); node != nil && node.Value != nil && node.Value.Kind != models.ExprLiteralNone {
+				return true
+			}
+		}
+		return false
 	})
 }
 

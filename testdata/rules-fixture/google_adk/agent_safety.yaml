@@ -354,3 +354,38 @@ rules:
       revises a support reply" routes correctly where "sequential agent" does
       not. One sentence is usually enough. Treat it as documentation for the
       parent agent's model.
+
+  - id: ADK-113
+    title: Google ADK Runner run call has no wall-clock timeout
+    severity: low
+    confidence: 0.5
+    language: python
+    applies_to:
+      - adk_llm_agent
+      - adk_sequential_agent
+      - adk_parallel_agent
+      - adk_loop_agent
+      - adk_langgraph_agent
+    scope: agent
+    match:
+      agent_run_call_wall_clock_timeout_missing: true
+    explanation: >
+      No Runner.run / run_async call that executes this agent is wrapped in a
+      wall-clock timeout (asyncio.wait_for, asyncio.timeout, or anyio
+      move_on_after / fail_after) or passes an abort_signal. RunConfig.max_llm_calls
+      caps how many model calls a run makes, but it does not bound how long ONE
+      call can block: a stalled model request or a slow tool hangs the run
+      indefinitely, holding the session, the worker, and the tool credentials the
+      agent was granted while it waits. This is distinct from a call-count limit;
+      a run can stay well under it and still never return. The check is structural
+      — a timeout elsewhere in the file that does not enclose the call is not
+      credited — and a timeout applied by the caller of the function that contains
+      the call is not visible here.
+    fix: >
+      Run the agent with the async API and bound it: wrap the loop in async with
+      asyncio.timeout(...): around async for event in runner.run_async(...), or pass
+      abort_signal= (an asyncio.Event) that a timer sets, sized to the task. The
+      synchronous Runner.run cannot be wrapped this way, so prefer run_async.
+      Treat the resulting TimeoutError as a failed run rather than retrying
+      blindly, and give the tools the agent calls their own timeouts so the outer
+      deadline is a backstop rather than the only bound.
