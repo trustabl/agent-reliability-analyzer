@@ -28,26 +28,36 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
 
 <h3 align="center">Trustabl Partners</h3>
 <p align="center">
-  <sub>One engine, seven front doors. Install it from the catalogue you already use.</sub>
+  <sub>One engine, eight front doors. Install it from the catalogue you already use.</sub>
 </p>
 
 <table align="center">
   <tr>
-    <td align="center" width="170">
+    <td align="center" width="200">
       <a href="https://registry.modelcontextprotocol.io/?q=trustabl"><b>MCP Registry</b></a><br>
       <sub>Scan from any<br>MCP-aware client</sub>
     </td>
-    <td align="center" width="170">
+    <td align="center" width="200">
       <a href="https://claude.ai/directory"><b>Claude Directory</b></a><br>
       <sub>Skills, agent and<br>scanner inside Claude</sub>
     </td>
-    <td align="center" width="170">
+    <td align="center" width="200">
+      <a href="https://www.npmjs.com/package/@trustabl/ai-sdk"><b>npm</b></a><br>
+      <sub>A tool your AI SDK<br>agent calls itself</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
       <a href="https://marketplace.visualstudio.com/items?itemName=trustabl.trustabl"><b>VS Code</b></a><br>
       <sub>Findings as you<br>write, in the editor</sub>
     </td>
-    <td align="center" width="170">
+    <td align="center">
       <a href="https://cursor.directory/plugins/trustabl"><b>Cursor</b></a><br>
       <sub>Same scan, wired<br>in as an MCP server</sub>
+    </td>
+    <td align="center">
+      <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><b>CLI</b></a><br>
+      <sub>Homebrew, Scoop,<br>Docker or a binary</sub>
     </td>
   </tr>
   <tr>
@@ -62,10 +72,6 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
     <td align="center">
       <a href="https://bitbucket.org/hoolisoftware/trustabl-pipe"><b>Bitbucket</b></a><br>
       <sub>Official pipe, no<br>install step needed</sub>
-    </td>
-    <td align="center">
-      <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><b>CLI</b></a><br>
-      <sub>Homebrew, Scoop,<br>Docker or a binary</sub>
     </td>
   </tr>
 </table>
