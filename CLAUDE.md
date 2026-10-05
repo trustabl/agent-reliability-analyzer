@@ -350,6 +350,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Server-entrypoint fact (2026-10-05, no schema change, stays 20; no rules, no predicates):** `RepoInventory.Entrypoints`
+> (`models.EntrypointDef`; also `ScanResult.entrypoints`) records Python FastAPI / Flask routes (`http`) and Celery / Dramatiq
+> tasks (`worker`), and `analysis.ApplyEntrypointReachability` stamps `AgentRunCallDef.ServerReachable` (in-memory) on run calls
+> reachable from one (direct, same-file helper, or imported helper; one hop each). It is a **fact only** — nothing reads the
+> stamp. Ranks 4 and 6 (a LangGraph run-call anchor, rules) build on it in follow-up PRs; do not add a rule or predicate here.
+> See `internal/analysis/entrypoints.go` for the v1 limits.
+>
 > **Observability instrumentor credit (2026-10-05, no schema change, stays 20; no new rules):** process-wide instrumentation calls
 > (`logfire.instrument_pydantic_ai()`, `Agent.instrument_all()`, `LangChainInstrumentor().instrument()`) now credit the agents they cover via
 > `AgentDef.InstrumentedBy`, which `agent_kwarg_missing` reads, so PYD-107 / LC-112 stop firing on a user who followed their own fix text.
