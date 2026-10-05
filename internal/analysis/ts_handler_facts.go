@@ -53,6 +53,9 @@ func tsHandlerFacts(handler *sitter.Node, src []byte) map[string]string {
 			out["http_call"] = "true"
 			if urlArgIsDynamic(n, src) {
 				out["dynamic_url"] = "true"
+				if !URLArgSchemePinned(firstArg(n), src) {
+					out["url_scheme_unpinned"] = "true"
+				}
 			}
 			if !httpCallHasTimeout(n, src) {
 				out["http_no_timeout"] = "true"
@@ -188,4 +191,13 @@ func httpCallHasTimeout(call *sitter.Node, src []byte) bool {
 		}
 	}
 	return false
+}
+
+// firstArg returns a call's first named argument, or nil.
+func firstArg(call *sitter.Node) *sitter.Node {
+	args := call.ChildByFieldName("arguments")
+	if args == nil || args.NamedChildCount() == 0 {
+		return nil
+	}
+	return args.NamedChild(0)
 }

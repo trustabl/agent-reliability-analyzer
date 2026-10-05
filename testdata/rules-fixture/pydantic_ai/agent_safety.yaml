@@ -96,7 +96,9 @@ rules:
       an allow-list of permitted hosts, blocked private/link-local IP ranges, and
       a proxy that rejects requests to internal addresses. Prefer a purpose-built
       tool that fetches from a fixed, vetted set of endpoints over an open URL
-      fetcher, and treat retrieved or searched content as untrusted input.
+      fetcher, and treat retrieved or searched content as untrusted input. WebFetchTool's allowed_domains
+      narrows destinations on Anthropic only (Google ignores it), so it is not a
+      substitute for process-level egress controls.
 
   - id: PYD-104
     title: Pydantic AI FileUrl forces a host-side download

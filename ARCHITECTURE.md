@@ -754,7 +754,7 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   description, zodSchema, handler, extras?)` factory calls. Captures `Name`
   (arg 0), `Description` (arg 1), `ParamNames` from the Zod schema top-level
   keys, handler body facts via shared `tsHandlerFacts` (`shells_out`,
-  `http_call`, `dynamic_url`, `http_no_timeout`, `writes_fs`, `code_exec`,
+  `http_call`, `dynamic_url`, `url_scheme_unpinned`, `http_no_timeout`, `writes_fs`, `code_exec`,
   `throws`, `try_catch`), and extras flattened into `Config`. Sets
   `VarName` from the enclosing `const x = tool(...)` binding.
 - **DiscoverTSAgents** (`ts_agents.go`) — TS Claude SDK agent shapes:
@@ -1956,7 +1956,7 @@ internal/
 │   ├── adk_hosted_tools.go      ADK built-in hosted-tool class set + classifier (ADKHostedToolClasses).
 │   ├── ts_discovery.go         TS Claude SDK tool() factory discovery (DiscoverTSTools).
 │   ├── ts_agents.go            TS AgentDef discovery (inline-in-query + typed-const).
-│   ├── ts_handler_facts.go      tsHandlerFacts (shared by all TS tool discovery): shells_out, writes_fs, http_call, dynamic_url (non-literal HTTP URL arg: the SSRF signal).
+│   ├── ts_handler_facts.go      tsHandlerFacts (shared by all TS tool discovery): shells_out, writes_fs, http_call, dynamic_url (non-literal HTTP URL arg: the SSRF signal), url_scheme_unpinned (dynamic URL with no literal `https://` prefix: the HTTPS-pinning signal).
 │   ├── ts_mcp_servers.go       TS MCP server discovery (createSdkMcpServer + 4 config literals).
 │   ├── ts_adk_agents.go         Google ADK TS agent discovery (5 constructors).
 │   ├── ts_adk_hosted_tools.go   Google ADK TS hosted-tool class set (13 classes) + classifier.
@@ -1977,7 +1977,7 @@ internal/
 │   ├── schema.go                PolicyFile / RuleDef / MatchExpr types.
 │   ├── schema_version.go        SupportedSchemaVersion const (engine ↔ pack gate).
 │   ├── loader.go                Validating YAML loader (recursive walk; skips manifest.yaml). Rejects repo_has_sdk_in_code values that are not SDK-enum tokens (catches the claude_sdk-vs-claude_agent_sdk silent never-fire).
-│   ├── predicates.go            One Pred* per detection primitive. TS-aware: PredHasShellCall/PredHasWriteCall/PredHasCodeExecCall/PredHasDynamicURLCall read the shells_out/writes_fs/code_exec/dynamic_url facts for TypeScript and walk the AST for Python; PredHasBodyText uses a [Line, EndLine] span substring fallback (bodyTextFromSpan), kept for textual-absence checks only.
+│   ├── predicates.go            One Pred* per detection primitive. TS-aware: PredHasShellCall/PredHasWriteCall/PredHasCodeExecCall/PredHasDynamicURLCall / PredHasUnpinnedSchemeURLCall read the shells_out/writes_fs/code_exec/dynamic_url/url_scheme_unpinned facts for TypeScript and walk the AST for Python; PredHasBodyText uses a [Line, EndLine] span substring fallback (bodyTextFromSpan), kept for textual-absence checks only.
 │   ├── evaluator.go             MatchExpr.Evaluate — recursive walker.
 │   └── rule_detector.go         RuleDetector adapter + LoadRegistry.
 │                                (No embed.go: rules are not embedded — see rulesource.)
