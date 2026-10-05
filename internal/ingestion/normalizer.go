@@ -53,6 +53,7 @@ var obsDepNeedles = []struct {
 	{models.VendorAgentOps, "agentops"},
 	{models.VendorMLflow, "mlflow"},
 	{models.VendorDatadogLLMObs, "ddtrace"},
+	{models.VendorOpik, "opik"},
 	// Helicone is deliberately absent: it is a provider base-URL override, not
 	// an importable package, so no AST pass can ever produce a code signal for
 	// it (see DiscoverObservability). Declaring the dep here without any way

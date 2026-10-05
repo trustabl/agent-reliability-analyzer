@@ -388,6 +388,7 @@ const (
 	VendorAgentOps      ObservabilityVendor = "agentops"
 	VendorMLflow        ObservabilityVendor = "mlflow"
 	VendorDatadogLLMObs ObservabilityVendor = "datadog_llmobs"
+	VendorOpik          ObservabilityVendor = "opik"
 	VendorNative        ObservabilityVendor = "native"
 )
 

@@ -4630,6 +4630,39 @@ var policyAgentRuleCases = []policyAgentCase{
 			},
 		},
 		false},
+	{"PYD-107 silent when logfire.instrument_pydantic_ai() covers the agent", "PYD-107",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+			InstrumentedBy: &models.GlobalInstrumentation{Kwarg: "instrument", Call: "logfire.instrument_pydantic_ai"},
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLogfire, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"PYD-107 silent when Agent.instrument_all() covers the agent", "PYD-107",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+			InstrumentedBy: &models.GlobalInstrumentation{Kwarg: "instrument", Call: "agent.instrument_all"},
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLogfire, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"PYD-107 still fires when the global credit names a different kwarg", "PYD-107",
+		models.AgentDef{
+			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
+			InstrumentedBy: &models.GlobalInstrumentation{Kwarg: "callbacks", Call: "agent.instrument_all"},
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLogfire, Kind: models.ObsSignalInit},
+			},
+		},
+		true},
 	{"PYD-107 silent when the repo has no observability at all", "PYD-107",
 		models.AgentDef{
 			SDK: models.SDKPydanticAI, Class: "PydanticAgent", Language: models.LanguagePython,
@@ -4656,6 +4689,17 @@ var policyAgentRuleCases = []policyAgentCase{
 		models.RepoInventory{
 			ObservabilitySignals: []models.ObservabilitySignal{
 				{Vendor: models.VendorLangfuse, Kind: models.ObsSignalInit},
+			},
+		},
+		false},
+	{"LC-112 silent when LangChainInstrumentor().instrument() covers the agent", "LC-112",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+			InstrumentedBy: &models.GlobalInstrumentation{Kwarg: "callbacks", Call: "langchaininstrumentor.instrument"},
+		},
+		models.RepoInventory{
+			ObservabilitySignals: []models.ObservabilitySignal{
+				{Vendor: models.VendorLogfire, Kind: models.ObsSignalInit},
 			},
 		},
 		false},

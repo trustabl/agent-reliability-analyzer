@@ -350,6 +350,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Observability instrumentor credit (2026-10-05, no schema change, stays 20; no new rules):** process-wide instrumentation calls
+> (`logfire.instrument_pydantic_ai()`, `Agent.instrument_all()`, `LangChainInstrumentor().instrument()`) now credit the agents they cover via
+> `AgentDef.InstrumentedBy`, which `agent_kwarg_missing` reads, so PYD-107 / LC-112 stop firing on a user who followed their own fix text.
+> Opik was added as a vendor. Deliberately **not** built: **rank 3** (tool result not recorded on a span — frameworks span every tool call once
+> tracing is on and enablement is often env/CLI-only, so a repo-level gate cannot say which tool is spanned; not same-body evidence),
+> **rank 2** (required span attributes — the SDK or instrumentor writes them, so a well-instrumented repo has no literals to find, and the
+> OTel GenAI semconv is still Development with renamed keys), and **rank 4** (run-level correlation id — session / `group_id` — needs a
+> run-call kwarg predicate, tracked with the HTTP-entrypoint design ticket). See `COVERAGE.md`.
+>
 > **P0 fetch HTTPS-only batch (2026-10-02, `schema_version` 19 → 20):** new tool-scope predicate `has_unpinned_scheme_url_call` and 14 rules (**CSDK-024/025**, **OAI-032/033**, **MCP-031/032**, **ADK-022/023**, **LC-026/027**, **CREW-015**, **PYD-015**, **AG2-022**, **VAI-021**), one per SSRF rule, each firing only once the SSRF sibling's allow-list credit applies and the URL scheme is neither pinned to a literal `https://` nor checked. The fixture now holds **330** rules (316 + 14; re-derive, do not trust this figure). Not built: LangGraph nodes, `raw_llm_sdk`, a Pydantic `WebFetchTool` `allowed_domains` rule (Anthropic-only option). PYD-103's fix text gained an `allowed_domains` caveat. Rulebook docs live in the nine `docs/Policy/*/ssrf.md` files plus `openai_sdk/network.md`.
 >
 > **P0 partial-gaps batch (2026-10-01, no schema change, stays 19):** the fixture now holds **316** rules

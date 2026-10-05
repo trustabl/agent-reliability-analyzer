@@ -300,6 +300,10 @@ rules:
 #   agent_kwarg_missing: [kwarg, dotted.path, ...]
 #       True when a kwarg is absent OR present with literal `None`.
 #       (Asymmetric with `agent_kwarg_present`, which tests pure presence.)
+#       One exception: a kwarg named by AgentDef.InstrumentedBy (set when a
+#       process-wide instrumentation call such as logfire.instrument_pydantic_ai()
+#       covers the agent) is treated as set, so `instrument` / `callbacks` are not
+#       reported missing on a covered agent. Every other kwarg is unaffected.
 #
 #   agent_kwarg_list_empty: [kwarg, ...]
 #       Fires when ANY of the listed list kwargs is absent or an empty list [].

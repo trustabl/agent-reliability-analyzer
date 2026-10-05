@@ -378,3 +378,124 @@ os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "true"
 		t.Fatal("expected a content_capture signal for the GenAI capture env var")
 	}
 }
+
+func obsInits(got []models.ObservabilitySignal) []models.ObservabilitySignal {
+	var out []models.ObservabilitySignal
+	for _, s := range got {
+		if s.Kind == models.ObsSignalInit {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// Process-wide instrumentor calls activate tracing, so they are init evidence.
+func TestDiscoverObservability_GlobalInstrumentorCalls(t *testing.T) {
+	cases := []struct {
+		name, src, detail string
+		vendor            models.ObservabilityVendor
+	}{
+		{"logfire pydantic", "import logfire\n\nlogfire.instrument_pydantic_ai()\n", "logfire.instrument_pydantic_ai", models.VendorLogfire},
+		{"logfire openai agents", "import logfire\n\nlogfire.instrument_openai_agents()\n", "logfire.instrument_openai_agents", models.VendorLogfire},
+		{"logfire mcp", "import logfire\n\nlogfire.instrument_mcp()\n", "logfire.instrument_mcp", models.VendorLogfire},
+		{"Agent.instrument_all", "from pydantic_ai import Agent\n\nAgent.instrument_all()\n", "agent.instrument_all", models.VendorNative},
+		{"instrument_all with logfire import", "import logfire\n\nPAgent.instrument_all()\n", "agent.instrument_all", models.VendorNative},
+		{"openinference instrumentor", "from openinference.instrumentation.openai import OpenAIInstrumentor\n\nOpenAIInstrumentor().instrument()\n", "openaiinstrumentor.instrument", models.VendorOpenInference},
+		{"qualified instrumentor", "import openinference.instrumentation.langchain as li\n\nli.LangChainInstrumentor().instrument(tracer_provider=tp)\n", "langchaininstrumentor.instrument", models.VendorOpenInference},
+		{"openllmetry instrumentor", "from opentelemetry.instrumentation.openai import OpenAIInstrumentor\n\nOpenAIInstrumentor().instrument()\n", "openaiinstrumentor.instrument", models.VendorOTel},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pf := parsePyFile(t, "obs.py", tc.src)
+			inits := obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf}))
+			if len(inits) != 1 || inits[0].Detail != tc.detail || inits[0].Vendor != tc.vendor {
+				t.Fatalf("got %+v, want one init %s/%s", inits, tc.vendor, tc.detail)
+			}
+		})
+	}
+}
+
+// The generic shapes need their import: someone else's instrument_all() or
+// FooInstrumentor().instrument() is not observability evidence, and must not
+// flip repo_has_observability.
+func TestDiscoverObservability_GlobalInstrumentorRequiresImport(t *testing.T) {
+	for name, src := range map[string]string{
+		"instrument_all":   "class Registry:\n    pass\n\nsomething.instrument_all()\n",
+		"instrumentor":     "FooInstrumentor().instrument()\n",
+		"unrelated vendor": "import langfuse\n\nsomething.instrument_all()\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			pf := parsePyFile(t, "x.py", src)
+			for _, s := range obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf})) {
+				t.Fatalf("unexpected init signal %+v", s)
+			}
+		})
+	}
+}
+
+func TestDiscoverObservability_OpikPython(t *testing.T) {
+	pf := parsePyFile(t, "obs.py", "import opik\n\nopik.configure(use_local=True)\n")
+	got := analysis.DiscoverObservability([]analysis.ParsedFile{pf})
+	var imp, init bool
+	for _, s := range got {
+		if s.Vendor != models.VendorOpik {
+			continue
+		}
+		imp = imp || s.Kind == models.ObsSignalImport
+		init = init || s.Kind == models.ObsSignalInit
+	}
+	if !imp || !init {
+		t.Fatalf("want opik import+init, got %+v", got)
+	}
+}
+
+func TestDiscoverObservability_OpikBareCalleeRequiresImport(t *testing.T) {
+	pf := parsePyFile(t, "x.py", "def track_openai():\n    pass\n\ntrack_openai()\n")
+	if inits := obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf})); len(inits) != 0 {
+		t.Fatalf("unrelated track_openai() must not fire without an opik import: %+v", inits)
+	}
+}
+
+func TestDiscoverObservability_OpikTS(t *testing.T) {
+	pf := parseTSForTest(t, "obs.ts", "import { Opik } from \"opik\";\n\nconst client = new Opik();\n")
+	got := analysis.DiscoverObservability([]analysis.ParsedFile{pf})
+	var imp, init bool
+	for _, s := range got {
+		if s.Vendor != models.VendorOpik {
+			continue
+		}
+		imp = imp || s.Kind == models.ObsSignalImport
+		init = init || s.Kind == models.ObsSignalInit
+	}
+	if !imp || !init {
+		t.Fatalf("want opik import+init, got %+v", got)
+	}
+}
+
+func TestApplyGlobalInstrumentation(t *testing.T) {
+	sig := func(detail string, lang models.Language) models.ObservabilitySignal {
+		return models.ObservabilitySignal{Vendor: models.VendorLogfire, Kind: models.ObsSignalInit, Detail: detail, File: "obs.py", StartLine: 3, Language: lang}
+	}
+	agents := []models.AgentDef{
+		{SDK: models.SDKPydanticAI, Language: models.LanguagePython},
+		{SDK: models.SDKLangChain, Language: models.LanguagePython},
+		{SDK: models.SDKVercelAI, Language: models.LanguageTypeScript},
+		{SDK: models.SDKPydanticAI, Language: models.LanguageTypeScript},
+	}
+	analysis.ApplyGlobalInstrumentation(agents, []models.ObservabilitySignal{
+		sig("logfire.instrument_pydantic_ai", models.LanguagePython),
+		sig("logfire.instrument_mcp", models.LanguagePython), // init evidence, covers no agent
+	})
+	if got := agents[0].InstrumentedBy; got == nil || got.Kwarg != "instrument" || got.Call != "logfire.instrument_pydantic_ai" || got.Line != 3 {
+		t.Errorf("pydantic agent: got %+v", got)
+	}
+	for i := 1; i < len(agents); i++ {
+		if agents[i].InstrumentedBy != nil {
+			t.Errorf("agent %d (%s/%s) must not be credited: %+v", i, agents[i].SDK, agents[i].Language, agents[i].InstrumentedBy)
+		}
+	}
+	analysis.ApplyGlobalInstrumentation(agents, []models.ObservabilitySignal{sig("langchaininstrumentor.instrument", models.LanguagePython)})
+	if got := agents[1].InstrumentedBy; got == nil || got.Kwarg != "callbacks" {
+		t.Errorf("langchain agent: got %+v", got)
+	}
+}

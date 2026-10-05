@@ -29,6 +29,7 @@ var obsPyModules = []struct {
 	{"agentops", models.VendorAgentOps},
 	{"mlflow", models.VendorMLflow},
 	{"ddtrace", models.VendorDatadogLLMObs},
+	{"opik", models.VendorOpik},
 }
 
 // obsInitCallees maps a call expression to the vendor whose instrumentation it
@@ -54,6 +55,9 @@ var obsInitCallees = []struct {
 	{"callbackhandler", models.VendorLangfuse},
 	{"langfuse.init", models.VendorLangfuse},
 	{"logfire.configure", models.VendorLogfire},
+	{"logfire.instrument_pydantic_ai", models.VendorLogfire},
+	{"logfire.instrument_openai_agents", models.VendorLogfire},
+	{"logfire.instrument_mcp", models.VendorLogfire},
 	{"braintrust.init_logger", models.VendorBraintrust},
 	{"init_logger", models.VendorBraintrust},
 	{"wrap_openai", models.VendorBraintrust},
@@ -61,6 +65,34 @@ var obsInitCallees = []struct {
 	{"agentops.init", models.VendorAgentOps},
 	{"autolog", models.VendorMLflow},
 	{"llmobs.enable", models.VendorDatadogLLMObs},
+	{"opik.configure", models.VendorOpik},
+	{"opiktracer", models.VendorOpik},
+	{"track_openai", models.VendorOpik},
+}
+
+// pydanticInstrumentAllDetail is the Detail recorded for Pydantic AI's
+// process-wide Agent.instrument_all(). It is matched outside obsInitCallees
+// because its gate differs: any `<receiver>.instrument_all()` counts (so an
+// aliased `PAgent.instrument_all()` is caught), but only in a file that imports
+// pydantic_ai or logfire — the name alone is too generic to trust.
+const pydanticInstrumentAllDetail = "agent.instrument_all"
+
+// instrumentorSuffix is the class-name suffix of the OpenInference and
+// OpenLLMetry instrumentor classes (LangChainInstrumentor, OpenAIInstrumentor,
+// ...). `<X>Instrumentor().instrument(...)` patches the library process-wide.
+const instrumentorSuffix = "instrumentor"
+
+// globalInstrumentors maps an init-signal Detail to the SDK whose agents that
+// call instruments process-wide, standing in for the per-agent kwarg in
+// nativeInstrumentKwargs. Only SDKs with such a kwarg are listed: the other
+// global calls (logfire.instrument_openai_agents, logfire.instrument_mcp, any
+// other instrumentor) are init evidence, but no agent-scope rule asks about
+// them. Vercel AI has no process-wide switch — experimental_telemetry is
+// enabled per call — so it has no entry.
+var globalInstrumentors = map[string]models.SDK{
+	"logfire.instrument_pydantic_ai":   models.SDKPydanticAI,
+	pydanticInstrumentAllDetail:        models.SDKPydanticAI,
+	"langchaininstrumentor.instrument": models.SDKLangChain,
 }
 
 // obsExporterNames maps a lowercased span-exporter class name to the sink it
@@ -175,6 +207,18 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 			})
 		}
 	}
+	// pydanticImported is computed on first use: it costs a tree walk and only
+	// an `.instrument_all()` call needs it.
+	var pydanticChecked, pydanticSeen bool
+	pydanticImported := func() bool {
+		if !pydanticChecked {
+			pydanticChecked = true
+			pydanticSeen = fileImportsModule(pf, func(mod string) bool {
+				return mod == "pydantic_ai" || strings.HasPrefix(mod, "pydantic_ai.")
+			})
+		}
+		return pydanticSeen
+	}
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
 		switch n.Type() {
 		case "call":
@@ -183,7 +227,14 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 				return true
 			}
 			callee := astutil.NodeText(fn, pf.Source)
-			if vendor, detail, ok := matchObsInitCallee(callee); ok && (!isBareInitCallee(detail) || imported[vendor]) {
+			vendor, detail, ok := matchObsInitCallee(callee)
+			if ok && isBareInitCallee(detail) && !imported[vendor] {
+				ok = false
+			}
+			if !ok {
+				vendor, detail, ok = matchPyGlobalInstrumentCall(fn, pf, imported, pydanticImported)
+			}
+			if ok {
 				out = append(out, models.ObservabilitySignal{
 					Vendor:    vendor,
 					Kind:      models.ObsSignalInit,
@@ -240,6 +291,84 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 		return true
 	})
 	return out
+}
+
+// matchPyGlobalInstrumentCall recognizes the two process-wide instrumentation
+// call shapes obsInitCallees cannot express, from the call's function node:
+//
+//   - `<receiver>.instrument_all()` — Pydantic AI's Agent.instrument_all(),
+//     counted only when the file imports pydantic_ai or logfire.
+//   - `<X>Instrumentor(...).instrument(...)` — an OpenInference / OpenLLMetry
+//     instrumentor, counted only when the file imports openinference,
+//     opentelemetry or traceloop. The two-step form
+//     (`i = XInstrumentor(); i.instrument()`) is not matched.
+func matchPyGlobalInstrumentCall(fn *sitter.Node, pf ParsedFile, imported map[models.ObservabilityVendor]bool, pydanticImported func() bool) (models.ObservabilityVendor, string, bool) {
+	if fn.Type() != "attribute" {
+		return "", "", false
+	}
+	attr := fn.ChildByFieldName("attribute")
+	obj := fn.ChildByFieldName("object")
+	if attr == nil || obj == nil {
+		return "", "", false
+	}
+	switch astutil.NodeText(attr, pf.Source) {
+	case "instrument_all":
+		if imported[models.VendorLogfire] || pydanticImported() {
+			return models.VendorNative, pydanticInstrumentAllDetail, true
+		}
+	case "instrument":
+		if obj.Type() != "call" {
+			return "", "", false
+		}
+		ctor := obj.ChildByFieldName("function")
+		if ctor == nil {
+			return "", "", false
+		}
+		class := strings.ToLower(astutil.NodeText(ctor, pf.Source))
+		if i := strings.LastIndex(class, "."); i >= 0 {
+			class = class[i+1:]
+		}
+		if len(class) <= len(instrumentorSuffix) || !strings.HasSuffix(class, instrumentorSuffix) {
+			return "", "", false
+		}
+		switch {
+		case imported[models.VendorOpenInference]:
+			return models.VendorOpenInference, class + ".instrument", true
+		case imported[models.VendorOTel], imported[models.VendorOpenLLMetry]:
+			return models.VendorOTel, class + ".instrument", true
+		}
+	}
+	return "", "", false
+}
+
+// ApplyGlobalInstrumentation sets AgentDef.InstrumentedBy on every agent whose
+// SDK has a native instrumentation kwarg (nativeInstrumentKwargs) and whose
+// SDK and language are covered by a process-wide init call in signals (see
+// globalInstrumentors). signals must already be sorted, so the first match is
+// deterministic. Mutates agents in place.
+func ApplyGlobalInstrumentation(agents []models.AgentDef, signals []models.ObservabilitySignal) {
+	for i := range agents {
+		a := &agents[i]
+		kwarg, ok := nativeInstrumentKwargs[a.SDK]
+		if !ok {
+			continue
+		}
+		for _, s := range signals {
+			if s.Kind != models.ObsSignalInit || s.Language != a.Language {
+				continue
+			}
+			if sdk, ok := globalInstrumentors[s.Detail]; !ok || sdk != a.SDK {
+				continue
+			}
+			a.InstrumentedBy = &models.GlobalInstrumentation{
+				Kwarg: kwarg,
+				Call:  s.Detail,
+				File:  s.File,
+				Line:  s.StartLine,
+			}
+			break
+		}
+	}
 }
 
 // matchObsExporter reports the sink a span-exporter constructor writes to.
@@ -371,6 +500,7 @@ var obsTSModules = []struct {
 	{"braintrust", models.VendorBraintrust},
 	{"@agentops/", models.VendorAgentOps},
 	{"dd-trace", models.VendorDatadogLLMObs},
+	{"opik", models.VendorOpik},
 }
 
 // obsTSInitCallees maps a lowercased TS/JS callee or constructor name to the
@@ -390,6 +520,9 @@ var obsTSInitCallees = []struct {
 	{"initlogger", models.VendorBraintrust},
 	{"wrapaisdkmodel", models.VendorBraintrust},
 	{"agentops.init", models.VendorAgentOps},
+	{"opik", models.VendorOpik},
+	{"opikexporter", models.VendorOpik},
+	{"opikcallbackhandler", models.VendorOpik},
 }
 
 // tsObservabilitySignals collects import and init signals from one TS/JS file.
