@@ -81,8 +81,9 @@ type MatchExpr struct {
 	ToolDecoratorKwargPresent []string                     `yaml:"tool_decorator_kwarg_present,omitempty"`
 
 	// Agent-scope predicates
-	AgentClass                     []string                  `yaml:"agent_class,omitempty"`
-	AgentKwargPresent              []string                  `yaml:"agent_kwarg_present,omitempty"`
+	AgentClass        []string `yaml:"agent_class,omitempty"`
+	AgentKwargPresent []string `yaml:"agent_kwarg_present,omitempty"`
+	// AgentKwargMissing treats a kwarg named by AgentDef.InstrumentedBy as set.
 	AgentKwargMissing              []string                  `yaml:"agent_kwarg_missing,omitempty"`
 	AgentKwargListEmpty            []string                  `yaml:"agent_kwarg_list_empty,omitempty"`
 	AgentKwargValue                *AgentKwargValueExpr      `yaml:"agent_kwarg_value,omitempty"`

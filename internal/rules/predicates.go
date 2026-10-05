@@ -685,6 +685,12 @@ func PredAgentKwargPresent(paths []string, a models.AgentDef) bool {
 
 func PredAgentKwargMissing(paths []string, a models.AgentDef) bool {
 	for _, p := range paths {
+		// A process-wide instrumentation call (AgentDef.InstrumentedBy) stands
+		// in for exactly the kwarg it names, so that kwarg is not missing even
+		// when absent or None. Any other kwarg is judged as usual.
+		if a.InstrumentedBy != nil && a.InstrumentedBy.Kwarg == p {
+			continue
+		}
 		kw := lookupKwarg(a, p)
 		if kw == nil {
 			return true // absent

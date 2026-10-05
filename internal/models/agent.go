@@ -93,6 +93,22 @@ type AgentDef struct {
 	// non-default value. Normalized to "True" or "allow-local". In-memory
 	// only — PYD-104 reads it; not serialized.
 	FileURLForceDownload string `json:"-"`
+	// InstrumentedBy records a process-wide instrumentation call in the repo
+	// (e.g. logfire.instrument_pydantic_ai(), Agent.instrument_all()) that turns
+	// on the tracing this agent's native instrumentation kwarg would. nil when
+	// no such call covers this agent's SDK and language. agent_kwarg_missing
+	// reads it: the kwarg it names is treated as set. Set by
+	// analysis.ApplyGlobalInstrumentation.
+	InstrumentedBy *GlobalInstrumentation `json:"instrumented_by,omitempty"`
+}
+
+// GlobalInstrumentation is the process-wide call that stands in for an
+// agent's native instrumentation kwarg.
+type GlobalInstrumentation struct {
+	Kwarg string `json:"kwarg"` // the native kwarg it stands in for ("instrument", "callbacks")
+	Call  string `json:"call"`  // the matched callee pattern, e.g. "logfire.instrument_pydantic_ai"
+	File  string `json:"file"`
+	Line  int    `json:"line"`
 }
 
 type GuardrailKind string

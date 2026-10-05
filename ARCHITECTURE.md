@@ -483,7 +483,7 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   Python and TS/JS files emitting a typed `ObservabilitySignal` per
   observability fact found: the vendor (`otel`, `langfuse`, `logfire`,
   `openinference`, `openllmetry`, `braintrust`, `weave`, `agentops`, `mlflow`,
-  `datadog_llmobs`, `langsmith`, `native`) and a `Kind` grading the
+  `datadog_llmobs`, `langsmith`, `opik`, `native`) and a `Kind` grading the
   evidence — `import` (module imported), `init` (provider set or vendor client
   constructed), `exporter` (span exporter, normalized to its sink: `console`,
   `otlp`, `jaeger`, `zipkin`, `memory`), `content_capture` (a switch sending
@@ -522,6 +522,24 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   Mirrored to `ScanResult.Observability` so a scan can report the positive
   signal (e.g. `langfuse · init · app/tracing.py:12`), not only findings.
   Additive inventory — like `Dependencies`, it is **not** folded into `ScanID`.
+
+  **Process-wide instrumentors.** Besides explicit init calls, the Python pass
+  recognizes `logfire.instrument_pydantic_ai` / `instrument_openai_agents` /
+  `instrument_mcp`, `<receiver>.instrument_all()` (Pydantic AI's
+  `Agent.instrument_all()`, counted only in a file importing `pydantic_ai` or
+  `logfire`) and `<X>Instrumentor(...).instrument(...)` (counted only in a file
+  importing `openinference`, `opentelemetry` or `traceloop`; the two-step
+  `i = XInstrumentor(); i.instrument()` is not matched) as init signals. Init
+  evidence alone cannot silence the agent-scope outlier rules, because
+  `agent_kwarg_missing` never reads it, so `analysis.ApplyGlobalInstrumentation`
+  (called in `scanner.go` right after the signals are merged) stamps
+  `AgentDef.InstrumentedBy` on every agent whose SDK and language the call
+  covers — `logfire.instrument_pydantic_ai` and `agent.instrument_all` credit
+  Pydantic AI's `instrument`, `LangChainInstrumentor().instrument()` credits
+  LangChain's `callbacks` — and `PredAgentKwargMissing` treats exactly that
+  kwarg as set. Vercel AI has no process-wide switch (`experimental_telemetry`
+  is per call), so VAI-101 is unaffected. `opik` is a vendor on both the Python
+  and TS sides (and a recon dep needle).
 
   The **declared** half of the picture comes from recon, not this pass:
   `detectObsDeps` (`internal/ingestion/normalizer.go`) needle-scans the root
@@ -1562,6 +1580,7 @@ classDiagram
         InputGuards
         OutputGuards
         Opaque
+        InstrumentedBy
     }
     class Finding {
         RuleID
@@ -1657,7 +1676,12 @@ AgentDef {
     InputGuards    []GuardrailRef
     OutputGuards   []GuardrailRef
     Opaque         bool           // Agent(**config) or tools=non-literal
+    InstrumentedBy *GlobalInstrumentation // process-wide instrumentation call covering this agent (json instrumented_by, omitted when nil); read by agent_kwarg_missing
 }
+
+// GlobalInstrumentation: the kwarg it stands in for ("instrument" / "callbacks"),
+// the matched call, and its file/line.
+GlobalInstrumentation { Kwarg, Call, File string; Line int }
 
 // KwargTree holds a kwarg value as either a leaf or a nested map
 // (e.g. model_settings.tool_choice parses as Children["model_settings"].Children["tool_choice"]).
