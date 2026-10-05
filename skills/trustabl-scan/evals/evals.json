@@ -1,0 +1,75 @@
+[
+  {
+    "id": "scan-eval-001-run-a-scan",
+    "question": "I just added a new @function_tool to my Google ADK agent. How do I check it for reliability problems before I commit?",
+    "ground_truth": "The agent runs a Trustabl scan over the repository, either through the mcp__trustabl__scan tool with {\"path\": \".\"} when that tool is available, or through the CLI as `trustabl scan .`. It does not ask the user to sign up for anything, supply an API key, or upload the repository, because none of those are required.",
+    "expected_behavior": [
+      "Runs mcp__trustabl__scan with the repository path, or falls back to `trustabl scan .`",
+      "Does not request an API key, account, or credential",
+      "Does not suggest uploading source to a hosted service"
+    ],
+    "expected_skill": "trustabl-scan",
+    "expected_script": null
+  },
+  {
+    "id": "scan-eval-002-inventory-first",
+    "question": "The scan came back with zero findings on my agent repo. Does that mean my agent is fine?",
+    "ground_truth": "The agent checks the reported inventory before concluding anything. An empty result is not a pass: if the tool, agent, subagent and MCP-server counts are zero or obviously wrong, the scan was pointed at the wrong directory and the absence of findings means nothing. Only once the inventory matches the repository does a clean result carry weight.",
+    "expected_behavior": [
+      "States that an empty result is not automatically a pass",
+      "Checks the inventory counts for tools, agents, subagents and MCP servers first",
+      "Explains that wrong counts indicate the scan targeted the wrong directory"
+    ],
+    "expected_skill": "trustabl-scan",
+    "expected_script": null
+  },
+  {
+    "id": "scan-eval-003-ci-exit-code",
+    "question": "I want my build to fail when the scanner finds something serious. How do I wire that up?",
+    "ground_truth": "The agent uses the process exit code rather than parsing output. `trustabl scan .` exits 0 when nothing reaches medium severity and 1 when something does. `--strict` lowers the gate so any finding of low severity or above fails the build; info and META signals never fail it. Exit code 2 means a scanner or I/O error, or that no usable rules were available, which is distinct from a policy failure.",
+    "expected_behavior": [
+      "Uses the exit code rather than grepping stdout",
+      "Explains that 0 means nothing at or above medium severity, and 1 means something was found",
+      "Mentions --strict for a lower threshold",
+      "Distinguishes exit code 2 as a scanner or rules error, not a finding"
+    ],
+    "expected_skill": "trustabl-scan",
+    "expected_script": null
+  },
+  {
+    "id": "scan-eval-004-remote-repo",
+    "question": "Can I scan a repository on GitHub without cloning it first?",
+    "ground_truth": "Yes. The scanner accepts a GitHub repository URL in place of a path, for example `trustabl scan https://github.com/owner/repo`. The repository is shallow-cloned to a temporary directory and removed when the scan exits. Nothing is written into the target repository.",
+    "expected_behavior": [
+      "Passes the GitHub URL directly as the scan target",
+      "Does not instruct the user to git clone first",
+      "Notes the clone is temporary and removed afterwards"
+    ],
+    "expected_skill": "trustabl-scan",
+    "expected_script": null
+  },
+  {
+    "id": "scan-eval-005-machine-readable",
+    "question": "I need the scan results in my dashboard and in GitHub code scanning. What formats are available?",
+    "ground_truth": "The agent uses `--format json` for the structured result and `--sarif-out` to write SARIF 2.1.0, which GitHub code scanning ingests directly. `--json-out` and `--sarif-out` can persist those formats alongside the human-readable report on stdout. It does not propose scraping or parsing the text report.",
+    "expected_behavior": [
+      "Names --format json for structured output",
+      "Names SARIF for GitHub code scanning",
+      "Does not suggest parsing the human-readable report"
+    ],
+    "expected_skill": "trustabl-scan",
+    "expected_script": null
+  },
+  {
+    "id": "scan-eval-006-offline",
+    "question": "Our build agents have no outbound internet. Can the scanner still run?",
+    "ground_truth": "Yes, with the rules cache pre-populated. Rules are versioned separately from the engine and fetched at scan time by default; `trustabl rules pull` populates the cache once, and `--no-rules-update` then runs entirely from that cache with no network access. The analysis itself is local and deterministic, with no model call and no source upload.",
+    "expected_behavior": [
+      "Explains that rules are fetched at scan time by default",
+      "Uses --no-rules-update to run from the local cache",
+      "Mentions pre-populating the cache with `trustabl rules pull`"
+    ],
+    "expected_skill": "trustabl-scan",
+    "expected_script": null
+  }
+]
