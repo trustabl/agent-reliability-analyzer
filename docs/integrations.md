@@ -109,7 +109,7 @@ supervisor middleware — rather than a partner directory.
 
 The relationship is real regardless, and it is the one target where the
 integration already exists rather than needing to be built:
-[Trustabl Probe](https://github.com/trustabl/trustabl-probe) runs an agent tool
+[Trustabl Agent Network Access Probe](https://github.com/trustabl/agent-network-access-probe) runs an agent tool
 in an OpenShell sandbox, observes the network destinations it actually reaches,
 and generates a least-privilege OpenShell `network_policies` draft from that
 evidence.
