@@ -22,7 +22,7 @@ with. Anything not on this list has no entry yet.
 | Directory | Status | Since |
 |---|---|---|
 | [MCP Registry](https://registry.modelcontextprotocol.io/?q=trustabl) | **Listed** | 24 Sep 2026 |
-| [Claude Directory](https://claude.ai/directory) | **Listed** | 29 Sep 2026 |
+| [Claude Directory](claude-plugin.md) | **Listed** | 29 Sep 2026 |
 | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=trustabl.trustabl) | **Listed** | 11 Sep 2026 |
 | [Cursor](https://cursor.directory/plugins/trustabl) | **Listed** | 11 Aug 2026 |
 | [GitHub Marketplace](https://github.com/marketplace/actions/trustabl-fix-agent-reliability-issues) | **Listed** | — |

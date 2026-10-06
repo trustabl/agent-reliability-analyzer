@@ -38,7 +38,7 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
       <sub>Scan from any<br>MCP-aware client</sub>
     </td>
     <td align="center" width="200">
-      <a href="https://claude.ai/directory"><b>Claude Directory</b></a><br>
+      <a href="docs/claude-plugin.md"><b>Claude Directory</b></a><br>
       <sub>Skills, agent and<br>scanner inside Claude</sub>
     </td>
     <td align="center" width="200">
