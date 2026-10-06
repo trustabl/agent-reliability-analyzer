@@ -30,6 +30,7 @@ with. Anything not on this list has no entry yet.
 | [Bitbucket Pipes](https://bitbucket.org/hoolisoftware/trustabl-pipe) | **Listed** | 18 Aug 2026 |
 | [in-toto](https://github.com/in-toto/friends/pull/122) | Submitted | 28 Sep 2026 |
 | [Google ADK](https://github.com/google/adk-docs/pull/2290) | Submitted | 1 Oct 2026 |
+| [NVIDIA NemoClaw](https://github.com/NVIDIA/nemoclaw-community/issues/196) | Proposed | 5 Oct 2026 |
 | [npm](https://www.npmjs.com/package/@trustabl/ai-sdk) | **Listed** | 2 Oct 2026 |
 
 ---
@@ -45,8 +46,8 @@ order we are working them.
 | 1 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
 | 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
 | 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **In progress** — see below |
-| 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route today |
-| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | No directory |
+| 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route — tracing only |
+| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Route open — see below |
 
 **Vercel AI SDK** is in progress. Its registry
 ([`content/tools-registry/registry.ts`](https://github.com/vercel/ai/blob/main/content/tools-registry/registry.ts))
@@ -62,12 +63,33 @@ paragraph excludes "generic OpenTelemetry support, or a hooks-only or
 guardrails-only integration". Trustabl never executes an agent, so there is
 nothing for it to trace; this is not a submission we can write our way into.
 
-**Pydantic AI** publishes no third-party directory. `docs/third-party-tools.md`
-covers MCP and LangChain tool *usage* and lists no servers or vendors.
+**Pydantic AI** does publish a third-party directory, and an earlier version of
+this page said otherwise. The mistake was reading `docs/third-party-tools.md`,
+which covers MCP and LangChain tool *usage* and lists no vendors, and stopping
+there. The vendor surface is two other places:
 
-**NVIDIA OpenShell** has no catalogue to list in either, and the one that
-existed is gone: `NVIDIA/OpenShell-Community`, which accepted sandbox images
-and skills, is retired and being archived. The live
+- [`docs/capabilities/third-party.md`](https://github.com/pydantic/pydantic-ai/blob/main/docs/capabilities/third-party.md)
+  lists community capability packages, under headings that include **Guardrails
+  & Safety** and **File Operations & Sandboxing**.
+- [`src/pydantic_ai_harness/`](https://github.com/pydantic/pydantic-ai/tree/main/src/pydantic_ai_harness/pydantic_ai_harness)
+  carries fifteen vendor integrations, among them StackOne, Pylon, Ordinal,
+  PostHog and Macroscope.
+
+[Macroscope](https://ai.pydantic.dev/docs/ai/harness/macroscope/) is the closest
+precedent. It is a CLI code-review tool that otherwise ships as editor plugins,
+wrapped as a capability that runs the CLI in the agent's workspace and returns
+structured findings for the agent to validate and fix. That is the same design
+as [`@trustabl/ai-sdk`](https://www.npmjs.com/package/@trustabl/ai-sdk).
+
+Two routes exist. Pydantic's
+[extensibility guide](https://github.com/pydantic/pydantic-ai/blob/main/docs/extensibility.md)
+invites third parties to publish their own package under the `pydantic-ai-`
+prefix, which needs no approval from anyone; upstreaming into the harness comes
+later, in their words "once a capability has real users and a stable API".
+
+**NVIDIA OpenShell** has no image catalogue to list in: `NVIDIA/OpenShell-Community`,
+which accepted sandbox images and skills, carries the notice "This repository is
+retired and will be archived" and OpenShell no longer depends on it. The live
 [`NVIDIA/OpenShell`](https://github.com/NVIDIA/OpenShell) repository documents
 extension points — drivers, gateway interceptors, isolation backends,
 supervisor middleware — rather than a partner directory.
@@ -77,8 +99,18 @@ integration already exists rather than needing to be built:
 [Trustabl Probe](https://github.com/trustabl/trustabl-probe) runs an agent tool
 in an OpenShell sandbox, observes the network destinations it actually reaches,
 and generates a least-privilege OpenShell `network_policies` draft from that
-evidence. That is a working technical integration looking for an audience, not
-a submission looking for a form. Worth pursuing as content and direct outreach.
+evidence.
+
+There is now a route for it. `NVIDIA/nemoclaw-community` carries partner recipes
+from outside vendors under `examples/recipes/partners/`, Tavily and Telnyx among
+them, and the contributing guide asks for location, name and provenance to be
+agreed with maintainers before anything is written. That agreement is what
+[issue #196](https://github.com/NVIDIA/nemoclaw-community/issues/196) asks for.
+
+The issue proposes **one** recipe, covering Probe deriving a least-privilege
+policy from an observation run. The analyzer is named in it only as a possible
+second recipe later, matching how the existing partner recipes are each scoped
+narrowly. So the analyzer has no open NVIDIA submission today.
 
 Checked against the public repositories only. NVIDIA may run a partner
 programme that is not on GitHub.
@@ -123,7 +155,7 @@ Registry listing: **[io.github.trustabl/agent-reliability-analyzer](https://regi
 | Ecosystem | Relationship | Listing |
 |---|---|---|
 | **in-toto** | Trustabl emits a signed scan attestation; in-toto makes it verifiable across the supply chain, so a verifier can prove an agent was checked against a known ruleset before it shipped | [Submitted](https://github.com/in-toto/friends/pull/122) |
-| **NVIDIA OpenShell** | Trustabl derives least-privilege policy from agent code, identity and required endpoints; OpenShell enforces it at runtime | Not listed |
+| **NVIDIA OpenShell** | Trustabl derives least-privilege policy from agent code, identity and required endpoints; OpenShell enforces it at runtime | [Proposed](https://github.com/NVIDIA/nemoclaw-community/issues/196) |
 
 See [`attestation.md`](attestation.md) for the attestation format.
 
