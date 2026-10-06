@@ -32,6 +32,8 @@ with. Anything not on this list has no entry yet.
 | [Google ADK](https://github.com/google/adk-docs/pull/2290) | Submitted | 1 Oct 2026 |
 | [NVIDIA NemoClaw](https://github.com/NVIDIA/nemoclaw-community/issues/196) | Proposed | 5 Oct 2026 |
 | [npm](https://www.npmjs.com/package/@trustabl/ai-sdk) | **Listed** | 2 Oct 2026 |
+| [PyPI](https://pypi.org/project/pydantic-ai-trustabl/) | **Listed** | 6 Oct 2026 |
+| Pydantic AI | Not listed | — |
 
 ---
 
@@ -47,7 +49,7 @@ order we are working them.
 | 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
 | 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **In progress** — see below |
 | 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route — tracing only |
-| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Route open — see below |
+| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Package published, not listed |
 
 **Vercel AI SDK** is in progress. Its registry
 ([`content/tools-registry/registry.ts`](https://github.com/vercel/ai/blob/main/content/tools-registry/registry.ts))
@@ -87,6 +89,23 @@ invites third parties to publish their own package under the `pydantic-ai-`
 prefix, which needs no approval from anyone; upstreaming into the harness comes
 later, in their words "once a capability has real users and a stable API".
 
+We took the first route. [`pydantic-ai-trustabl`](https://pypi.org/project/pydantic-ai-trustabl/)
+is published, source at [trustabl/pydantic-ai-tool](https://github.com/trustabl/pydantic-ai-tool).
+It registers a `scan_repository` tool that runs the scanner in the agent's
+workspace and returns a summarised report for the agent to verify and fix.
+A [pull request](https://github.com/pydantic/pydantic-ai/pull/9876) adding the
+directory entry was closed unmerged by a maintainer on 6 October, without a
+comment, so the reason is not recorded. The package is unaffected and remains
+installable; what we do not have is the directory entry.
+
+Worth separating those two things. The integration exists and works. The
+*listing* does not, and by our own standard a partner integration counts only
+once it is publicly listed, so this target is not complete.
+
+Upstreaming into the harness is deliberately not attempted yet. Their guide
+treats that as a conversation for a capability that already has users, and
+opening it now would only add to a backlog.
+
 **NVIDIA OpenShell** has no image catalogue to list in: `NVIDIA/OpenShell-Community`,
 which accepted sandbox images and skills, carries the notice "This repository is
 retired and will be archived" and OpenShell no longer depends on it. The live
@@ -96,10 +115,10 @@ supervisor middleware — rather than a partner directory.
 
 The relationship is real regardless, and it is the one target where the
 integration already exists rather than needing to be built:
-[Trustabl Probe](https://github.com/trustabl/trustabl-probe) runs an agent tool
-in an OpenShell sandbox, observes the network destinations it actually reaches,
-and generates a least-privilege OpenShell `network_policies` draft from that
-evidence.
+the [Agent Network Access Probe](https://github.com/trustabl/agent-network-access-probe)
+runs an agent tool in an OpenShell sandbox, observes the network destinations it
+actually reaches, and generates a least-privilege OpenShell `network_policies`
+draft from that evidence.
 
 There is now a route for it. `NVIDIA/nemoclaw-community` carries partner recipes
 from outside vendors under `examples/recipes/partners/`, Tavily and Telnyx among
