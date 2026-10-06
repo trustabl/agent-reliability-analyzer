@@ -33,7 +33,7 @@ with. Anything not on this list has no entry yet.
 | [NVIDIA NemoClaw](https://github.com/NVIDIA/nemoclaw-community/issues/196) | Proposed | 5 Oct 2026 |
 | [npm](https://www.npmjs.com/package/@trustabl/ai-sdk) | **Listed** | 2 Oct 2026 |
 | [PyPI](https://pypi.org/project/pydantic-ai-trustabl/) | **Listed** | 6 Oct 2026 |
-| [Pydantic AI](https://github.com/pydantic/pydantic-ai/pull/9876) | Submitted | 6 Oct 2026 |
+| Pydantic AI | Not listed | — |
 
 ---
 
@@ -49,7 +49,7 @@ order we are working them.
 | 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
 | 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **In progress** — see below |
 | 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route — tracing only |
-| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | [Submitted](https://github.com/pydantic/pydantic-ai/pull/9876) |
+| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Package published, not listed |
 
 **Vercel AI SDK** is in progress. Its registry
 ([`content/tools-registry/registry.ts`](https://github.com/vercel/ai/blob/main/content/tools-registry/registry.ts))
@@ -93,8 +93,27 @@ We took the first route. [`pydantic-ai-trustabl`](https://pypi.org/project/pydan
 is published, source at [trustabl/pydantic-ai-tool](https://github.com/trustabl/pydantic-ai-tool).
 It registers a `scan_repository` tool that runs the scanner in the agent's
 workspace and returns a summarised report for the agent to verify and fix.
-[Pull request #9876](https://github.com/pydantic/pydantic-ai/pull/9876) adds the
-directory entry.
+A [pull request](https://github.com/pydantic/pydantic-ai/pull/9876) adding the
+directory entry was closed unmerged by a maintainer on 6 October, without a
+comment, so the reason is not recorded. The package is unaffected and remains
+installable; what we do not have is the directory entry.
+
+Worth separating those two things. The integration exists and works. The
+*listing* does not, and by our own standard a partner integration counts only
+once it is publicly listed, so this target is not complete.
+
+The reason the pull request failed is recoverable. A comment on an earlier
+vendor pull request in the same repository sets out what maintainers expect:
+docs changes adding third-party content should be discussed in an issue first,
+and an entry has to sit in a category that matches what it does. Ours did
+neither. It arrived without prior discussion, and it was filed under Guardrails
+& Safety, which lists capabilities that shield a run in progress, while this one
+analyses source code and never sees a request.
+
+[Issue #9944](https://github.com/pydantic/pydantic-ai/issues/9944) takes the
+documented route instead: it asks maintainers which section they want, offers a
+new heading as an alternative, and accepts "nowhere" as an answer. A pull
+request follows only if they name a placement.
 
 Upstreaming into the harness is deliberately not attempted yet. Their guide
 treats that as a conversation for a capability that already has users, and
