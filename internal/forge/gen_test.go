@@ -316,7 +316,7 @@ func TestGenerateCombined_GoldenFile(t *testing.T) {
 		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
 		Template:      TemplateVersion,
 	}
-	got := GenerateCombined(stamp.Categories, policies, stamp)
+	got := GenerateCombined(stamp.Categories, policies, stamp, TracingSelection{})
 
 	goldenPath := filepath.Join("..", "..", "testdata", "forge", "multi_sdk", "expected", "SKILL.md")
 	if *update {
@@ -354,8 +354,8 @@ func TestGenerateCombined_Deterministic(t *testing.T) {
 		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
 		Template:      TemplateVersion,
 	}
-	a := GenerateCombined(stamp.Categories, policies, stamp)
-	b := GenerateCombined(stamp.Categories, policies, stamp)
+	a := GenerateCombined(stamp.Categories, policies, stamp, TracingSelection{})
+	b := GenerateCombined(stamp.Categories, policies, stamp, TracingSelection{})
 	if a != b {
 		t.Error("GenerateCombined is not deterministic")
 	}
@@ -375,7 +375,7 @@ func TestGenerateCombined_UnknownCategorySkipped(t *testing.T) {
 		Categories:    []models.DetectorCategory{models.CategoryMCP}, // not in fixture
 		Template:      TemplateVersion,
 	}
-	got := GenerateCombined(stamp.Categories, policies, stamp)
+	got := GenerateCombined(stamp.Categories, policies, stamp, TracingSelection{})
 	// should produce valid frontmatter + header but no rule sections
 	if !strings.Contains(got, "name: trustabl-pre-coding") {
 		t.Error("expected frontmatter in output")
@@ -452,7 +452,7 @@ func TestGenerateCombined_EmitsApplyLoop(t *testing.T) {
 		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
 		Template:      TemplateVersion,
 	}
-	got := GenerateCombined(stamp.Categories, policies, stamp)
+	got := GenerateCombined(stamp.Categories, policies, stamp, TracingSelection{})
 
 	if !strings.Contains(got, "## How to Apply These Constraints") {
 		t.Fatal("generated skill is missing the apply-loop section")
@@ -489,13 +489,16 @@ func TestGenerateCombined_SkillCompliant(t *testing.T) {
 		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
 		Template:      TemplateVersion,
 	}
-	got := GenerateCombined(stamp.Categories, policies, stamp)
+	got := GenerateCombined(stamp.Categories, policies, stamp, allTracingSelection())
 
 	// Anchor: this test guards the hand-authored loop prose. If that prose is
 	// absent the assertions below would pass vacuously, so fail loudly rather
 	// than silently guarding nothing.
 	if !strings.Contains(got, "## How to Apply These Constraints") {
 		t.Fatal("apply-loop section absent — the compliance assertions below would pass vacuously")
+	}
+	if !strings.Contains(got, "## Runtime Tracing") {
+		t.Fatal("runtime tracing section absent — the compliance assertions below would not cover it")
 	}
 
 	skill := discoverGeneratedSkill(t, got)

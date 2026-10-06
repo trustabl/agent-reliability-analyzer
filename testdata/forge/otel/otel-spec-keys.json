@@ -1,0 +1,53 @@
+{
+  "$comment": "The shared source of truth for every language binding. Derived from trustabl-guard/docs/trustabl-otel-attributes.md, where these names are RESERVED. Adding a key here is step two of three: amend that spec with a named producer and bump it first, then this manifest, then the code. Each binding has a test asserting it matches this file.",
+  "profile_version": "1.0.0",
+  "derived_from": {
+    "spec": "trustabl-guard/docs/trustabl-otel-attributes.md",
+    "spec_version": "1.2",
+    "status": "these names are reserved in 1.2 and land as a 1.3 addition when this emitter ships; profile 1.0.0 is the list proposed for 1.3"
+  },
+  "attributes": [
+    "trustabl.step_index",
+    "trustabl.run_id",
+    "trustabl.tool.input_fp",
+    "trustabl.tool.output_fp",
+    "trustabl.tool.side_effect",
+    "trustabl.tool.error_class",
+    "trustabl.tool.attempt",
+    "trustabl.handoff_id",
+    "trustabl.exit_reason"
+  ],
+  "events": {
+    "policy_binding": "trustabl.policy.binding"
+  },
+  "event_attributes": [
+    "trustabl.policy.binding.id",
+    "trustabl.policy.binding.type",
+    "trustabl.policy.binding.sha256",
+    "trustabl.policy.binding.version",
+    "trustabl.policy.binding.required",
+    "trustabl.policy.binding.source"
+  ],
+  "enums": {
+    "side_effect": ["pure", "read", "write", "irreversible"],
+    "error_class": ["timeout", "4xx", "5xx", "empty", "schema", "auth"],
+    "exit_reason": ["final_answer", "max_steps", "policy_stop", "error"],
+    "binding_type": ["sandbox", "content_safety", "tool_grants", "retention", "data_security", "custom"],
+    "binding_source": ["entrypoint", "inherited", "sidecar", "external"]
+  },
+  "fingerprint": {
+    "algorithm": "sha256",
+    "encoding": "hex",
+    "length": 16,
+    "serialization": "RFC 8785 (JCS) after volatile fields are stripped; a value that cannot be canonicalized yields no fingerprint"
+  },
+  "not_emitted_here": {
+    "$comment": "Produced elsewhere. A binding that emits these creates a second producer for one key.",
+    "trustabl.contract_id": "deployment, via OTEL_RESOURCE_ATTRIBUTES",
+    "trustabl.contract_hash": "deployment, via OTEL_RESOURCE_ATTRIBUTES",
+    "trustabl.agent.id": "collector processor, from the join index",
+    "trustabl.bind.method": "collector processor and runtime binder",
+    "trustabl.verdict": "runtime conformance verdicts",
+    "trustabl.constraint.id": "the compiler; reserved enrichments are a separate revision"
+  }
+}

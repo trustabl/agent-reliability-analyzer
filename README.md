@@ -1053,6 +1053,14 @@ step: no AST parsing, fast, and safe on any repo. When no manifests are found
 (or none declare a recognized SDK), forge exits `1` and tells you what to pass
 via `--policy`.
 
+**Language detection.** The same manifests tell forge which language each SDK
+is declared in: `pyproject.toml`, `requirements.txt`, `Pipfile` and
+`poetry.lock` mean Python, `package.json` means TypeScript, `go.mod` means Go.
+That selects the language blocks of the Runtime Tracing section. Pass
+`--lang python,typescript,go` to add a language, for example in a brand-new
+repo with no manifest yet. A Go repo that declares Google ADK is detected, and
+the `google_adk` rule sections it gets are written for Python and TypeScript.
+
 ```bash
 # Auto-detect SDKs from the current directory
 trustabl forge
@@ -1073,6 +1081,9 @@ trustabl forge --rules-ref v0.3.0
 
 # Backward-compatible: generate only the Agent Skill (CSKILL-*) rules
 trustabl forge --policy claude_skill
+
+# New Go repo with no go.mod yet
+trustabl forge --policy google_adk --lang go
 ```
 
 **Available policy categories** (pass to `--policy`):
@@ -1107,6 +1118,16 @@ Multiple categories are comma-separated: `--policy openai_sdk,mcp`.
   by rule ID, apply that rule's directive, and log the repair. This is a
   self-check the model performs — it does not run `trustabl scan` itself;
   scanning the resulting code remains a separate step.
+- A `## Runtime Tracing` section: how to make the agent emit OpenTelemetry
+  spans, then how to label them with `agent-reliability-otel-labels` (run
+  identity, step order, tool-call fingerprints, retry count, side-effect class,
+  exit reason). It has a block per selected language (Python, TypeScript, Go)
+  and a verified setup for Google ADK (Python, Go), the Vercel AI SDK (TypeScript),
+  Pydantic AI (Python), the OpenAI Agents SDK (Python, TypeScript),
+  LangChain / LangGraph (Python), CrewAI (Python), AutoGen (Python), and MCP
+  client sessions (Python). Other frameworks get the language block only.
+  Non-OpenTelemetry tracing stacks are not covered. The section is left out
+  when no supported language is found.
 - One `## SDK Name` section per detected SDK, each containing `### Tool Rules`,
   `### Agent Rules`, `### Subagent Rules`, `### Repo Rules`, and
   `### Skill Rules` subsections (empty subsections are omitted).

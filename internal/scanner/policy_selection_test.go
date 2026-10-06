@@ -151,3 +151,15 @@ func TestEmitSkippedRulesMETA_Deterministic(t *testing.T) {
 		t.Errorf("duplicate IDs should be deduped to 3, got: %q", b[0].Explanation)
 	}
 }
+
+func TestSelectPolicies_NoMETA002ForReconOnlyGoADK(t *testing.T) {
+	// google-adk-go is recon-only: there is no Go ADK discovery, so it can
+	// never be "observed in code". It must stay out of depNameToSDK.
+	profile := models.RepoProfile{SDKDeps: []models.SDKDep{{Name: "google-adk-go", Source: "go.mod"}}}
+	findings := scanner.SelectAndEmitMETA(profile, models.RepoInventory{})
+	for _, f := range findings {
+		if f.RuleID == "META-002" {
+			t.Errorf("recon-only google-adk-go must not emit META-002, got %+v", f)
+		}
+	}
+}

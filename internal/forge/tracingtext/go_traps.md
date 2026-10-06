@@ -1,0 +1,4 @@
+- Set the global tracer provider before the agent runs.
+- Marshal arguments and results and pass `json.RawMessage`; structs are refused.
+- Guard shared attempt counts with a mutex when tools can run in parallel.
+- Build the agent once, but the `Run` and the attempt counts per run.

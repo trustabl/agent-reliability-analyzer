@@ -2004,8 +2004,11 @@ internal/
 │   ├── jsonrpc.go               JSON-RPC 2.0 stdio framing (no third-party SDK).
 │   └── server.go                MCP methods (initialize/tools-list/tools-call) + scan tool.
 ├── forge/                       Pre-coding SKILL.md generator (trustabl forge).
-│   ├── detect.go                DetectCategories (dep-manifest recon → DetectorCategory slice),
-│   │                            MergeCategories (dedup + sort two category slices).
+│   ├── detect.go                Detect (dep-manifest recon → categories + (category, language) pairs),
+│   │                            DetectCategories, MergeCategories (dedup + sort two category slices),
+│   │                            SelectTracing (languages + pairs for the Runtime Tracing section).
+│   ├── tracing.go               emitRuntimeTracing + the languageBlocks / frameworkRecipes tables.
+│   ├── tracingtext/             Embedded markdown text of the Runtime Tracing section.
 │   └── gen.go                   Generate (single-pack skill-scope, kept for compat),
 │                                GenerateCombined (multi-SDK all-scope output),
 │                                matchConditionForScope, Stamp.
@@ -2309,8 +2312,8 @@ trustabl scan <target> [--detectors=…] [--format=human|json|sarif]
                        [--strict] [--no-color] [--no-progress]
                        [--rules-repo=URL] [--rules-ref=REF] [--channel=NAME]
                        [--no-rules-update] [--vuln-scan] [--include-test-paths]
-trustabl forge [target] [--policy=CATEGORY,…] [--output=PATH|-o PATH]
-                        [--rules-ref=REF]
+trustabl forge [target] [--policy=CATEGORY,…] [--lang=LANG,…]
+                        [--output=PATH|-o PATH] [--rules-ref=REF]
 trustabl enrich        [-i SCAN_JSON] [-r REPO_ROOT] [-o OUTPUT_FILE]
                        [--diff] [--apply] [--only-enriched] [--rule RULE_ID]
                        [--langsmith] [--langsmith-project NAME]
@@ -2530,17 +2533,27 @@ writing any SDK code.
 
 **Pipeline** (four steps, no AST):
 
-1. **DetectCategories** (`internal/forge/detect.go`) — calls `ingestion.Resolve`
-   and `ingestion.Recon` against the target directory to obtain
+1. **Detect** (`internal/forge/detect.go`) — calls `ingestion.Resolve` and
+   `ingestion.Recon` against the target directory to obtain
    `RepoProfile.SDKDeps`, then maps each dep name through a local
-   `depCategoryMap` table (9 entries, mirrors `scanner.depNameToSDK`) to
-   produce a sorted, deduplicated `[]models.DetectorCategory`. Returns a
-   non-nil empty slice (not nil) when no SDK is found.
+   `depCategoryMap` table (mirrors `scanner.depNameToSDK`, plus the recon-only
+   `google-adk-go`) to produce a sorted, deduplicated
+   `[]models.DetectorCategory`. Each dep's `Source` manifest is mapped through
+   `ingestion.ManifestLanguage` to a language, yielding `(category, language)`
+   pairs for Python, TypeScript and Go. `DetectCategories` returns the
+   categories alone.
 
 2. **MergeCategories** — deduplicates and sorts the auto-detected slice with
    any categories supplied via `--policy`. Explicit additions are additive, not
    overrides — useful when a new SDK is being introduced before its first
    dependency declaration.
+
+   **SelectTracing** then decides what the Runtime Tracing section covers:
+   detected pairs as detected (no cross product). An explicit `--policy`
+   category or `--lang` language widens the selection only when detection did
+   not already place it: a category with no detected pair pairs with every
+   selected language, and a language that was not detected pairs with every
+   category. Repeating something detection already found changes nothing.
 
 3. **rulesource.Resolve + rules.LoadLenient** — same resolution path as
    `trustabl scan`, keyed on `--rules-ref`. All policy packs are loaded;
@@ -2550,12 +2563,19 @@ writing any SDK code.
    comment (`<!-- generated: DATE | rules: SHA | schema: VERSION | sdks: LIST
    | template: N -->`) in the body — not in frontmatter — so the file is
    scannable to detect staleness. `template` is `TemplateVersion` (currently
-   `2`); a stamp with no `template` field predates it and parses as `1`. Right
+   `3`); a stamp with no `template` field predates it and parses as `1`. Right
    after the stamp, GenerateCombined emits a constant `## How to Apply These
    Constraints` apply-loop section: a static four-step procedure telling the
    model to check each definition it writes against the matching constraints,
    name any violation by rule ID, apply that rule's directive, and log the
-   repair. It then routes each rule into per-category, per-scope buckets
+   repair. It then emits `## Runtime Tracing` (`internal/forge/tracing.go`) for
+   the selected languages: Step 1 sets up OpenTelemetry, Step 2 places the
+   `agent-reliability-otel-labels` labels, Step 3 says how to choose their
+   values, Step 4 lists checks. The text is embedded from
+   `internal/forge/tracingtext/`; two small tables (`languageBlocks`,
+   `frameworkRecipes`) fix what exists and in what order. The section is
+   omitted when no selected language has a block. It then routes each rule into
+   per-category, per-scope buckets
    (`tools`, `agents`, `subagents`, `repos`, `skills`), emitting one
    `## SDK Name` section per category in `stamp.Categories` order, with
    `### Tool / Agent / Subagent / Repo / Skill Rules` subsections (empty
@@ -2578,7 +2598,7 @@ generated prose accurate for all five scopes without enumerating 15+ predicates.
 
 - `0` — SKILL.md generated and written.
 - `1` — no SDKs detected and no `--policy` given; or an unrecognized `--policy`
-  value.
+  or `--lang` value.
 - `2` — rules fetch / load error (same as `scan`).
 
 The `Generate` function (single-pack, skill-scope-only) is kept for backward

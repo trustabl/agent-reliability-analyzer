@@ -7,9 +7,10 @@ package forge
 //
 // This versions the GenerateCombined layout exclusively. Generate (the
 // single-pack, skill-scope-only function kept for backward compatibility)
-// does not emit the apply-loop section that defines version 2, has no
-// production caller, and its golden fixture is intentionally left stamped
-// at template: 2 rather than kept in sync with what it actually emits.
+// emits neither the apply-loop section that defines version 2 nor the
+// Runtime Tracing section that defines version 3, and has no production
+// caller. Its golden fixture is stamped with the current TemplateVersion
+// rather than kept in sync with what it actually emits.
 //
 // Forward-compatibility note: ParseStamp rejects a stamp with more than 5
 // fields, so adding a 6th field to the stamp format will make an older
@@ -31,4 +32,5 @@ package forge
 //
 //	1 — original layout: header + per-SDK rule blocks.
 //	2 — added the "How to Apply These Constraints" apply-loop section.
-const TemplateVersion = 2
+//	3 — added the "Runtime Tracing" section (OpenTelemetry + agent-reliability-otel-labels).
+const TemplateVersion = 3
