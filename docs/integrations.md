@@ -32,6 +32,8 @@ with. Anything not on this list has no entry yet.
 | [Google ADK](https://github.com/google/adk-docs/pull/2290) | Submitted | 1 Oct 2026 |
 | [NVIDIA NemoClaw](https://github.com/NVIDIA/nemoclaw-community/issues/196) | Proposed | 5 Oct 2026 |
 | [npm](https://www.npmjs.com/package/@trustabl/ai-sdk) | **Listed** | 2 Oct 2026 |
+| [PyPI](https://pypi.org/project/pydantic-ai-trustabl/) | **Listed** | 6 Oct 2026 |
+| [Pydantic AI](https://github.com/pydantic/pydantic-ai/pull/9876) | Submitted | 6 Oct 2026 |
 
 ---
 
@@ -47,7 +49,7 @@ order we are working them.
 | 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
 | 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **In progress** — see below |
 | 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route — tracing only |
-| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Route open — see below |
+| 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | [Submitted](https://github.com/pydantic/pydantic-ai/pull/9876) |
 
 **Vercel AI SDK** is in progress. Its registry
 ([`content/tools-registry/registry.ts`](https://github.com/vercel/ai/blob/main/content/tools-registry/registry.ts))
@@ -86,6 +88,17 @@ Two routes exist. Pydantic's
 invites third parties to publish their own package under the `pydantic-ai-`
 prefix, which needs no approval from anyone; upstreaming into the harness comes
 later, in their words "once a capability has real users and a stable API".
+
+We took the first route. [`pydantic-ai-trustabl`](https://pypi.org/project/pydantic-ai-trustabl/)
+is published, source at [trustabl/pydantic-ai-tool](https://github.com/trustabl/pydantic-ai-tool).
+It registers a `scan_repository` tool that runs the scanner in the agent's
+workspace and returns a summarised report for the agent to verify and fix.
+[Pull request #9876](https://github.com/pydantic/pydantic-ai/pull/9876) adds the
+directory entry.
+
+Upstreaming into the harness is deliberately not attempted yet. Their guide
+treats that as a conversation for a capability that already has users, and
+opening it now would only add to a backlog.
 
 **NVIDIA OpenShell** has no image catalogue to list in: `NVIDIA/OpenShell-Community`,
 which accepted sandbox images and skills, carries the notice "This repository is
