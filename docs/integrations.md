@@ -30,6 +30,7 @@ with. Anything not on this list has no entry yet.
 | [Bitbucket Pipes](https://bitbucket.org/hoolisoftware/trustabl-pipe) | **Listed** | 18 Aug 2026 |
 | [in-toto](https://github.com/in-toto/friends/pull/122) | Submitted | 28 Sep 2026 |
 | [Google ADK](https://github.com/google/adk-docs/pull/2290) | Submitted | 1 Oct 2026 |
+| [Vercel AI SDK](https://github.com/vercel/ai/pull/22206) | Submitted | 7 Oct 2026 |
 | [NVIDIA NemoClaw](https://github.com/NVIDIA/nemoclaw-community/issues/196) | Proposed | 5 Oct 2026 |
 | [npm](https://www.npmjs.com/package/@trustabl/ai-sdk) | **Listed** | 2 Oct 2026 |
 | [PyPI](https://pypi.org/project/pydantic-ai-trustabl/) | **Listed** | 6 Oct 2026 |
@@ -47,17 +48,27 @@ order we are working them.
 |---|---|---|---|
 | 1 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
 | 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
-| 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | **In progress** — see below |
+| 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | [Submitted](https://github.com/vercel/ai/pull/22206) |
 | 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route — tracing only |
 | 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Package published, not listed |
 
-**Vercel AI SDK** is in progress. Its registry
+**Vercel AI SDK** is submitted. Its registry
 ([`content/tools-registry/registry.ts`](https://github.com/vercel/ai/blob/main/content/tools-registry/registry.ts))
 accepts an entry only for a published npm package that an agent calls at
-runtime. That package now exists —
-[`@trustabl/ai-sdk`](https://www.npmjs.com/package/@trustabl/ai-sdk), source at
-[trustabl/ai-sdk-tool](https://github.com/trustabl/ai-sdk-tool) — so only the
-registry pull request remains.
+runtime, which is why
+[`@trustabl/ai-sdk`](https://www.npmjs.com/package/@trustabl/ai-sdk) exists,
+source at [trustabl/ai-sdk-tool](https://github.com/trustabl/ai-sdk-tool).
+[Pull request #22206](https://github.com/vercel/ai/pull/22206) adds the entry.
+
+Unlike Pydantic AI, this one is a direct pull request on purpose. Vercel
+publishes a
+[registry contribution guide](https://github.com/vercel/ai/blob/main/contributing/add-new-tool-to-registry.md)
+that asks for a pull request with no prior issue, and the registry's own history
+shows outside vendors adding themselves that way. The guide does set three
+prerequisites: the package must be published, its documentation must cover the
+AI SDK integration specifically, and the code example must be tested rather than
+written from the API. All three were met before submitting, and the example was
+executed against a real repository.
 
 **OpenAI Agents SDK** has one listing mechanism, *tracing integration listings*,
 and its criteria require implementing the Agents SDK tracing interface. The same
