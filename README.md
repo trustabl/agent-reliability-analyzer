@@ -28,7 +28,7 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
 
 <h3 align="center">Trustabl Partners</h3>
 <p align="center">
-  <sub>One engine, eight front doors. Install it from the catalogue you already use.</sub>
+  <sub>One engine, nine front doors. Install it from the catalogue you already use.</sub>
 </p>
 
 <table align="center">
@@ -38,12 +38,13 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
       <sub>Scan from any<br>MCP-aware client</sub>
     </td>
     <td align="center" width="200">
-      <a href="https://claude.ai/directory"><b>Claude Directory</b></a><br>
+      <a href="docs/claude-plugin.md"><b>Claude Directory</b></a><br>
       <sub>Skills, agent and<br>scanner inside Claude</sub>
     </td>
     <td align="center" width="200">
-      <a href="https://www.npmjs.com/package/@trustabl/ai-sdk"><b>npm</b></a><br>
-      <sub>A tool your AI SDK<br>agent calls itself</sub>
+      <a href="https://www.npmjs.com/package/@trustabl/ai-sdk"><b>npm</b></a> &middot;
+      <a href="https://pypi.org/project/pydantic-ai-trustabl/"><b>PyPI</b></a><br>
+      <sub>A tool your AI SDK or<br>Pydantic AI agent calls</sub>
     </td>
   </tr>
   <tr>

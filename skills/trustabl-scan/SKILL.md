@@ -9,6 +9,16 @@ description: >-
   server registration, agent guardrails, or .claude/settings.json permissions.
   Runs Trustabl's `scan` tool via the plugin's bundled MCP server and guides
   remediation of the findings.
+version: "0.1.13"
+license: Apache-2.0
+metadata:
+  author: Trustabl
+  tags:
+    - security
+    - static-analysis
+    - agents
+    - mcp
+    - reliability
 ---
 
 # Self-audit agent code with Trustabl
@@ -77,11 +87,28 @@ on `PATH`:
 "$TRUSTABL_BIN" scan . --detectors claude_sdk # claude_sdk|openai_sdk|google_adk|openshell|mcp|langchain|crewai|pydantic_ai|vercel_ai|autogen|claude_skill
 "$TRUSTABL_BIN" scan . --vuln-scan            # also match declared deps against OSV → CVE findings
 "$TRUSTABL_BIN" scan . --bom-out bom.json     # write a CycloneDX SBOM (+ VEX vulnerabilities under --vuln-scan)
+
+On Windows, give the output flags a native path. The binary does not resolve a
+Git Bash style `/tmp/...` path: it writes nothing and reports no error, so the
+missing file is the only symptom.
 ```
 
 In the CLI fallback the exit code is the gate: `0` = no findings of medium
 severity or higher, `1` = at least one, `2` = scanner/I-O error or no usable
 rules (run `"$TRUSTABL_BIN" rules pull` once to pre-populate the rules cache).
+
+## Reading the inventory safely
+
+Empty inventory fields are `null` in the JSON result, not `[]`. `subagents`,
+`skills` and `mcp_servers` are all absent rather than empty when nothing of that
+kind was found, so take the length defensively:
+
+```python
+count = len(result.get("mcp_servers") or [])
+```
+
+Treating them as lists unconditionally raises on a repository that happens to
+declare no subagents, which is most of them.
 
 ## How to read findings
 

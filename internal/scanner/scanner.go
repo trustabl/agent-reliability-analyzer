@@ -415,6 +415,10 @@ func Run(cfg Config) (models.ScanResult, error) {
 		analysis.DiscoverObservability(allParsed),
 		analysis.DiscoverAgentObservabilitySignals(agents),
 	)
+	// Credit process-wide instrumentation (logfire.instrument_pydantic_ai(),
+	// Agent.instrument_all(), ...) onto the agents it covers, so the
+	// per-agent kwarg-missing outlier rules do not fire on them.
+	analysis.ApplyGlobalInstrumentation(inventory.Agents, inventory.ObservabilitySignals)
 	inventory.Subagents = analysis.DiscoverSubagents(profile.Manifest)
 	inventory.Skills = analysis.DiscoverSkills(profile.Manifest)
 	inventory.Dependencies = analysis.DiscoverDependencies(profile.Manifest.RepoRoot)

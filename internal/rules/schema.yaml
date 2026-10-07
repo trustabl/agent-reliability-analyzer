@@ -185,6 +185,10 @@ rules:
 #                           the JSON-RPC frames).
 #   has_write_call:         body opens a file 'w'/'a'/'x', or shutil.copy/copy2/move/rmtree
 #   has_dynamic_url_call:   HTTP call where the URL is a non-literal (param/f-string)
+#   has_unpinned_scheme_url_call: HTTP call with a non-literal URL that does not
+#                           start with a literal https:// prefix (f-string / template
+#                           / concat / .format / % forms are recognized; an identifier
+#                           URL is unpinned). Pair with the SSRF allow-list gate.
 #   has_http_call_without_timeout: (TypeScript only) a fetch/axios/got/undici call
 #                           with no signal/timeout/abortSignal option — an unbounded
 #                           HTTP call that can hang the agent's run loop. Python
@@ -296,6 +300,10 @@ rules:
 #   agent_kwarg_missing: [kwarg, dotted.path, ...]
 #       True when a kwarg is absent OR present with literal `None`.
 #       (Asymmetric with `agent_kwarg_present`, which tests pure presence.)
+#       One exception: a kwarg named by AgentDef.InstrumentedBy (set when a
+#       process-wide instrumentation call such as logfire.instrument_pydantic_ai()
+#       covers the agent) is treated as set, so `instrument` / `callbacks` are not
+#       reported missing on a covered agent. Every other kwarg is unaffected.
 #
 #   agent_kwarg_list_empty: [kwarg, ...]
 #       Fires when ANY of the listed list kwargs is absent or an empty list [].

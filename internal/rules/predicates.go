@@ -268,6 +268,46 @@ func PredHasDynamicURLCall(t models.ToolDef, pf analysis.ParsedFile) bool {
 	return found
 }
 
+// PredHasUnpinnedSchemeURLCall reports whether the tool makes an HTTP call whose
+// URL is dynamic and does not begin with a literal https:// prefix (see
+// analysis.URLArgSchemePinned). TypeScript reads the url_scheme_unpinned fact.
+func PredHasUnpinnedSchemeURLCall(t models.ToolDef, pf analysis.ParsedFile) bool {
+	if models.IsTSOrJS(t.Language) {
+		return t.Facts["url_scheme_unpinned"] == "true"
+	}
+	root := analysis.FindFunctionNode(t, pf)
+	if root == nil {
+		return false
+	}
+	aliases := analysis.ResolveClientAliases(root, pf.Source)
+	found := false
+	astutil.Walk(root, func(n *sitter.Node) bool {
+		if found {
+			return false
+		}
+		if n.Type() != "call" {
+			return true
+		}
+		if _, ok := analysis.IsHTTPCallNode(n, pf.Source, aliases); !ok {
+			return true
+		}
+		args := n.ChildByFieldName("arguments")
+		if args == nil || args.NamedChildCount() == 0 {
+			return true
+		}
+		first := args.NamedChild(0)
+		dynamic := first.Type() != "string"
+		for i := 0; !dynamic && i < int(first.NamedChildCount()); i++ {
+			dynamic = first.NamedChild(i).Type() == "interpolation"
+		}
+		if dynamic && !analysis.URLArgSchemePinned(first, pf.Source) {
+			found = true
+		}
+		return !found
+	})
+	return found
+}
+
 // PredHasHTTPCallWithoutTimeout reports whether a TypeScript tool handler makes
 // an HTTP call (fetch / axios / got / undici) with no timeout bound — its
 // options object carries no `signal`, `timeout`, or `abortSignal` key. It is
@@ -645,6 +685,12 @@ func PredAgentKwargPresent(paths []string, a models.AgentDef) bool {
 
 func PredAgentKwargMissing(paths []string, a models.AgentDef) bool {
 	for _, p := range paths {
+		// A process-wide instrumentation call (AgentDef.InstrumentedBy) stands
+		// in for exactly the kwarg it names, so that kwarg is not missing even
+		// when absent or None. Any other kwarg is judged as usual.
+		if a.InstrumentedBy != nil && a.InstrumentedBy.Kwarg == p {
+			continue
+		}
 		kw := lookupKwarg(a, p)
 		if kw == nil {
 			return true // absent
