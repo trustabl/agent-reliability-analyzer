@@ -469,6 +469,13 @@ files in the scanned repo. Each run produces a `ScanResult` containing:
   statically in Python and TypeScript/JavaScript only — Trustabl does not ingest
   runtime traces.
 
+- **Server entrypoints** (`entrypoints`, omitted when none) — Python functions a
+  server framework invokes for an external request or job: FastAPI and Flask
+  route handlers (`kind: http`, with the literal `route` when present) and Celery
+  tasks / Dramatiq actors (`kind: worker`). A fact only: no rule consumes it yet.
+  Entrypoints under `examples/`, `demo/`, `docs/` and similar directories are not
+  recorded.
+
 ### The summary's tool surface, broken out
 
 The human format honestly separates the three things people commonly

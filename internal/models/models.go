@@ -515,6 +515,7 @@ type RepoInventory struct {
 	ClaudeSettings     []ClaudeSettings        `json:"claude_settings"`
 	ClaudeAgentOptions []ClaudeAgentOptionsDef `json:"claude_agent_options,omitempty"`
 	AgentRunCalls      []AgentRunCallDef       `json:"agent_run_calls,omitempty"`
+	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	SDKsDetected       []SDK                   `json:"sdks_detected"`
 	// HasShellInvocations is true if any discovered ToolDef is a
 	// KindShellInvocation (a Python function whose body calls
@@ -633,6 +634,7 @@ type ScanResult struct {
 	// signal, not only the findings. Additive inventory, NOT folded into ScanID
 	// (same treatment as Dependencies).
 	Observability      []ObservabilitySignal `json:"observability,omitempty"`
+	Entrypoints        []EntrypointDef       `json:"entrypoints,omitempty"`     // server entrypoints (Python): a fact only, no rule consumes it yet
 	Vulnerabilities    []DepVuln             `json:"vulnerabilities,omitempty"` // --vuln-scan OSV matches (TR-271); absent on the default path
 	Secrets            []SecretMatch         `json:"secrets,omitempty"`         // --secret-scan hardcoded-credential matches; absent on the default path
 	SlashCommands      []SlashCommandDef     `json:"slash_commands"`
