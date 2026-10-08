@@ -410,11 +410,31 @@ rules:
 #       (e.g. a chained StateGraph(...).compile() with no named variable, or a
 #       compiled graph that is used as a subgraph).
 #
+#   agent_checkpointer_in_memory: true | false
+#       True when the agent's checkpointer= (LangGraph compile() /
+#       create_react_agent() / create_agent()) resolves to an in-process saver:
+#       MemorySaver or InMemorySaver, imported from a langgraph module (bare,
+#       `as` alias, or module-qualified), passed as a call
+#       (MemorySaver(serde=...)) or as a same-file variable bound to one. Any
+#       other class, an unresolved name, a saver chosen at runtime, or no
+#       checkpointer at all is false. Used by LC-116.
+#
+#   agent_server_reachable: true | false
+#       True when at least one same-SDK run call of the agent is reachable from
+#       a server entrypoint (FastAPI / Flask route = http; Celery / Dramatiq task
+#       = worker), within the v1 one-hop-per-edge reachability model (inside the
+#       entrypoint, a same-file helper it calls, or an imported helper it calls).
+#       Run calls correlate by AgentVarName and file, including a LangGraph graph
+#       compiled in one module and imported into another (`from graph import
+#       app`). Test paths (tests/, test_*.py, conftest.py, ...) are ignored for
+#       the agent, the run call and the entrypoint. Used by LC-116.
+#
 #   repo_langgraph_platform_config_present: true | false
 #       DUAL-SCOPE (valid at agent and repo scope, like repo_has_observability).
 #       True when the repo ships a langgraph.json at any depth
 #       (RepoInventory.Manifest.JSONFiles) — LangGraph Platform then injects its
-#       own checkpointer. Used by LC-114 to stay silent on Platform deployments.
+#       own checkpointer. Used by LC-114 and LC-116 to stay silent on Platform
+#       deployments.
 #
 #
 # ━━━ SUBAGENT-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

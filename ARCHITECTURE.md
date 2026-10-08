@@ -744,7 +744,24 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   (`same_file`), or in a top-level function it calls that was imported by name,
   absolute or relative (`import`). One hop per edge kind, no call graph, no
   `m.f()` / method calls / DI; relative imports resolve only to files in the scan
-  set (see the doc comment). Ranks 4 and 6 build on it in follow-up PRs.
+  set (see the doc comment). The stamp is read by the `agent_server_reachable`
+  predicate (LC-116); the resolver was generalized to `resolveImportedName` so
+  run-call discovery reuses it for cross-file graphs.
+- **LangGraph run calls** (`agent_run_calls.go`, `discoverLangGraphRunCalls`) —
+  SDK `langchain` `AgentRunCallDef`s for `invoke` / `ainvoke` / `stream` /
+  `astream` / `astream_events` / `batch` / `abatch`. The receiver is never an
+  arbitrary identifier: it must be a compiled-graph variable
+  (`app = builder.compile(...)`, from `discoverLangGraphGraphsInFile`'s compile
+  map), the direct chain `builder.compile(...).invoke(...)`, or the variable of a
+  prebuilt `create_react_agent` / `create_agent`. `AgentVarName` is the builder
+  variable. A module-level graph imported into another file (`from graph import
+  app`) is recorded with `AgentFilePath` (in-memory) set to the defining file.
+  `AgentDef.CheckpointerClass` (in-memory) carries the `checkpointer=` class of
+  `compile()` / the prebuilt helpers, resolved through its langgraph import;
+  unresolved names, local classes and conflicting bindings leave it empty.
+  `agent_checkpointer_in_memory` (`MemorySaver` / `InMemorySaver`) and
+  `agent_server_reachable` (a correlated run call with a `ServerReachable`
+  stamp; test paths ignored) back LC-116. Run calls are not in the JSON report.
 - **DiscoverLangGraphNodes** (`langgraph_nodes.go`) — a function registered via
   `<builder>.add_node("name", func)` / `add_node(func)` is not a `@tool` but runs
   on every graph visit. Same-file, undecorated, top-level functions are emitted

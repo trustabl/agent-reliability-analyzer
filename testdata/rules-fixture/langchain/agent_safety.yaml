@@ -179,3 +179,43 @@ rules:
       invoke with a config={"configurable": {"thread_id": ...}}. If this graph
       runs only on LangGraph Platform, add the langgraph.json the platform
       expects so the intent is explicit.
+
+  - id: LC-116
+    title: LangGraph graph with an in-memory checkpointer is run from a server entrypoint
+    severity: high
+    confidence: 0.6
+    language: python
+    applies_to:
+      - langchain_state_graph
+      - langchain_agent
+    scope: agent
+    match:
+      all:
+        - agent_checkpointer_in_memory: true
+        - agent_server_reachable: true
+        - repo_langgraph_platform_config_present: false
+    explanation: >
+      This graph's checkpointer is MemorySaver / InMemorySaver, and it is run
+      from a server entrypoint (a FastAPI or Flask route, or a Celery or
+      Dramatiq task). An in-memory saver keeps every thread's state in a dict
+      inside one process: a restart, a deploy, a crash, or a second worker
+      loses all in-flight threads, their completed steps, and any interrupt()
+      pause awaiting human approval, and a retry re-executes side-effecting
+      nodes from the start. Because a checkpointer is configured, the graph
+      looks durable when it is not. Limits: reachability follows one hop per
+      edge (the entrypoint itself, a same-file helper it calls, or an imported
+      helper it calls), so a graph run through a helper of a helper is not
+      seen; a graph built or compiled inside a factory function is not
+      tracked; a saver chosen at runtime (an environment variable, a config
+      object) is not resolved and stays silent; a subgraph is reported only
+      when it is itself invoked from a server path; test paths are ignored;
+      the rule is silent when the repo ships a langgraph.json (LangGraph
+      Platform injects its own checkpointer). Recall on real server code is
+      unmeasured.
+    fix: >
+      Pass a durable checkpointer in production, e.g.
+      builder.compile(checkpointer=PostgresSaver(...)) or AsyncPostgresSaver /
+      RedisSaver (the same checkpointer= applies to create_react_agent), and
+      keep MemorySaver for tests. Invoke with
+      config={"configurable": {"thread_id": ...}} so each conversation resumes
+      from its own persisted thread.

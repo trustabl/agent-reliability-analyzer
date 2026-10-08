@@ -350,6 +350,20 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **In-memory LangGraph checkpointer on a server path (2026-10-08, `schema_version` 20 → 21):** one rule, **LC-116** (high, 0.6, agent
+> scope, Python; `applies_to: [langchain_state_graph, langchain_agent]`): a graph whose `checkpointer=` is `MemorySaver` / `InMemorySaver`
+> and that is run from a FastAPI / Flask / Celery / Dramatiq entrypoint, silent when the repo ships a `langgraph.json`. New predicates
+> `agent_checkpointer_in_memory` and `agent_server_reachable` (the first consumer of #244's `ServerReachable` stamp); new in-memory
+> fields `AgentDef.CheckpointerClass` and `AgentRunCallDef.AgentFilePath`; run-call discovery gained a LangGraph (`models.SDKLangChain`)
+> anchor on compiled-graph variables, `builder.compile(...).invoke(...)` and prebuilt-agent variables, cross-file via the entrypoint import
+> resolver. `buildImportsByFile` no longer drops `from graph import graph` (a name equal to its module). The fixture holds **331** rules
+> (330 + 1; re-derive). **Test paths:** `agent_server_reachable` ignores an agent, run call or entrypoint under a `pathclass` test path
+> (`tests/`, `test_*.py`, `conftest.py`, ...) — entrypoint and run-call discovery stay unfiltered, so the exclusion is local to LC-116.
+> **Limits:** one hop per edge (a helper of a helper is silent); a graph built or compiled in a factory function is not tracked; a saver
+> chosen at runtime is silent; subgraphs and the Platform exemption are inherited from LC-114; recall on real server repos is
+> **unmeasured** — the corpus has 40 run calls, none LangGraph, none server-reachable, and its findings are byte-identical before and after.
+> Rulebook rationale doc for LC-116 is a separate follow-up in `../trustabl-rulebook` (not touched here).
+>
 > **Server-entrypoint fact (2026-10-05, no schema change, stays 20; no rules, no predicates):** `RepoInventory.Entrypoints`
 > (`models.EntrypointDef`; also `ScanResult.entrypoints`) records Python FastAPI / Flask routes (`http`) and Celery / Dramatiq
 > tasks (`worker`), and `analysis.ApplyEntrypointReachability` stamps `AgentRunCallDef.ServerReachable` (in-memory) on run calls

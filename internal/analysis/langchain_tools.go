@@ -68,6 +68,9 @@ func fileImportsLangChain(pf ParsedFile) bool {
 type langChainImports struct {
 	names   map[string]bool // local names imported FROM a langchain/langgraph module
 	aliases map[string]bool // module aliases bound to a langchain/langgraph module
+	// orig maps a `from <langchain module> import X as Y` alias Y back to X, so
+	// a caller that needs the imported class's real name can recover it.
+	orig map[string]string
 }
 
 // collectLangChainImports walks pf's import statements and records langchain /
@@ -75,7 +78,7 @@ type langChainImports struct {
 // `from X import Y` is skipped by byte offset so the module is not mistaken for
 // an imported name.
 func collectLangChainImports(pf ParsedFile) langChainImports {
-	res := langChainImports{names: map[string]bool{}, aliases: map[string]bool{}}
+	res := langChainImports{names: map[string]bool{}, aliases: map[string]bool{}, orig: map[string]string{}}
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
 		switch n.Type() {
 		case "import_from_statement":
@@ -95,6 +98,7 @@ func collectLangChainImports(pf ParsedFile) langChainImports {
 				case "aliased_import":
 					if alias := astutil.NodeText(c.ChildByFieldName("alias"), pf.Source); alias != "" {
 						res.names[alias] = true
+						res.orig[alias] = astutil.NodeText(c.ChildByFieldName("name"), pf.Source)
 					}
 				}
 			}

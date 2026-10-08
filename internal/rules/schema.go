@@ -102,6 +102,10 @@ type MatchExpr struct {
 	// AgentKwargsObserved is true iff discovery resolved the agent's call site
 	// (kwargs captured, not opaque) — see PredAgentKwargsObserved.
 	AgentKwargsObserved *bool `yaml:"agent_kwargs_observed,omitempty"`
+	// AgentCheckpointerInMemory: see PredAgentCheckpointerInMemory.
+	AgentCheckpointerInMemory *bool `yaml:"agent_checkpointer_in_memory,omitempty"`
+	// AgentServerReachable: see PredAgentServerReachable.
+	AgentServerReachable *bool `yaml:"agent_server_reachable,omitempty"`
 
 	// Subagent-scope predicates
 	SubagentGrantsTool []string `yaml:"subagent_grants_tool,omitempty"`
