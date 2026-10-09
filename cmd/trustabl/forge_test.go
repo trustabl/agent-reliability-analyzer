@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -208,5 +209,60 @@ func TestForgeCheckCommand_NoStamp_Exit1(t *testing.T) {
 	}
 	if !strings.Contains(errBuf.String(), "no forge stamp") {
 		t.Errorf("stderr should mention 'no forge stamp', got: %s", errBuf.String())
+	}
+}
+
+func TestForgeCommand_LangFlag_Registered(t *testing.T) {
+	cmd := newForgeCommand(nil)
+	if cmd.Flags().Lookup("lang") == nil {
+		t.Fatal("--lang flag not registered")
+	}
+	if !strings.Contains(cmd.Long, "--lang") {
+		t.Error("help text should mention --lang")
+	}
+}
+
+func TestForgeCommand_UnknownLang_Exit1(t *testing.T) {
+	root := &cobra.Command{Use: "trustabl", SilenceUsage: true, SilenceErrors: true}
+	root.AddCommand(newForgeCommand(nil))
+	root.SetArgs([]string{"forge", "--policy", "openai_sdk", "--lang", "rust"})
+
+	buf := &bytes.Buffer{}
+	root.SetErr(buf)
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for unknown --lang value")
+	}
+	var ec exitCodeError
+	if !errors.As(err, &ec) {
+		t.Fatalf("got error %v (%T), want an exitCodeError", err, err)
+	}
+	if ec.code != 1 {
+		t.Errorf("exit code = %d, want 1", ec.code)
+	}
+	if !strings.Contains(buf.String(), "rust") {
+		t.Errorf("stderr should mention the bad language, got: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "python") {
+		t.Errorf("stderr should list the accepted values, got: %s", buf.String())
+	}
+}
+
+func TestParseForgeLangs(t *testing.T) {
+	got, bad := parseForgeLangs([]string{"python, javascript", "go"})
+	if bad != "" {
+		t.Fatalf("unexpected bad value %q", bad)
+	}
+	want := []models.Language{models.LanguagePython, models.LanguageTypeScript, models.LanguageGo}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("index %d: got %q, want %q", i, got[i], want[i])
+		}
+	}
+	if _, bad := parseForgeLangs([]string{"python,rust"}); bad != "rust" {
+		t.Errorf("bad = %q, want %q", bad, "rust")
 	}
 }

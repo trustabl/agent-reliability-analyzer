@@ -90,3 +90,16 @@ func TestCheckStamp_MessageEndsInNewline(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckStamp_HintSaysToReuseFlags(t *testing.T) {
+	// The stamp does not carry the flags that produced a file, so the hint
+	// must say to pass them again.
+	s := Stamp{Date: "2026-01-01", SHA: "abc1234def", Schema: 13, Template: 2}
+	_, msg := CheckStamp(s, "abc1234def", 3, "SKILL.md")
+	if !strings.Contains(msg, "regenerate: trustabl forge --output SKILL.md") {
+		t.Errorf("message must carry the fix command, got: %s", msg)
+	}
+	if !strings.Contains(msg, "--policy") || !strings.Contains(msg, "--lang") {
+		t.Errorf("message must say to pass the original flags again, got: %s", msg)
+	}
+}

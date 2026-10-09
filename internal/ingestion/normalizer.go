@@ -134,6 +134,25 @@ func languagesFromManifest(m models.ScanManifest) []models.Language {
 	return langs
 }
 
+// depManifestLanguages maps a fixed-name root dependency manifest to the
+// language whose packages it declares. package.json is a best guess — it
+// could be plain JavaScript.
+var depManifestLanguages = map[string]models.Language{
+	"pyproject.toml":   models.LanguagePython,
+	"requirements.txt": models.LanguagePython,
+	"Pipfile":          models.LanguagePython,
+	"poetry.lock":      models.LanguagePython,
+	"package.json":     models.LanguageTypeScript,
+	"go.mod":           models.LanguageGo,
+}
+
+// ManifestLanguage returns the language a root dependency manifest declares
+// packages for, and false for a manifest this table does not know.
+func ManifestLanguage(name string) (models.Language, bool) {
+	lang, ok := depManifestLanguages[name]
+	return lang, ok
+}
+
 // detectSDKDeps scans pyproject.toml / requirements.txt / Pipfile / poetry.lock /
 // package.json for known SDK package names.
 func detectSDKDeps(root string) []models.SDKDep {
@@ -165,6 +184,13 @@ func detectSDKDeps(root string) []models.SDKDep {
 			Manifests: []string{"package.json"}},
 		{Name: "google-adk", Pattern: "@google/adk",
 			Manifests: []string{"package.json"}},
+		// Google ADK for Go. Recon-only, like nvidia-nat below: there is no Go
+		// ADK discovery pass, so this name is deliberately NOT in
+		// scanner.depNameToSDK (a mapped name would emit a permanent false
+		// META-002). forge maps it to the google_adk category to select the Go
+		// runtime-tracing recipe.
+		{Name: "google-adk-go", Pattern: "google.golang.org/adk",
+			Manifests: []string{"go.mod"}},
 		// MCP TypeScript SDK. The package id is unambiguous (no Python-substring
 		// hazard), so it scans package.json only. Drives the "declared but
 		// unused" drift signal; actual pack loading is driven by SDKMCP from
@@ -607,15 +633,7 @@ func discoverComponents(root string, m models.ScanManifest, onFile func(string))
 	}
 
 	// Dependency manifests at repo root only.
-	depFiles := map[string]models.Language{
-		"pyproject.toml":   models.LanguagePython,
-		"requirements.txt": models.LanguagePython,
-		"Pipfile":          models.LanguagePython,
-		"poetry.lock":      models.LanguagePython,
-		"package.json":     models.LanguageTypeScript, // best-guess; could be JS too
-		"go.mod":           models.LanguageGo,
-	}
-	for name, lang := range depFiles {
+	for name, lang := range depManifestLanguages {
 		if exists(filepath.Join(root, name)) {
 			out = append(out, models.AgentComponent{
 				Kind: models.ComponentDependencyManifest, Path: name, Language: lang,

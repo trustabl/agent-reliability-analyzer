@@ -525,3 +525,47 @@ func TestDetectObsDeps_NoObservabilityDeclared(t *testing.T) {
 		t.Fatalf("got %+v, want no observability deps", got)
 	}
 }
+
+func TestDetectSDKDeps_GoogleADKGo(t *testing.T) {
+	dir := t.TempDir()
+	gomod := "module example.com/agent\n\ngo 1.23\n\nrequire google.golang.org/adk v1.7.0\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(gomod), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps := detectSDKDeps(dir)
+	var found bool
+	for _, d := range deps {
+		if d.Name == "google-adk-go" && d.Source == "go.mod" {
+			found = true
+		}
+		if d.Name == "google-adk" {
+			t.Errorf("a Go ADK repo must not produce the Python/TS name google-adk: %+v", d)
+		}
+	}
+	if !found {
+		t.Errorf("google-adk-go not in detected deps: %+v", deps)
+	}
+}
+
+func TestManifestLanguage(t *testing.T) {
+	cases := []struct {
+		name string
+		want models.Language
+		ok   bool
+	}{
+		{"pyproject.toml", models.LanguagePython, true},
+		{"requirements.txt", models.LanguagePython, true},
+		{"Pipfile", models.LanguagePython, true},
+		{"poetry.lock", models.LanguagePython, true},
+		{"package.json", models.LanguageTypeScript, true},
+		{"go.mod", models.LanguageGo, true},
+		{"composer.json", "", false},
+		{"Cargo.toml", "", false},
+	}
+	for _, c := range cases {
+		got, ok := ManifestLanguage(c.name)
+		if got != c.want || ok != c.ok {
+			t.Errorf("ManifestLanguage(%q) = (%q, %v), want (%q, %v)", c.name, got, ok, c.want, c.ok)
+		}
+	}
+}

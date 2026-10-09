@@ -231,7 +231,10 @@ func emitApplyLoop(b *strings.Builder) {
 // Output is byte-stable: categories are iterated in stamp.Categories order;
 // within each section rules are sorted by severity (critical first) then rule
 // ID ascending.
-func GenerateCombined(categories []models.DetectorCategory, policies []rules.PolicyFile, stamp PolicyStamp) string {
+//
+// tracing selects the languages and frameworks the Runtime Tracing section
+// covers; its zero value omits the section.
+func GenerateCombined(categories []models.DetectorCategory, policies []rules.PolicyFile, stamp PolicyStamp, tracing TracingSelection) string {
 	// build category set for O(1) membership check
 	catSet := make(map[models.DetectorCategory]bool, len(categories))
 	for _, c := range categories {
@@ -310,6 +313,7 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 	fmt.Fprintf(&b, "in post-build scan — prevent it now.\n\n")
 
 	emitApplyLoop(&b)
+	emitRuntimeTracing(&b, tracing)
 
 	// --- One section per category, in stamp.Categories order ---
 	for _, cat := range stamp.Categories {

@@ -39,8 +39,13 @@ func CheckStamp(stamp Stamp, currentSHA string, currentTemplate int, path string
 	}
 }
 
+// regenerateHint names the fix. The stamp does not carry the flags a file was
+// generated with (its format cannot take another field), so the hint says to
+// pass them again rather than pretending the bare command reproduces the file.
 func regenerateHint(path string) string {
-	return fmt.Sprintf("regenerate: trustabl forge --output %s\n", path)
+	return fmt.Sprintf(
+		"regenerate: trustabl forge --output %s\n"+
+			"  (pass any --policy or --lang flags used originally)\n", path)
 }
 
 // shortSHA returns the first 7 characters of a SHA for display, or the full
