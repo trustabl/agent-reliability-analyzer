@@ -100,6 +100,12 @@ type AgentDef struct {
 	// reads it: the kwarg it names is treated as set. Set by
 	// analysis.ApplyGlobalInstrumentation.
 	InstrumentedBy *GlobalInstrumentation `json:"instrumented_by,omitempty"`
+	// CheckpointerClass is the class of the checkpointer= passed to a LangGraph
+	// compile() / create_react_agent() / create_agent() call (e.g. "MemorySaver",
+	// "PostgresSaver"), resolved through a langchain / langgraph import. Empty
+	// when there is no checkpointer, or when it is a name or factory discovery
+	// cannot resolve. In-memory only — LC-116 reads it; not serialized.
+	CheckpointerClass string `json:"-"`
 }
 
 // GlobalInstrumentation is the process-wide call that stands in for an
@@ -358,7 +364,8 @@ type ClaudeAgentOptionsDef struct {
 // an agent: a Runner.run/run_sync/run_streamed call (OpenAI Agents SDK) or an
 // <agent>.run/run_sync/run_stream call (Pydantic AI), a Runner.run/run_async
 // call resolved to its agent (Google ADK), or an initiate_chat/run-family call
-// (AutoGen / AG2). Execution limits like
+// (AutoGen / AG2), or an invoke/stream-family call on a compiled LangGraph
+// graph or prebuilt LangGraph agent (LangChain). Execution limits like
 // max_turns or usage_limits are set at this call site, not at the agent's
 // constructor — ClaudeAgentOptionsDef-style construction-site capture can't
 // see them. AgentVarName is the resolved identifier naming the agent this
@@ -383,8 +390,13 @@ type AgentRunCallDef struct {
 	// ServerReachable is non-nil when the call is reachable from a server
 	// entrypoint (HTTP route / worker task) within the v1 one-hop-per-edge
 	// limits documented on analysis.ApplyEntrypointReachability. In-memory
-	// only; nothing consumes it yet (no predicate, no rule).
+	// only; read by the agent_server_reachable predicate (LC-116).
 	ServerReachable *EntrypointRef `json:"-"`
+	// AgentFilePath is the file that defines the agent this call runs, when it
+	// was resolved across files (LangGraph: `from graph import app` then
+	// app.invoke(...)). Empty means the agent is defined in the call's own file.
+	// In-memory only.
+	AgentFilePath string `json:"-"`
 }
 
 // EntrypointKind classifies a server entrypoint.

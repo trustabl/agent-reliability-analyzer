@@ -6786,6 +6786,66 @@ var policyAgentRuleCases = []policyAgentCase{
 			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{}}},
 		models.RepoInventory{Manifest: models.ScanManifest{JSONFiles: []string{"services/api/langgraph.json"}}}, false},
 
+	{"LC-114 unaffected by LangGraph run calls (still fires, no checkpointer)", "LC-114",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "graph.py"}, VarName: "builder",
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{}}},
+		lc116Inv("graph.py", "", "api.py"), true},
+
+	// ─── LC-116 in-memory checkpointer run from a server entrypoint ──────────
+	{"LC-116 fires: StateGraph + MemorySaver, run in a same-file FastAPI route", "LC-116",
+		lc116Graph("app.py", "MemorySaver"), lc116Inv("app.py", "", "app.py"), true},
+	{"LC-116 fires: InMemorySaver", "LC-116",
+		lc116Graph("app.py", "InMemorySaver"), lc116Inv("app.py", "", "app.py"), true},
+	{"LC-116 fires: graph in graph.py, run from a handler in api.py", "LC-116",
+		lc116Graph("graph.py", "MemorySaver"), lc116Inv("api.py", "graph.py", "api.py"), true},
+	{"LC-116 fires: run from a Celery worker task", "LC-116",
+		lc116Graph("app.py", "MemorySaver"),
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{{
+			SDK: models.SDKLangChain, Location: models.Location{FilePath: "tasks.py"}, AgentVarName: "builder", AgentFilePath: "app.py",
+			ServerReachable: &models.EntrypointRef{FilePath: "tasks.py", Kind: models.EntrypointWorker, Framework: "celery", Via: "direct"},
+		}}}, true},
+	{"LC-116 fires: prebuilt create_react_agent with MemorySaver", "LC-116",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "app.py"}, VarName: "agent", CheckpointerClass: "MemorySaver"},
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{{
+			SDK: models.SDKLangChain, Location: models.Location{FilePath: "app.py"}, AgentVarName: "agent",
+			ServerReachable: &models.EntrypointRef{FilePath: "app.py", Kind: models.EntrypointHTTP, Framework: "fastapi", Via: "direct"},
+		}}}, true},
+	{"LC-116 silent: PostgresSaver", "LC-116",
+		lc116Graph("app.py", "PostgresSaver"), lc116Inv("app.py", "", "app.py"), false},
+	{"LC-116 silent: SqliteSaver", "LC-116",
+		lc116Graph("app.py", "SqliteSaver"), lc116Inv("app.py", "", "app.py"), false},
+	{"LC-116 silent: RedisSaver", "LC-116",
+		lc116Graph("app.py", "RedisSaver"), lc116Inv("app.py", "", "app.py"), false},
+	{"LC-116 silent: unresolved checkpointer (empty class)", "LC-116",
+		lc116Graph("app.py", ""), lc116Inv("app.py", "", "app.py"), false},
+	{"LC-116 silent: no checkpointer at all (LC-114's job)", "LC-116",
+		models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+			Location: models.Location{FilePath: "app.py"}, VarName: "builder",
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{}}},
+		lc116Inv("app.py", "", "app.py"), false},
+	{"LC-116 silent: run call not reachable from any entrypoint (script)", "LC-116",
+		lc116Graph("app.py", "MemorySaver"),
+		models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{{
+			SDK: models.SDKLangChain, Location: models.Location{FilePath: "run.py"}, AgentVarName: "builder", AgentFilePath: "app.py",
+		}}}, false},
+	{"LC-116 silent: LangGraph Platform repo (langgraph.json)", "LC-116",
+		lc116Graph("app.py", "MemorySaver"),
+		func() models.RepoInventory {
+			inv := lc116Inv("app.py", "", "app.py")
+			inv.Manifest = models.ScanManifest{JSONFiles: []string{"langgraph.json"}}
+			return inv
+		}(), false},
+	{"LC-116 silent: run call resolves to a same-named graph in another file", "LC-116",
+		lc116Graph("app.py", "MemorySaver"), lc116Inv("api.py", "other_graph.py", "api.py"), false},
+	{"LC-116 silent: FastAPI test app under tests/", "LC-116",
+		lc116Graph("app.py", "MemorySaver"), lc116Inv("tests/test_api.py", "app.py", "tests/test_api.py"), false},
+	{"LC-116 silent: production run call stamped only by a conftest.py entrypoint", "LC-116",
+		lc116Graph("app.py", "MemorySaver"), lc116Inv("app.py", "", "conftest.py"), false},
+	{"LC-116 silent: graph defined in a test_*.py file", "LC-116",
+		lc116Graph("test_graph.py", "MemorySaver"), lc116Inv("test_graph.py", "", "test_graph.py"), false},
+
 	// ─── OAI-120 / PYD-108 no wall-clock timeout on run calls ────────────────
 	{"OAI-120 fires when the Runner.run call is not timeout-wrapped", "OAI-120",
 		models.AgentDef{
@@ -7130,4 +7190,24 @@ func TestFixtureAgentsHaveLanguage(t *testing.T) {
 			}
 		}
 	}
+}
+
+// lc116Graph is a resolved StateGraph AgentDef with the given checkpointer class.
+func lc116Graph(file, ckpt string) models.AgentDef {
+	return models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Language: models.LanguagePython,
+		Location: models.Location{FilePath: file}, VarName: "builder", CheckpointerClass: ckpt,
+		Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+			"checkpointer": {Value: &models.Expr{Kind: models.ExprCall, Text: ckpt + "()"}},
+		}}}
+}
+
+// lc116Inv is an inventory with one LangGraph run call of `builder` in
+// callFile (agentFile set when resolved cross-file), stamped reachable from a
+// FastAPI route in entryFile.
+func lc116Inv(callFile, agentFile, entryFile string) models.RepoInventory {
+	return models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{{
+		SDK: models.SDKLangChain, Callee: "app.invoke", Location: models.Location{FilePath: callFile},
+		AgentVarName: "builder", AgentFilePath: agentFile,
+		ServerReachable: &models.EntrypointRef{FilePath: entryFile, Kind: models.EntrypointHTTP, Framework: "fastapi", Via: "direct"},
+	}}}
 }

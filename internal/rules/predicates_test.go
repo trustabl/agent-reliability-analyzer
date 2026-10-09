@@ -1827,3 +1827,86 @@ func TestPredRepoObservabilityCapturesContent(t *testing.T) {
 		t.Error("no capture signal must not satisfy the predicate")
 	}
 }
+
+func TestPredAgentCheckpointerInMemory(t *testing.T) {
+	for class, want := range map[string]bool{
+		"MemorySaver": true, "InMemorySaver": true,
+		"PostgresSaver": false, "AsyncPostgresSaver": false, "SqliteSaver": false,
+		"RedisSaver": false, "MongoDBSaver": false, "": false,
+	} {
+		a := models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", CheckpointerClass: class}
+		if got := rules.PredAgentCheckpointerInMemory(a); got != want {
+			t.Errorf("class %q: got %v, want %v", class, got, want)
+		}
+	}
+}
+
+func TestPredAgentServerReachable(t *testing.T) {
+	ep := func(file string) *models.EntrypointRef {
+		return &models.EntrypointRef{FilePath: file, Kind: models.EntrypointHTTP, Framework: "fastapi", Via: "direct"}
+	}
+	agent := models.AgentDef{SDK: models.SDKLangChain, Class: "StateGraph", Location: models.Location{FilePath: "graph.py"}, VarName: "builder"}
+	rc := func(file, agentFile string, ref *models.EntrypointRef) models.AgentRunCallDef {
+		return models.AgentRunCallDef{SDK: models.SDKLangChain, Location: models.Location{FilePath: file},
+			AgentVarName: "builder", AgentFilePath: agentFile, ServerReachable: ref}
+	}
+	cases := []struct {
+		name string
+		a    models.AgentDef
+		rcs  []models.AgentRunCallDef
+		want bool
+	}{
+		{"same file, reachable", agent, []models.AgentRunCallDef{rc("graph.py", "", ep("graph.py"))}, true},
+		{"cross file, reachable", agent, []models.AgentRunCallDef{rc("api.py", "graph.py", ep("api.py"))}, true},
+		{"one of two calls reachable", agent, []models.AgentRunCallDef{rc("graph.py", "", nil), rc("api.py", "graph.py", ep("api.py"))}, true},
+		{"opaque run call still counts", agent, []models.AgentRunCallDef{func() models.AgentRunCallDef {
+			r := rc("graph.py", "", ep("graph.py"))
+			r.Opaque = true
+			return r
+		}()}, true},
+		{"not reachable", agent, []models.AgentRunCallDef{rc("graph.py", "", nil)}, false},
+		{"no run calls", agent, nil, false},
+		{"cross-file call names a different defining file", agent, []models.AgentRunCallDef{rc("api.py", "other.py", ep("api.py"))}, false},
+		{"same-file correlation needs the agent's file", agent, []models.AgentRunCallDef{rc("api.py", "", ep("api.py"))}, false},
+		{"other var name", agent, []models.AgentRunCallDef{{SDK: models.SDKLangChain, Location: models.Location{FilePath: "graph.py"}, AgentVarName: "x", ServerReachable: ep("graph.py")}}, false},
+		{"other SDK", agent, []models.AgentRunCallDef{{SDK: models.SDKPydanticAI, Location: models.Location{FilePath: "graph.py"}, AgentVarName: "builder", ServerReachable: ep("graph.py")}}, false},
+		{"agent with no VarName", models.AgentDef{SDK: models.SDKLangChain, Location: models.Location{FilePath: "graph.py"}}, []models.AgentRunCallDef{rc("graph.py", "", ep("graph.py"))}, false},
+		{"run call under tests/", agent, []models.AgentRunCallDef{rc("tests/test_api.py", "graph.py", ep("tests/test_api.py"))}, false},
+		{"entrypoint in conftest.py", agent, []models.AgentRunCallDef{rc("graph.py", "", ep("conftest.py"))}, false},
+		{"agent in a test_*.py file", models.AgentDef{SDK: models.SDKLangChain, Location: models.Location{FilePath: "test_graph.py"}, VarName: "builder"},
+			[]models.AgentRunCallDef{rc("test_graph.py", "", ep("test_graph.py"))}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := rules.PredAgentServerReachable(c.a, models.RepoInventory{AgentRunCalls: c.rcs}); got != c.want {
+				t.Errorf("got %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+// TestRunCallPredicates_IgnoreLangGraphRunCalls guards the leak path for the
+// LangGraph run-call records added for LC-116: every pre-existing run-call
+// predicate is SDK-gated, so a LangChain run call (even one sharing a same-file
+// VarName with another SDK's agent) must not change its result.
+func TestRunCallPredicates_IgnoreLangGraphRunCalls(t *testing.T) {
+	lgCall := models.AgentRunCallDef{SDK: models.SDKLangChain, Callee: "agent.invoke",
+		Location: models.Location{FilePath: "main.py"}, AgentVarName: "agent",
+		ServerReachable: &models.EntrypointRef{FilePath: "main.py", Kind: models.EntrypointHTTP, Framework: "fastapi"}}
+	inv := models.RepoInventory{AgentRunCalls: []models.AgentRunCallDef{lgCall}}
+	for _, sdk := range []models.SDK{models.SDKOpenAIAgents, models.SDKPydanticAI, models.SDKGoogleADK, models.SDKAutoGen, models.SDKLangChain} {
+		a := models.AgentDef{SDK: sdk, Location: models.Location{FilePath: "main.py"}, VarName: "agent"}
+		if rules.PredAgentRunCallMaxTurnsMissing(a, inv) {
+			t.Errorf("%s: max_turns predicate fired on a LangGraph run call", sdk)
+		}
+		if rules.PredAgentRunCallUsageLimitsMissing(a, inv) {
+			t.Errorf("%s: usage_limits predicate fired on a LangGraph run call", sdk)
+		}
+		if rules.PredAgentRunCallWallClockTimeoutMissing(a, inv) {
+			t.Errorf("%s: wall-clock predicate fired on a LangGraph run call", sdk)
+		}
+		if sdk != models.SDKLangChain && rules.PredAgentServerReachable(a, inv) {
+			t.Errorf("%s: server-reachable credited a LangGraph run call to another SDK's agent", sdk)
+		}
+	}
+}

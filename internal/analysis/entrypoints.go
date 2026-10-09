@@ -13,13 +13,12 @@ import (
 
 // Server-entrypoint discovery (Python) and run-call reachability.
 //
-// This is a FACT only. Nothing consumes it yet: there is no predicate, no rule
-// and no schema change. It records which functions a server framework invokes
-// on behalf of an external request or job, and stamps the agent run calls that
-// are reachable from them (AgentRunCallDef.ServerReachable), so a later rule
-// can tell "an agent run inside a request handler" from "an agent run in a
-// script". Follow-up work (a LangGraph run-call anchor, rank 6, maybe rank 4)
-// builds on it.
+// It records which functions a server framework invokes on behalf of an
+// external request or job, and stamps the agent run calls that are reachable
+// from them (AgentRunCallDef.ServerReachable), so a rule can tell "an agent run
+// inside a request handler" from "an agent run in a script". The agent_server_reachable predicate (LC-116, LangGraph in-memory
+// checkpointer on a server path) reads the stamp; the entrypoint list itself is
+// a reported fact.
 //
 // Recognized entrypoints (each gated on a real import of the framework):
 //
@@ -400,27 +399,43 @@ func ApplyEntrypointReachability(inv *models.RepoInventory, parsed []ParsedFile)
 // resolveImportedFunction finds the top-level function an import binding names,
 // in a file that is part of the scan set. Returns ("", nil) when unresolvable.
 func resolveImportedFunction(importer string, imp importBinding, parsed []ParsedFile, files map[string]ParsedFile, topOf func(string) map[string]*sitter.Node) (string, *sitter.Node) {
+	file := resolveImportedName(importer, imp, parsed, files, func(rel, name string) bool {
+		return topOf(rel)[name] != nil
+	})
+	if file == "" {
+		return "", nil
+	}
+	return file, topOf(file)[imp.name]
+}
+
+// resolveImportedName returns the scanned file that defines the name an import
+// binding refers to, where "defines" is decided by has(file, name). Returns ""
+// when unresolvable. Relative imports are resolved from the importer's
+// directory (a candidate that exists but does not define the name stops the
+// search: no guessing); absolute imports use matchesModule, first parsed file
+// in input order wins.
+func resolveImportedName(importer string, imp importBinding, parsed []ParsedFile, files map[string]ParsedFile, has func(rel, name string) bool) string {
 	if strings.HasPrefix(imp.module, ".") {
 		for _, cand := range relativeImportCandidates(importer, imp.module) {
 			if _, ok := files[cand]; !ok {
 				continue
 			}
-			if def := topOf(cand)[imp.name]; def != nil {
-				return cand, def
+			if has(cand, imp.name) {
+				return cand
 			}
-			return "", nil // the target exists but does not define the name: stop, no guessing
+			return "" // the target exists but does not define the name: stop, no guessing
 		}
-		return "", nil
+		return ""
 	}
 	for _, pf := range parsed {
 		if !matchesModule(pf.RelPath, imp.module) {
 			continue
 		}
-		if def := topOf(pf.RelPath)[imp.name]; def != nil {
-			return pf.RelPath, def
+		if has(pf.RelPath, imp.name) {
+			return pf.RelPath
 		}
 	}
-	return "", nil
+	return ""
 }
 
 // relativeImportCandidates turns a relative module (".mod", "..pkg.mod", ".")

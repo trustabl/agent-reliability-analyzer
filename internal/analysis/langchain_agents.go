@@ -73,6 +73,7 @@ func DiscoverLangChainAgents(files []ParsedFile) []models.AgentDef {
 func discoverLangChainAgentsInFile(pf ParsedFile) []models.AgentDef {
 	var out []models.AgentDef
 	imp := collectLangChainImports(pf)
+	var ckptBindings map[string][]*sitter.Node
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
 		if n.Type() != "call" {
 			return true
@@ -113,6 +114,15 @@ func discoverLangChainAgentsInFile(pf ParsedFile) []models.AgentDef {
 		}
 		if nm := kwargStringLiteral(kwargs, "name"); nm != "" {
 			a.Name = nm
+		}
+		// The prebuilt graph helpers take the same checkpointer= as compile().
+		if class == "ReactAgent" || class == "CreateAgent" {
+			if arg := keywordArgNode(n, "checkpointer", pf.Source); arg != nil {
+				if ckptBindings == nil {
+					ckptBindings = checkpointerBindings(pf)
+				}
+				a.CheckpointerClass = langGraphCheckpointerClass(arg, pf, imp, ckptBindings)
+			}
 		}
 		// Capture the assignment-target identifier (agent = create_react_agent(...))
 		// for handoff/edge resolution by variable name.

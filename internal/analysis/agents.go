@@ -948,14 +948,18 @@ func buildImportsByFile(parsed []ParsedFile) map[string]map[string]importBinding
 			if n.Type() != "import_from_statement" {
 				return true
 			}
-			module := astutil.NodeText(n.ChildByFieldName("module_name"), pf.Source)
+			modNode := n.ChildByFieldName("module_name")
+			module := astutil.NodeText(modNode, pf.Source)
 			for i := 0; i < int(n.ChildCount()); i++ {
 				child := n.Child(i)
+				// Skip the module_name node itself by position, not by text:
+				// `from graph import graph` imports a name equal to its module.
+				if modNode != nil && child.StartByte() == modNode.StartByte() {
+					continue
+				}
 				if child.Type() == "dotted_name" {
 					name := astutil.NodeText(child, pf.Source)
-					if name != module {
-						m[name] = importBinding{module: module, name: name}
-					}
+					m[name] = importBinding{module: module, name: name}
 				} else if child.Type() == "aliased_import" {
 					orig := astutil.NodeText(child.ChildByFieldName("name"), pf.Source)
 					alias := astutil.NodeText(child.ChildByFieldName("alias"), pf.Source)

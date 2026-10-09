@@ -9,8 +9,8 @@ import (
 	"github.com/trustabl/trustabl/internal/models"
 )
 
-// Agent execution-call discovery: OpenAI Agents SDK, Pydantic AI, Google ADK
-// and AutoGen / AG2.
+// Agent execution-call discovery: OpenAI Agents SDK, Pydantic AI, Google ADK,
+// AutoGen / AG2 and LangGraph.
 //
 // Execution limits (max_turns for OpenAI Agents SDK, usage_limits for
 // Pydantic AI) are set on the call that RUNS an agent, not on the agent's
@@ -63,7 +63,20 @@ import (
 //     (RoundRobinGroupChat, ...) are not discovered as agents, so a team.run()
 //     record never correlates.
 //
-// All four discoverers require the agent reference (first positional arg for
+//   - LangGraph (LangChain SDK): `<graph>.invoke / ainvoke / stream / astream /
+//     astream_events / batch / abatch(...)`. These method names are on every
+//     LangChain Runnable (LLMs, chains, retrievers), so the receiver is never an
+//     arbitrary identifier: it must be a compiled-graph variable
+//     (`app = builder.compile(...)`, from DiscoverLangGraphGraphs' compile map),
+//     the direct chain `builder.compile(...).invoke(...)`, or the variable of a
+//     prebuilt create_react_agent / create_agent. A module-level compiled graph
+//     or prebuilt agent imported into another file (`from graph import app`) is
+//     resolved through the entrypoint import resolver and recorded with
+//     AgentFilePath. AgentVarName is the BUILDER variable (the StateGraph
+//     AgentDef's VarName), or the prebuilt agent's own variable. A graph built
+//     or compiled inside a factory function and returned is not tracked.
+//
+// The other four discoverers require the agent reference (first positional arg for
 // OpenAI, receiver for Pydantic AI / AutoGen, Runner(agent=) identifier for ADK)
 // to be a plain identifier, silently skipping anything else (a call expression,
 // an attribute access), mirroring adk_agents.go's DiscoverADKTools.
@@ -112,7 +125,137 @@ func DiscoverAgentRunCalls(files []ParsedFile) []models.AgentRunCallDef {
 		}
 		out = append(out, discoverAgentRunCallsInFile(pf, imp)...)
 	}
+	return append(out, discoverLangGraphRunCalls(files)...)
+}
+
+// langGraphRunMethods are the Runnable methods that execute a compiled graph.
+var langGraphRunMethods = map[string]bool{
+	"invoke": true, "ainvoke": true, "stream": true, "astream": true,
+	"astream_events": true, "batch": true, "abatch": true,
+}
+
+// langGraphRunnable is the agent a receiver variable runs: its AgentDef
+// VarName, and the defining file when that is not the call's own file.
+type langGraphRunnable struct{ agentVar, agentFile string }
+
+// discoverLangGraphRunCalls emits one SDKLangChain AgentRunCallDef per
+// invoke/stream-family call on a known LangGraph graph (see the package comment
+// above for the anchoring rules). Two passes: first the runnable variables of
+// every langchain-importing file, then the calls in EVERY file, since a file
+// that only does `from graph import app` need not import langchain itself.
+func discoverLangGraphRunCalls(files []ParsedFile) []models.AgentRunCallDef {
+	local := map[string]map[string]string{}    // file -> receiver var -> agent VarName
+	builders := map[string]map[string]bool{}   // file -> StateGraph builder vars
+	exported := map[string]map[string]string{} // file -> module-level receiver var -> agent VarName
+	for _, pf := range files {
+		if !fileImportsLangChain(pf) {
+			continue
+		}
+		g := discoverLangGraphGraphsInFile(pf)
+		vars := map[string]string{}
+		for v, b := range g.compiled {
+			if b != "" {
+				vars[v] = b
+			}
+		}
+		for _, a := range discoverLangChainAgentsInFile(pf) {
+			if (a.Class == "ReactAgent" || a.Class == "CreateAgent") && a.VarName != "" {
+				vars[a.VarName] = a.VarName
+			}
+		}
+		if len(vars) == 0 && len(g.builderVars) == 0 {
+			continue
+		}
+		local[pf.RelPath], builders[pf.RelPath] = vars, g.builderVars
+		top := moduleLevelAssignedNames(pf)
+		ex := map[string]string{}
+		for v, b := range vars {
+			if top[v] {
+				ex[v] = b
+			}
+		}
+		if len(ex) > 0 {
+			exported[pf.RelPath] = ex
+		}
+	}
+	if len(local) == 0 {
+		return nil
+	}
+
+	var imports map[string]map[string]importBinding
+	fileSet := map[string]ParsedFile{}
+	if len(exported) > 0 {
+		imports = buildImportsByFile(files)
+		for _, pf := range files {
+			if _, ok := fileSet[pf.RelPath]; !ok {
+				fileSet[pf.RelPath] = pf
+			}
+		}
+	}
+	isExported := func(rel, name string) bool {
+		_, ok := exported[rel][name]
+		return ok
+	}
+
+	var out []models.AgentRunCallDef
+	for _, pf := range files {
+		recv := map[string]langGraphRunnable{}
+		for v, b := range local[pf.RelPath] {
+			recv[v] = langGraphRunnable{agentVar: b}
+		}
+		for name, ib := range imports[pf.RelPath] {
+			if _, shadowed := recv[name]; shadowed {
+				continue
+			}
+			if file := resolveImportedName(pf.RelPath, ib, files, fileSet, isExported); file != "" && file != pf.RelPath {
+				recv[name] = langGraphRunnable{agentVar: exported[file][ib.name], agentFile: file}
+			}
+		}
+		bv := builders[pf.RelPath]
+		if len(recv) == 0 && len(bv) == 0 {
+			continue
+		}
+		astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
+			if n.Type() != "call" {
+				return true
+			}
+			fn := n.ChildByFieldName("function")
+			if fn == nil || fn.Type() != "attribute" || !langGraphRunMethods[astutil.NodeText(fn.ChildByFieldName("attribute"), pf.Source)] {
+				return true
+			}
+			r, ok := langGraphRunReceiver(fn.ChildByFieldName("object"), recv, bv, pf)
+			if !ok {
+				return true
+			}
+			rc := buildSimpleRunCall(models.SDKLangChain, n, fn, r.agentVar, pf)
+			rc.AgentFilePath = r.agentFile
+			out = append(out, rc)
+			return true
+		})
+	}
 	return out
+}
+
+// langGraphRunReceiver resolves a run-call receiver to the graph it runs: a
+// known runnable variable, or the direct chain <builder>.compile(...).
+func langGraphRunReceiver(obj *sitter.Node, recv map[string]langGraphRunnable, builders map[string]bool, pf ParsedFile) (langGraphRunnable, bool) {
+	if obj == nil {
+		return langGraphRunnable{}, false
+	}
+	switch obj.Type() {
+	case "identifier":
+		r, ok := recv[astutil.NodeText(obj, pf.Source)]
+		return r, ok
+	case "call":
+		cf := obj.ChildByFieldName("function")
+		if cf == nil || cf.Type() != "attribute" || astutil.NodeText(cf.ChildByFieldName("attribute"), pf.Source) != "compile" {
+			return langGraphRunnable{}, false
+		}
+		if b := cf.ChildByFieldName("object"); b != nil && b.Type() == "identifier" && builders[astutil.NodeText(b, pf.Source)] {
+			return langGraphRunnable{agentVar: astutil.NodeText(b, pf.Source)}, true
+		}
+	}
+	return langGraphRunnable{}, false
 }
 
 // isOpenAIAgentsModule reports whether a dotted module path belongs to the

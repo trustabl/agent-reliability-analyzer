@@ -10,6 +10,7 @@ import (
 	"github.com/trustabl/trustabl/internal/analysis"
 	"github.com/trustabl/trustabl/internal/analysis/astutil"
 	"github.com/trustabl/trustabl/internal/models"
+	"github.com/trustabl/trustabl/internal/pathclass"
 )
 
 // ─── bool predicates ─────────────────────────────────────────────────────────
@@ -1753,6 +1754,49 @@ func PredRepoClaudeOptionsModeWithoutKwarg(e ClaudeOptionsModeKwargExpr, inv mod
 // absence rule can stay silent on the latter.
 func PredAgentKwargsObserved(a models.AgentDef) bool {
 	return a.Kwargs != nil && !a.Opaque
+}
+
+// PredAgentCheckpointerInMemory is true when this agent's checkpointer= resolves
+// to an in-process LangGraph saver (MemorySaver / InMemorySaver). Any other
+// class, an unresolved name, a runtime-selected saver and no checkpointer at
+// all are false: discovery never guesses (see AgentDef.CheckpointerClass).
+func PredAgentCheckpointerInMemory(a models.AgentDef) bool {
+	return analysis.IsLangGraphInMemoryCheckpointer(a.CheckpointerClass)
+}
+
+// PredAgentServerReachable is true when at least one run call of this agent is
+// reachable from a server entrypoint (HTTP route or worker task;
+// AgentRunCallDef.ServerReachable, one hop per edge). Run calls correlate by
+// same SDK and AgentVarName, and by file: the call's AgentFilePath when it was
+// resolved across files, else the call's own file. An agent with no VarName
+// never fires.
+//
+// Test paths are excluded (pathclass.Classify): an agent defined in a test
+// file, a run call in a test file, and a run call stamped by an entrypoint in a
+// test file (a FastAPI test app) do not count. A test harness is not a
+// production server path. The exclusion is local to this predicate; entrypoint
+// and run-call discovery stay unfiltered.
+func PredAgentServerReachable(a models.AgentDef, inv models.RepoInventory) bool {
+	if a.VarName == "" || pathclass.Classify(a.FilePath) == models.OriginTest {
+		return false
+	}
+	for _, rc := range inv.AgentRunCalls {
+		if rc.SDK != a.SDK || rc.AgentVarName != a.VarName || rc.ServerReachable == nil {
+			continue
+		}
+		defining := rc.AgentFilePath
+		if defining == "" {
+			defining = rc.FilePath
+		}
+		if defining != a.FilePath {
+			continue
+		}
+		if pathclass.Classify(rc.FilePath) == models.OriginTest || pathclass.Classify(rc.ServerReachable.FilePath) == models.OriginTest {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // PredRepoLangGraphPlatformConfigPresent reports whether the repo ships a

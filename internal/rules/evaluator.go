@@ -78,6 +78,12 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentKwargsObserved != nil && PredAgentKwargsObserved(a) != *e.AgentKwargsObserved {
 		return false
 	}
+	if e.AgentCheckpointerInMemory != nil && PredAgentCheckpointerInMemory(a) != *e.AgentCheckpointerInMemory {
+		return false
+	}
+	if e.AgentServerReachable != nil && PredAgentServerReachable(a, inv) != *e.AgentServerReachable {
+		return false
+	}
 	if e.RepoLangGraphPlatformConfigPresent != nil && PredRepoLangGraphPlatformConfigPresent(inv) != *e.RepoLangGraphPlatformConfigPresent {
 		return false
 	}
@@ -454,6 +460,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_file_url_force_download":             true,
 		"agent_run_call_wall_clock_timeout_missing": true,
 		"agent_kwargs_observed":                     true,
+		"agent_checkpointer_in_memory":              true,
+		"agent_server_reachable":                    true,
 		// Dual-scope (see EvaluateAgent): LangGraph Platform injects a checkpointer.
 		"repo_langgraph_platform_config_present": true,
 	},
@@ -554,6 +562,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentFileURLForceDownload != nil, "agent_file_url_force_download")
 	add(e.AgentRunCallWallClockTimeoutMissing != nil, "agent_run_call_wall_clock_timeout_missing")
 	add(e.AgentKwargsObserved != nil, "agent_kwargs_observed")
+	add(e.AgentCheckpointerInMemory != nil, "agent_checkpointer_in_memory")
+	add(e.AgentServerReachable != nil, "agent_server_reachable")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
 	// Skill scope
