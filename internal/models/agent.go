@@ -380,4 +380,39 @@ type AgentRunCallDef struct {
 	// and token spend but not how long one step can block; this is the only
 	// wall-clock bound discovery can see. In-memory only.
 	WallClockTimeoutWrapped bool `json:"-"`
+	// ServerReachable is non-nil when the call is reachable from a server
+	// entrypoint (HTTP route / worker task) within the v1 one-hop-per-edge
+	// limits documented on analysis.ApplyEntrypointReachability. In-memory
+	// only; nothing consumes it yet (no predicate, no rule).
+	ServerReachable *EntrypointRef `json:"-"`
+}
+
+// EntrypointKind classifies a server entrypoint.
+type EntrypointKind string
+
+const (
+	EntrypointHTTP   EntrypointKind = "http"
+	EntrypointWorker EntrypointKind = "worker"
+)
+
+// EntrypointDef is a function that a server framework invokes on behalf of an
+// external request or job: a FastAPI / Flask route handler, a Celery task or a
+// Dramatiq actor. It is a fact only; see analysis.DiscoverEntrypoints. Location
+// is the function definition (not the decorator).
+type EntrypointDef struct {
+	Location
+	Kind      EntrypointKind `json:"kind"`
+	Framework string         `json:"framework"`       // fastapi | flask | celery | dramatiq
+	Route     string         `json:"route,omitempty"` // first positional string literal of the decorator, else ""
+	FuncName  string         `json:"func_name"`
+}
+
+// EntrypointRef records which entrypoint reaches an agent run call and how.
+type EntrypointRef struct {
+	FilePath  string         `json:"file_path"`
+	Line      int            `json:"start_line"`
+	FuncName  string         `json:"func_name"`
+	Kind      EntrypointKind `json:"kind"`
+	Framework string         `json:"framework"`
+	Via       string         `json:"via"` // "direct" | "same_file" | "import"
 }

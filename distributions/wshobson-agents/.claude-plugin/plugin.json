@@ -1,0 +1,19 @@
+{
+  "name": "trustabl",
+  "version": "0.1.13",
+  "description": "Find and fix reliability and safety gaps in AI agent code before they reach production: unsafe tool grants, missing turn limits, untyped tools, prompt-injectable shell tools, and fetch calls with no timeout.",
+  "author": {
+    "name": "Trustabl",
+    "url": "https://github.com/trustabl"
+  },
+  "homepage": "https://github.com/trustabl/agent-reliability-analyzer",
+  "repository": "https://github.com/trustabl/agent-reliability-analyzer",
+  "license": "Apache-2.0",
+  "keywords": [
+    "agent-reliability",
+    "agent-security",
+    "static-analysis",
+    "mcp-security",
+    "code-review"
+  ]
+}

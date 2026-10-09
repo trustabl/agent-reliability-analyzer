@@ -49,7 +49,7 @@ order we are working them.
 | 1 | **Claude Agent SDK** | Agents, tools, skills and hooks — unsafe tool grants, missing turn limits, prompt-injectable shell tools | **Listed** |
 | 2 | **Google ADK** | Agents, tools, skills, plugins and callbacks | [Submitted](https://github.com/google/adk-docs/pull/2290) |
 | 3 | **Vercel AI SDK** | Untyped tools, missing step bounds, provider shell and file tools, fetch calls with no timeout | [Submitted](https://github.com/vercel/ai/pull/22206) |
-| 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | No route — tracing only |
+| 4 | **OpenAI Agents SDK** | Agents, tools, handoffs and guardrails | Closed — see below |
 | 5 | **Pydantic AI** | Typed tools, structured outputs, usage limits, idempotent mutations | Package published, not listed |
 
 **Vercel AI SDK** is submitted. Its registry
@@ -70,11 +70,40 @@ AI SDK integration specifically, and the code example must be tested rather than
 written from the API. All three were met before submitting, and the example was
 executed against a real repository.
 
-**OpenAI Agents SDK** has one listing mechanism, *tracing integration listings*,
-and its criteria require implementing the Agents SDK tracing interface. The same
-paragraph excludes "generic OpenTelemetry support, or a hooks-only or
-guardrails-only integration". Trustabl never executes an agent, so there is
-nothing for it to trace; this is not a submission we can write our way into.
+**OpenAI Agents SDK** is closed as researched. Its only listing is the external
+tracing processors list, requests go through an issue rather than a pull request,
+and its
+[criteria](https://github.com/openai/openai-agents-python/blob/main/CONTRIBUTING.md#tracing-integration-listings)
+are published. Five must all be met. Quoting the two that rule us out, rather
+than paraphrasing them, because the reasoning is the useful part:
+
+> The integration is available in a published, installable release and uses the
+> Agents SDK tracing interface. [...] A planned integration, generic
+> OpenTelemetry support, or a hooks-only or guardrails-only integration is
+> insufficient.
+
+A tracing processor receives spans from a running agent and exports them.
+Trustabl never executes an agent, so there are no spans. Our OpenTelemetry work
+does not help either: the criterion excludes generic OpenTelemetry support by
+name.
+
+> at least one independently verifiable example of continued use [...] by a user
+> or project outside the integration maintainer's organization. Vendor demos,
+> launch announcements, customer logos [...] do not satisfy this criterion.
+
+That one cannot be satisfied on a first submission by construction, since it
+asks for outside users of something that does not exist yet.
+
+All thirty-one vendors on that list are observability platforms, Datadog,
+Langfuse, Arize, PostHog and Weights & Biases among them. Receiving and storing
+runtime traces is what the list is for, and the repository carries no vendor
+directories at all, so there is no second route hiding in the source.
+
+Qualifying would mean building a span exporter, standing up a destination,
+documenting it to their specification, and finding an unaffiliated user who
+keeps using it. That is a product decision about runtime observability, not a
+listing task. If it is ever taken, this becomes reachable and can be reopened
+deliberately.
 
 **Pydantic AI** does publish a third-party directory, and an earlier version of
 this page said otherwise. The mistake was reading `docs/third-party-tools.md`,

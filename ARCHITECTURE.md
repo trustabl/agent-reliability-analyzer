@@ -388,9 +388,9 @@ flowchart TD
     end
 
     subgraph S2["Step 2 — Inventory (per-language AST)"]
-        disc["analysis.DiscoverTools<br/>DiscoverAgents<br/>DiscoverGuardrails<br/>DiscoverSessions<br/>DiscoverSubagents<br/>DiscoverSkills<br/>DiscoverDependencies<br/>DiscoverSlashCommands<br/>DiscoverPlugins<br/>DiscoverClaudeSettings<br/>DiscoverADKAgents<br/>DiscoverADKTools<br/>DiscoverClaudeAgentOptions<br/>DiscoverAgentRunCalls<br/>DiscoverLangGraphNodes<br/>DetectRawLLMToolOutputInSystem<br/>DiscoverObservability<br/>LangChain/CrewAI/AutoGen/PydanticAI (Py)<br/>TS: OpenAI/ADK/LangChain/Vercel/MCP-proper<br/>Go/CSharp/PHP/Rust MCP"]
+        disc["analysis.DiscoverTools<br/>DiscoverAgents<br/>DiscoverGuardrails<br/>DiscoverSessions<br/>DiscoverSubagents<br/>DiscoverSkills<br/>DiscoverDependencies<br/>DiscoverSlashCommands<br/>DiscoverPlugins<br/>DiscoverClaudeSettings<br/>DiscoverADKAgents<br/>DiscoverADKTools<br/>DiscoverClaudeAgentOptions<br/>DiscoverAgentRunCalls<br/>DiscoverEntrypoints<br/>ApplyEntrypointReachability<br/>DiscoverLangGraphNodes<br/>DetectRawLLMToolOutputInSystem<br/>DiscoverObservability<br/>LangChain/CrewAI/AutoGen/PydanticAI (Py)<br/>TS: OpenAI/ADK/LangChain/Vercel/MCP-proper<br/>Go/CSharp/PHP/Rust MCP"]
         edges["analysis.ResolveEdges"]
-        inv[["RepoInventory<br/>Tools · Agents · Guardrails · Sessions<br/>SDKsDetected · HasShellInvocations · UsesDefaultTracing<br/>ObservabilitySignals<br/>Dependencies (BOM)<br/>MCPServers · Subagents · Skills · SlashCommands<br/>PluginManifests · ClaudeSettings · ClaudeAgentOptions<br/>AgentRunCalls"]]
+        inv[["RepoInventory<br/>Tools · Agents · Guardrails · Sessions<br/>SDKsDetected · HasShellInvocations · UsesDefaultTracing<br/>ObservabilitySignals<br/>Dependencies (BOM)<br/>MCPServers · Subagents · Skills · SlashCommands<br/>PluginManifests · ClaudeSettings · ClaudeAgentOptions<br/>AgentRunCalls · Entrypoints"]]
         disc --> edges --> inv
     end
 
@@ -727,6 +727,24 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   `cancellation_token` kwarg on the run call (`wallClockCancelKwarg`). The
   Vercel AI analogue (VAI-020) is a plain agent-kwarg rule over `abortSignal` /
   `timeout` and needs no run-call record.
+- **DiscoverEntrypoints / ApplyEntrypointReachability** (`entrypoints.go`) —
+  a **fact only**: no predicate, no rule, no schema change. Python,
+  import-gated: FastAPI (`@<recv>.get/post/put/patch/delete/head/options/
+  websocket/api_route`; recv bound in-file to `FastAPI(...)` / `APIRouter(...)`,
+  or unbound-but-imported in a file that imports fastapi — a small documented
+  FP), Flask (`@<recv>.route/get/...`), Celery (`@app.task`, `@shared_task`) and
+  Dramatiq (`@dramatiq.actor`). Each becomes an `EntrypointDef` on
+  `RepoInventory.Entrypoints` (and `ScanResult.entrypoints` in the JSON report),
+  sorted by (file, line, route, framework). Directories named `examples`, `demo`,
+  `docs`, `samples`, `cookbook`, `tutorial(s)` are skipped by a list local to the
+  detector (`pathclass` is untouched). `__main__` / CLI markers are not recorded.
+  `ApplyEntrypointReachability` runs after `DiscoverAgentRunCalls` and stamps
+  `AgentRunCallDef.ServerReachable` (in-memory, `json:"-"`) when the run call is
+  in the entrypoint (`direct`), in a same-file top-level function it calls
+  (`same_file`), or in a top-level function it calls that was imported by name,
+  absolute or relative (`import`). One hop per edge kind, no call graph, no
+  `m.f()` / method calls / DI; relative imports resolve only to files in the scan
+  set (see the doc comment). Ranks 4 and 6 build on it in follow-up PRs.
 - **DiscoverLangGraphNodes** (`langgraph_nodes.go`) — a function registered via
   `<builder>.add_node("name", func)` / `add_node(func)` is not a `@tool` but runs
   on every graph visit. Same-file, undecorated, top-level functions are emitted
@@ -1560,6 +1578,7 @@ classDiagram
         HasShellInvocations
         UsesDefaultTracing
         AgentRunCalls
+        Entrypoints
     }
     class ToolDef {
         Name
@@ -1634,7 +1653,8 @@ RepoInventory {
     PluginManifests    []PluginManifest
     ClaudeSettings     []ClaudeSettings
     ClaudeAgentOptions []ClaudeAgentOptionsDef  // ClaudeAgentOptions(...) session configs (permission_mode, max_turns, etc.)
-    AgentRunCalls      []AgentRunCallDef        // Runner.run / agent.run / ADK Runner.run_async / AutoGen initiate_chat call sites (max_turns, usage_limits, WallClockTimeoutWrapped)
+    AgentRunCalls      []AgentRunCallDef        // Runner.run / agent.run / ADK Runner.run_async / AutoGen initiate_chat call sites (max_turns, usage_limits, WallClockTimeoutWrapped, in-memory ServerReachable stamp)
+    Entrypoints        []EntrypointDef          // Python FastAPI/Flask routes, Celery tasks, Dramatiq actors (fact only; also ScanResult.entrypoints)
     SDKsDetected        []SDK     // observed in code, PLUS claude_agent_sdk when any markdown subagent OR ClaudeAgentOptions(...) is present (drives the policy-selection step)
     HasShellInvocations bool      // any Python function calling subprocess.* / os.system / os.popen ("openshell" risk surface, not an SDK)
     Manifest            ScanManifest

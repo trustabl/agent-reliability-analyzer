@@ -427,6 +427,10 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.ClaudeSettings = analysis.DiscoverClaudeSettings(profile.Manifest)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
+	// Server-entrypoint fact (Python): must follow DiscoverAgentRunCalls, which
+	// supplies the run calls the reachability stamp is applied to.
+	inventory.Entrypoints = analysis.DiscoverEntrypoints(parsed)
+	analysis.ApplyEntrypointReachability(&inventory, parsed)
 	inventory.RawAnthropicToolOutputInSystemPrompt, inventory.RawOpenAIToolOutputInSystemMessage = analysis.DetectRawLLMToolOutputInSystem(parsed)
 	// Markdown subagents are an independent Claude Agent SDK signal: a repo can
 	// ship .claude/agents/*.md (or a flat collection) with no Claude SDK code.
@@ -648,6 +652,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 		Skills:              inventory.Skills,
 		Dependencies:        inventory.Dependencies,
 		Observability:       inventory.ObservabilitySignals,
+		Entrypoints:         inventory.Entrypoints,
 		Vulnerabilities:     vulns,
 		Secrets:             secrets,
 		SlashCommands:       inventory.SlashCommands,
