@@ -380,6 +380,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > OTel GenAI semconv is still Development with renamed keys), and **rank 4** (run-level correlation id — session / `group_id` — needs a
 > run-call kwarg predicate, tracked with the HTTP-entrypoint design ticket). See `COVERAGE.md`.
 >
+> **agent-reliability-otel-labels correctness, Batch 1 (2026-10-08, `schema_version` 22 → 23):** the fixture now holds **338** rules
+> (334 + 4; re-derive, do not trust this figure). Built in parallel with LC-116, which took 21 → 22 first, so this batch takes 23. **OBS-009** (shared `Run`) / **OBS-010** (tool span labelled only on success) /
+> **OBS-011** (constant `attempt`) / **OBS-012** (run end only on success) read new facts on `OtelLabelsSignal`; test-file
+> signals never count and findings point at the offending call. Hand-written `trustabl.*` keys now credit OBS-006..008.
+> Spec: `.superpowers/specs/2026-10-04-otel-labels-correctness-rules-design.md`. Not built: the handoff rule (spec O7),
+> the `side_effect` rules (Batch 2). OBS-009..012 must not reach production before library 0.1.1 is published (spec O1): the 0.1.0 README example trips all four.
+>
 > **agent-reliability-otel-labels batch (2026-10-04, `schema_version` 20 → 21):** the fixture now holds **333** rules
 > (330 + 3; re-derive, do not trust this figure). Built in parallel with the HTTPS-only batch, which had already taken
 > 19 → 20, so this batch takes 21. **OBS-006** / **OBS-007** / **OBS-008** are a mutually exclusive
