@@ -3565,6 +3565,49 @@ def summarize(state):
 `, wantFires: false},
 }
 
+// otelLabelsCorrectnessInv is an instrumented repo that is fully labelled
+// except for the signals passed in, so OBS-006..008 are silent and only the
+// correctness rule under test can fire.
+func otelLabelsCorrectnessInv(extra ...models.OtelLabelsSignal) models.RepoInventory {
+	base := []models.OtelLabelsSignal{
+		{Kind: models.OtelLabelsImport, File: "agent.py", StartLine: 1, EndLine: 1},
+		{Kind: models.OtelLabelsRunStart, File: "agent.py", StartLine: 5, EndLine: 5},
+	}
+	return models.RepoInventory{
+		SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+		Manifest:     models.ScanManifest{PythonFiles: []string{"agent.py"}},
+		ObservabilitySignals: []models.ObservabilitySignal{
+			{Vendor: models.VendorOTel, Kind: models.ObsSignalInit},
+		},
+		Tools:             []models.ToolDef{{Name: "search", Kind: models.KindOpenAITool}},
+		OtelLabelsSignals: append(base, extra...),
+	}
+}
+
+var otelLabelsCorrectnessProfile = models.RepoProfile{
+	Languages:            []models.Language{models.LanguagePython},
+	OtelLabelsDeclaredIn: []string{"pyproject.toml"},
+}
+
+// Correct labelling: a per-run Run, a counted attempt, a failure-safe tool
+// span, and a run end on the error path.
+var otelLabelsGood = []models.OtelLabelsSignal{
+	{Kind: models.OtelLabelsRunConstruct, File: "agent.py", StartLine: 4, EndLine: 4},
+	{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9, EndLine: 9, FailureSafe: true},
+	{Kind: models.OtelLabelsRunEnd, File: "agent.py", StartLine: 11, EndLine: 11, ExitReason: "final_answer"},
+	{Kind: models.OtelLabelsRunEnd, File: "agent.py", StartLine: 13, EndLine: 13, ExitReason: "error", ErrorPath: true},
+}
+
+// withOtel returns a copy of the good signals with one replaced or added.
+func withOtel(replace int, s models.OtelLabelsSignal) []models.OtelLabelsSignal {
+	out := append([]models.OtelLabelsSignal(nil), otelLabelsGood...)
+	if replace >= 0 {
+		out[replace] = s
+		return out
+	}
+	return append(out, s)
+}
+
 // policyRepoRuleCases covers repo-scoped rules.
 var policyRepoRuleCases = []policyRepoCase{
 	// ─── LangChain repo rule (LC-201) ───────────────────────────────────────
@@ -4386,6 +4429,44 @@ var policyRepoRuleCases = []policyRepoCase{
 				{Kind: models.OtelLabelsImport},
 			},
 		},
+		false},
+	// agent-reliability-otel-labels correctness (OBS-009..012). Each starts
+	// from a fully labelled repo and breaks one thing.
+	{"OBS-009 fires on a module-scope Run", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(0, models.OtelLabelsSignal{Kind: models.OtelLabelsRunConstruct, File: "agent.py", StartLine: 2, ModuleScope: true})...),
+		true},
+	{"OBS-009 fires on a literal run id", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(0, models.OtelLabelsSignal{Kind: models.OtelLabelsRunConstruct, File: "agent.py", StartLine: 4, RunIDConst: true})...),
+		true},
+	{"OBS-009 silent on a per-run Run", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-009 silent when the shared Run is in a test file", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsRunConstruct, File: "tests/test_agent.py", StartLine: 3, ModuleScope: true, TestOrigin: true})...),
+		false},
+	{"OBS-010 fires when no tool-span label runs on failure", "OBS-010", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(1, models.OtelLabelsSignal{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9})...),
+		true},
+	{"OBS-010 silent when a tool-span label is failure-safe", "OBS-010", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-010 silent when labels are only in a success hook", "OBS-010", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(1, models.OtelLabelsSignal{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9, HookUnknown: true})...),
+		false},
+	{"OBS-011 fires when every attempt is a constant", "OBS-011", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(1, models.OtelLabelsSignal{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9, FailureSafe: true, AttemptConst: true})...),
+		true},
+	{"OBS-011 silent when the attempt is counted", "OBS-011", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-012 fires when the run end is recorded only on success", "OBS-012", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood[:3]...), true},
+	{"OBS-012 silent when the error path records the run end", "OBS-012", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-012 silent when the repo is not instrumented", "OBS-012",
+		otelLabelsCorrectnessProfile,
+		func() models.RepoInventory {
+			inv := otelLabelsCorrectnessInv(otelLabelsGood[:3]...)
+			inv.ObservabilitySignals = nil
+			return inv
+		}(),
 		false},
 	// Mutual exclusion with the absence rules: a declared-but-unwired dep is
 	// OBS-005 at medium, NOT "this project wires no observability" at low.

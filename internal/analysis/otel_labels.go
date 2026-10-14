@@ -220,6 +220,9 @@ func otelLabelsCallSignals(pf ParsedFile, lang models.Language, test bool, alias
 	}
 	var out []models.OtelLabelsSignal
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
+		if sig, ok := otelLabelsRunSignal(n, pf, lang, test, aliases); ok {
+			out = append(out, sig)
+		}
 		if n.Type() != callType {
 			return true
 		}
@@ -232,14 +235,16 @@ func otelLabelsCallSignals(pf ParsedFile, lang models.Language, test bool, alias
 			if name != c.Name || (c.NeedsReceiver && !hasReceiver) {
 				continue
 			}
-			out = append(out, models.OtelLabelsSignal{
+			sig := models.OtelLabelsSignal{
 				Kind:       c.Kind,
 				File:       pf.RelPath,
 				StartLine:  astutil.NodeLine(n),
 				EndLine:    astutil.NodeEndLine(n),
 				Language:   lang,
 				TestOrigin: test,
-			})
+			}
+			otelLabelsCallFacts(&sig, n, pf.Source, lang)
+			out = append(out, sig)
 		}
 		return true
 	})

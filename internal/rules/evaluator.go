@@ -178,6 +178,18 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoOtelLabelsImplemented != nil && !PredRepoOtelLabelsImplemented(*e.RepoOtelLabelsImplemented, inv) {
 		return false
 	}
+	if e.RepoOtelLabelsRunShared != nil && !PredRepoOtelLabelsRunShared(*e.RepoOtelLabelsRunShared, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsToolSpanFailureUnsafe != nil && !PredRepoOtelLabelsToolSpanFailureUnsafe(*e.RepoOtelLabelsToolSpanFailureUnsafe, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsAttemptConstant != nil && !PredRepoOtelLabelsAttemptConstant(*e.RepoOtelLabelsAttemptConstant, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsRunEndSuccessOnly != nil && !PredRepoOtelLabelsRunEndSuccessOnly(*e.RepoOtelLabelsRunEndSuccessOnly, inv) {
+		return false
+	}
 	if len(e.RepoClaudeDefaultModeIs) > 0 && !PredRepoClaudeDefaultModeIs(e.RepoClaudeDefaultModeIs, inv) {
 		return false
 	}
@@ -516,6 +528,10 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_otel_labels_installed":                   true,
 		"repo_otel_labels_initialized":                 true,
 		"repo_otel_labels_implemented":                 true,
+		"repo_otel_labels_run_shared":                  true,
+		"repo_otel_labels_tool_span_failure_unsafe":    true,
+		"repo_otel_labels_attempt_constant":            true,
+		"repo_otel_labels_run_end_success_only":        true,
 		"repo_langgraph_platform_config_present":       true,
 		"repo_raw_anthropic_tool_output_in_system":     true,
 		"repo_raw_openai_tool_output_in_system":        true,
@@ -620,6 +636,10 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoOtelLabelsInstalled != nil, "repo_otel_labels_installed")
 	add(e.RepoOtelLabelsInitialized != nil, "repo_otel_labels_initialized")
 	add(e.RepoOtelLabelsImplemented != nil, "repo_otel_labels_implemented")
+	add(e.RepoOtelLabelsRunShared != nil, "repo_otel_labels_run_shared")
+	add(e.RepoOtelLabelsToolSpanFailureUnsafe != nil, "repo_otel_labels_tool_span_failure_unsafe")
+	add(e.RepoOtelLabelsAttemptConstant != nil, "repo_otel_labels_attempt_constant")
+	add(e.RepoOtelLabelsRunEndSuccessOnly != nil, "repo_otel_labels_run_end_success_only")
 	return n
 }
 

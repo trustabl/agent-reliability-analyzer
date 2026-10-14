@@ -1795,6 +1795,109 @@ func PredRepoOtelLabelsImplemented(want bool, inv models.RepoInventory) bool {
 	return implemented == want
 }
 
+// countedOtelLabels returns the signals of one kind that a correctness check
+// may count: test files never decide one (spec D8).
+func countedOtelLabels(inv models.RepoInventory, kind models.OtelLabelsSignalKind) []models.OtelLabelsSignal {
+	var out []models.OtelLabelsSignal
+	for _, s := range inv.OtelLabelsSignals {
+		if s.Kind == kind && !s.TestOrigin {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// otelRunSharedOffender returns the first Run built once rather than per run,
+// or given a literal run id; nil when there is none.
+func otelRunSharedOffender(inv models.RepoInventory) *models.OtelLabelsSignal {
+	for _, s := range countedOtelLabels(inv, models.OtelLabelsRunConstruct) {
+		if s.ModuleScope || s.RunIDConst {
+			return &s
+		}
+	}
+	return nil
+}
+
+// otelToolSpanFailureUnsafeOffender returns the first tool-span label when no
+// tool-span label runs on failure. Labels inside a framework success hook are
+// left out: unknown, not unsafe (spec D10). One failure-safe label credits the
+// repo (spec D6).
+func otelToolSpanFailureUnsafeOffender(inv models.RepoInventory) *models.OtelLabelsSignal {
+	var spans []models.OtelLabelsSignal
+	for _, s := range countedOtelLabels(inv, models.OtelLabelsToolSpan) {
+		if !s.HookUnknown {
+			spans = append(spans, s)
+		}
+	}
+	if len(spans) == 0 {
+		return nil
+	}
+	for _, s := range spans {
+		if s.FailureSafe {
+			return nil
+		}
+	}
+	return &spans[0]
+}
+
+// otelAttemptConstantOffender returns the first tool-span label when every one
+// passes attempt as an integer literal.
+func otelAttemptConstantOffender(inv models.RepoInventory) *models.OtelLabelsSignal {
+	spans := countedOtelLabels(inv, models.OtelLabelsToolSpan)
+	if len(spans) == 0 {
+		return nil
+	}
+	for _, s := range spans {
+		if !s.AttemptConst {
+			return nil
+		}
+	}
+	return &spans[0]
+}
+
+// otelRunEndSuccessOnlyOffender returns the first run-end label when none can
+// record a failure. A run end credits the repo when it sits on the error path,
+// passes the literal "error", or passes a variable reason that may carry
+// "error". A fixed reason in finally does not (spec D9).
+func otelRunEndSuccessOnlyOffender(inv models.RepoInventory) *models.OtelLabelsSignal {
+	ends := countedOtelLabels(inv, models.OtelLabelsRunEnd)
+	if len(ends) == 0 {
+		return nil
+	}
+	for _, s := range ends {
+		if s.ErrorPath || s.ExitReason == "error" || s.ExitReason == "" {
+			return nil
+		}
+	}
+	return &ends[0]
+}
+
+// PredRepoOtelLabelsRunShared reports whether a Run is shared between runs:
+// built at module scope, in a class body or as a Python default argument, or
+// given a literal run id. Every run then writes the same trustabl.run_id.
+func PredRepoOtelLabelsRunShared(want bool, inv models.RepoInventory) bool {
+	return (otelRunSharedOffender(inv) != nil) == want
+}
+
+// PredRepoOtelLabelsToolSpanFailureUnsafe reports whether tool spans are
+// labelled only on success: tool-span labels exist and none sits in a
+// finally / except / catch, an error callback, or a .finally / .catch handler.
+func PredRepoOtelLabelsToolSpanFailureUnsafe(want bool, inv models.RepoInventory) bool {
+	return (otelToolSpanFailureUnsafeOffender(inv) != nil) == want
+}
+
+// PredRepoOtelLabelsAttemptConstant reports whether every tool-span label
+// passes attempt as an integer literal, so no retry can ever show.
+func PredRepoOtelLabelsAttemptConstant(want bool, inv models.RepoInventory) bool {
+	return (otelAttemptConstantOffender(inv) != nil) == want
+}
+
+// PredRepoOtelLabelsRunEndSuccessOnly reports whether no run-end label can
+// record a failure.
+func PredRepoOtelLabelsRunEndSuccessOnly(want bool, inv models.RepoInventory) bool {
+	return (otelRunEndSuccessOnlyOffender(inv) != nil) == want
+}
+
 // PredRepoClaudeOptionsModeWithoutKwarg fires when a SINGLE discovered
 // ClaudeAgentOptions(...) construction both sets permission_mode to one of
 // e.Modes and does not set e.Kwarg. This correlates the two facts at the
