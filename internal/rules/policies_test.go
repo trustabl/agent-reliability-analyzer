@@ -4947,6 +4947,45 @@ var policyAgentRuleCases = []policyAgentCase{
 		},
 		models.RepoInventory{},
 		false},
+	{"LC-117 fires when a privileged create_agent has no approval prerequisites", "LC-117",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "CreateAgent", Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{{Class: "ShellTool"}},
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-117 fires when middleware is present but no checkpointer", "LC-117",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "CreateAgent", Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{{Class: "PythonREPLTool"}},
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"middleware": {Value: &models.Expr{Kind: models.ExprList, List: []models.Expr{
+					{Kind: models.ExprCall, Text: "HumanInTheLoopMiddleware(...)"},
+				}}},
+			}},
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-117 silent with both middleware and a checkpointer", "LC-117",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "CreateAgent", Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{{Class: "ShellTool"}},
+			Kwargs: &models.KwargTree{Children: map[string]*models.KwargTree{
+				"middleware": {Value: &models.Expr{Kind: models.ExprList, List: []models.Expr{
+					{Kind: models.ExprCall, Text: "HumanInTheLoopMiddleware(...)"},
+				}}},
+				"checkpointer": {Value: &models.Expr{Kind: models.ExprCall, Text: "InMemorySaver()"}},
+			}},
+		},
+		models.RepoInventory{},
+		false},
+	{"LC-117 silent without a privileged execution tool", "LC-117",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "CreateAgent", Language: models.LanguagePython,
+			HostedToolRefs: []models.HostedToolRef{{Class: "TavilySearchResults"}},
+		},
+		models.RepoInventory{},
+		false},
 	{"VAI-101 fires when an instrumented repo has a call with no telemetry", "VAI-101",
 		models.AgentDef{
 			SDK: models.SDKVercelAI, Class: "GenerateText", Language: models.LanguageTypeScript,
