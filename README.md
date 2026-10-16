@@ -28,13 +28,14 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
 
 <h3 align="center">Trustabl Partners</h3>
 <p align="center">
-  <sub>One engine, nine front doors. Install it from the catalogue you already use.</sub>
+  <sub>One engine, ten front doors. Install it from the catalogue you already use.</sub>
 </p>
 
 <table align="center">
   <tr>
     <td align="center" width="200">
-      <a href="https://registry.modelcontextprotocol.io/?q=trustabl"><b>MCP Registry</b></a><br>
+      <a href="https://registry.modelcontextprotocol.io/?q=trustabl"><b>MCP Registry</b></a> &middot;
+      <a href="https://mcprush.com/trustabl"><b>mcprush</b></a><br>
       <sub>Scan from any<br>MCP-aware client</sub>
     </td>
     <td align="center" width="200">
