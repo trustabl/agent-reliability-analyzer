@@ -157,9 +157,10 @@ to ask.
 
 #### OpenAI Agents SDK
 
-Run the mediation step as the first statement of each `@function_tool`
-function, before any side effect, through one shared wrapper so no tool is
-left out. Map review to the tool's `needs_approval` gate.
+Run the mediation step in a tool input guardrail (`@tool_input_guardrail`,
+attached through the tool's `tool_input_guardrails`). It runs before the tool
+with the call's arguments; reject the call from it on deny and review. Map
+review to the tool's `needs_approval` gate.
 
 ### Check before moving on
 
