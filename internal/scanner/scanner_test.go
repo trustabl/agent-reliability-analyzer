@@ -1594,3 +1594,91 @@ jobs:
 		}
 	}
 }
+
+// Ties the finding-granularity text in the CI rule YAML and docs to behaviour:
+// one finding per step that runs an offending agent, one per actions/checkout
+// step for CI-003, and two agent CLIs in one run: step share a line and give
+// one finding.
+func TestScan_CIFindingGranularity(t *testing.T) {
+	dir := t.TempDir()
+	const wf = `name: granularity
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  two:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          path: other
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_non_write_users: "*"
+          claude_args: --allowedTools "Bash"
+      - uses: google-github-actions/run-gemini-cli@v0
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: '{"tools": {"core": ["run_shell_command"]}}'
+  cli:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: |
+          claude --dangerously-skip-permissions -p hi && codex --dangerously-bypass-approvals-and-sandbox exec hi
+`
+	full := filepath.Join(dir, ".github/workflows/granularity.yml")
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(wf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	type site struct {
+		job  string
+		line int
+	}
+	got := map[string][]site{}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "CI-") {
+			got[f.RuleID] = append(got[f.RuleID], site{f.ToolName, f.StartLine})
+		}
+	}
+	// job "two": 2 agent steps, 2 checkout steps. job "cli": 1 run step with
+	// 2 agent CLIs, bypass flags on both, no gate (CI-001) and no egress
+	// block (CI-005), no write token or extra secret (no CI-002).
+	want := map[string]int{"CI-001": 3, "CI-002": 2, "CI-003": 2, "CI-004": 3, "CI-005": 3}
+	for id, n := range want {
+		sites := got[id]
+		if len(sites) != n {
+			t.Errorf("%s: %d findings %v, want %d", id, len(sites), sites, n)
+		}
+		seen := map[site]bool{}
+		for _, s := range sites {
+			if seen[s] {
+				t.Errorf("%s: duplicate site %+v", id, s)
+			}
+			seen[s] = true
+		}
+	}
+	for id, sites := range got {
+		if _, ok := want[id]; !ok {
+			t.Errorf("unexpected rule %s fired: %v", id, sites)
+		}
+	}
+	// CI-003 is attributed to the checkout steps of job "two", not to "cli".
+	for _, s := range got["CI-003"] {
+		if s.job != "two" {
+			t.Errorf("CI-003 attributed to job %q, want %q", s.job, "two")
+		}
+	}
+}
