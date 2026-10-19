@@ -1155,6 +1155,15 @@ Multiple categories are comma-separated: `--policy openai_sdk,mcp`.
   by rule ID, apply that rule's directive, and log the repair. This is a
   self-check the model performs — it does not run `trustabl scan` itself;
   scanning the resulting code remains a separate step.
+- A `## Tool-Call Claims` section: every tool call carries a small typed
+  claim (`ToolInvocationExplanation`: intent class, selected tool, expected
+  effect, risk tier, uncertainty, untrusted-context dependencies, evidence
+  digests), and a mediation step outside the model checks it against
+  server-held facts before the call has any effect. Conflicts deny, unknowns
+  go to review, and the most restrictive outcome wins; the claim never grants
+  authority. It follows Explanation-Bound Tool Execution (EBTE) and names
+  where the step goes in each detected SDK. Left out when `claude_skill` is
+  the only category.
 - A `## Runtime Tracing` section: how to make the agent emit OpenTelemetry
   spans, then how to label them with `agent-reliability-otel-labels` (run
   identity, step order, tool-call fingerprints, retry count, side-effect class,

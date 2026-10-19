@@ -2219,6 +2219,8 @@ internal/
 │   │                            SelectTracing (languages + pairs for the Runtime Tracing section).
 │   ├── tracing.go               emitRuntimeTracing + the languageBlocks / frameworkRecipes tables.
 │   ├── tracingtext/             Embedded markdown text of the Runtime Tracing section.
+│   ├── claims.go                emitToolCallClaims + the claimPlacements table.
+│   ├── claimtext/               Embedded markdown text of the Tool-Call Claims section.
 │   └── gen.go                   Generate (single-pack skill-scope, kept for compat),
 │                                GenerateCombined (multi-SDK all-scope output),
 │                                matchConditionForScope, Stamp.
@@ -2785,12 +2787,19 @@ writing any SDK code.
    comment (`<!-- generated: DATE | rules: SHA | schema: VERSION | sdks: LIST
    | template: N -->`) in the body — not in frontmatter — so the file is
    scannable to detect staleness. `template` is `TemplateVersion` (currently
-   `3`); a stamp with no `template` field predates it and parses as `1`. Right
+   `4`); a stamp with no `template` field predates it and parses as `1`. Right
    after the stamp, GenerateCombined emits a constant `## How to Apply These
    Constraints` apply-loop section: a static four-step procedure telling the
    model to check each definition it writes against the matching constraints,
    name any violation by rule ID, apply that rule's directive, and log the
-   repair. It then emits `## Runtime Tracing` (`internal/forge/tracing.go`) for
+   repair. It then emits `## Tool-Call Claims` (`internal/forge/claims.go`):
+   a reserved `claim` argument typed as an EBTE `ToolInvocationExplanation` on
+   every tool, the mediation step that checks it against server-held facts
+   (deny on conflict, review on unknown, most restrictive wins), one placement
+   block per selected SDK from the `claimPlacements` table, and a check list.
+   Its text is embedded from `internal/forge/claimtext/`; it is omitted when
+   no selected category has tool-calling code. It then emits
+   `## Runtime Tracing` (`internal/forge/tracing.go`) for
    the selected languages: Step 1 sets up OpenTelemetry, Step 2 places the
    `agent-reliability-otel-labels` labels, Step 3 says how to choose their
    values, Step 4 lists checks. The text is embedded from

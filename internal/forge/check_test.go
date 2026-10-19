@@ -103,3 +103,17 @@ func TestCheckStamp_HintSaysToReuseFlags(t *testing.T) {
 		t.Errorf("message must say to pass the original flags again, got: %s", msg)
 	}
 }
+
+// A skill generated before the Tool-Call Claims section (template 3) lacks
+// that section, so it must read as outdated against this build even when the
+// rules SHA has not moved.
+func TestCheckStamp_PreClaimsTemplateIsStale(t *testing.T) {
+	s := Stamp{Date: "2026-01-01", SHA: "abc1234def", Schema: 13, Template: 3}
+	ok, msg := CheckStamp(s, "abc1234def", TemplateVersion, "SKILL.md")
+	if ok {
+		t.Fatalf("template 3 against TemplateVersion %d reported up to date", TemplateVersion)
+	}
+	if !strings.Contains(msg, "template 3, current 4") {
+		t.Errorf("message does not name the template change: %q", msg)
+	}
+}

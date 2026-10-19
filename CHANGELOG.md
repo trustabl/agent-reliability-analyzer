@@ -8,6 +8,14 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Added
 
+- **Forge: Tool-Call Claims section (template 3 → 4).** `trustabl forge` now
+  emits a `## Tool-Call Claims` section after the apply loop. It tells the
+  coding agent to give every tool a typed `claim` argument (an EBTE
+  `ToolInvocationExplanation`) and to wire a mediation step that checks it
+  against server-held facts before the call has any effect, with placement for
+  each detected SDK. The claim never grants authority. Every skill generated
+  by template 3 now reads as outdated in `trustabl forge check`; regenerate
+  it.
 - **A one-time star line after the first interactive scan.** `trustabl scan`
   prints "⭐ Found this useful? Star Agent Reliability Analyzer" with the
   repository link to stderr once, after the first successful scan with human

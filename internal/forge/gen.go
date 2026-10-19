@@ -232,6 +232,9 @@ func emitApplyLoop(b *strings.Builder) {
 // within each section rules are sorted by severity (critical first) then rule
 // ID ascending.
 //
+// The Tool-Call Claims section follows the apply loop whenever a selected
+// category has tool-calling agent code (see emitToolCallClaims).
+//
 // tracing selects the languages and frameworks the Runtime Tracing section
 // covers; its zero value omits the section.
 //
@@ -332,6 +335,7 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 	fmt.Fprintf(&b, "in post-build scan — prevent it now.\n\n")
 
 	emitApplyLoop(&b)
+	emitToolCallClaims(&b, stamp.Categories)
 	emitRuntimeTracing(&b, tracing)
 
 	// --- One section per category, in stamp.Categories order ---
