@@ -310,7 +310,8 @@ flowchart LR
    `.claude/agents/*.md` subagents at any depth, `SKILL.md` skills,
    slash commands at both `.claude/commands/*.md` and
    `<plugin-root>/commands/*.md`, `.claude-plugin/{plugin,marketplace}.json`
-   manifests, sandbox policies). No
+   manifests, sandbox policies, and the repo-root `.github/workflows/*.yml`
+   GitHub Actions workflows). No
    tree-sitter parses happen here — this step decides whether the
    expensive AST work is even worth attempting.
 2. **Inventory** — for each language Recon cleared, do the AST work and
@@ -1117,6 +1118,7 @@ trustabl forge --policy google_adk --lang go
 | `claude_skill` | Claude Code skills (`SKILL.md`) |
 | `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework) |
 | `agent_config` | Harness config committed to a repo that runs code or grants authority before the folder is trusted (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`) |
+| `ci` | Coding agents run from GitHub Actions workflows (`.github/workflows/*.yml`) on events any GitHub user can cause |
 | `openshell` | Shell-invocation tools (no rules in the current pack) |
 
 Multiple categories are comma-separated: `--policy openai_sdk,mcp`.

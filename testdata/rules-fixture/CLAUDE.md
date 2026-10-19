@@ -110,6 +110,7 @@ SDK enum values used by the `repo_has_sdk_in_code` predicate:
 | `vercel_ai`        | Vercel AI SDK (TypeScript)           |
 | `autogen`          | AutoGen / AG2                        |
 | `raw_llm_sdk`      | Bare `anthropic` / `openai` client usage (no agent framework); category `raw_llm_sdk` loads unconditionally, the rule's own predicate gates |
+| `github_actions`   | Coding agents in GitHub Actions workflows (repo-root `.github/workflows/*.yml`); category `ci` loads unconditionally, the rule's own `repo_ci_agent_*` predicate gates. One finding per agent job, carrying the step's file and line |
 | `agent_config`     | Pre-trust harness config committed to the repo (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`); category `agent_config` loads unconditionally, the rule's own `repo_*` predicate gates. Findings carry the offending file and line |
 
 Repo-scope rules typically combine `applies_to` with a `repo_has_sdk_in_code`

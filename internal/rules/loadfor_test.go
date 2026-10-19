@@ -2,6 +2,7 @@ package rules_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/trustabl/trustabl/internal/models"
@@ -147,5 +148,43 @@ func TestLoadFor_LoadsAgentConfigPackUnconditionally(t *testing.T) {
 	}
 	if got[0].FilePath != ".vscode/settings.json" || got[0].StartLine != 4 {
 		t.Fatalf("finding location = %s:%d, want .vscode/settings.json:4", got[0].FilePath, got[0].StartLine)
+	}
+}
+
+// ci (GitHub Actions workflows running coding agents) reads files that exist
+// with no SDK code in the repo, so it loads unconditionally. A CI rule reports
+// one finding per offending agent job, each attributed to its own step.
+func TestLoadFor_LoadsCIPackUnconditionally(t *testing.T) {
+	reg, _, err := rules.LoadFor(fixtureFS(t), nil)
+	if err != nil {
+		t.Fatalf("LoadFor: %v", err)
+	}
+	hit := func(file string, line int, job string) models.CIHit {
+		return models.CIHit{Location: models.Location{FilePath: file, Line: line, EndLine: line}, Job: job, Reason: "x"}
+	}
+	inv := models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{
+		UntrustedUngated: []models.CIHit{
+			hit(".github/workflows/a.yml", 12, "triage"),
+			hit(".github/workflows/b.yml", 7, "ask"),
+		},
+	}}
+	var got []models.Finding
+	for _, f := range reg.Run(models.RepoProfile{}, inv, nil, nil) {
+		if f.RuleID == "CI-001" {
+			got = append(got, f)
+		}
+	}
+	if len(got) != 2 {
+		t.Fatalf("want CI-001 once per hit (2) with no SDK detected, got %d", len(got))
+	}
+	for _, f := range got {
+		if f.StartLine < 1 || f.FilePath == "" || f.ToolName == "" || f.Scope != models.ScopeRepo {
+			t.Fatalf("finding lacks its site: %+v", f)
+		}
+	}
+	for _, f := range reg.Run(models.RepoProfile{}, models.RepoInventory{}, nil, nil) {
+		if strings.HasPrefix(f.RuleID, "CI-") {
+			t.Fatalf("%s fired with no CI fact", f.RuleID)
+		}
 	}
 }

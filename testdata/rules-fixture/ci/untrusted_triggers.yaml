@@ -1,0 +1,78 @@
+policy:
+  id: ci_untrusted_triggers
+  name: Coding agents on untrusted GitHub Actions triggers
+  category: ci
+  description: >
+    Repo-scoped rules for GitHub Actions workflows in the repo-root
+    .github/workflows directory that run a coding agent on an event any GitHub
+    user can cause: issues, issue comments, pull request review comments,
+    discussions, discussion comments and pull_request_target. The pack loads
+    on each scan and each rule's predicate gates it. One finding is reported
+    per offending agent job.
+
+rules:
+  - id: CI-001
+    title: Agent step runs on an untrusted trigger without an actor gate
+    severity: critical
+    confidence: 0.7
+    applies_to:
+      - github_actions
+    scope: repo
+    match:
+      repo_ci_agent_untrusted_trigger_ungated: true
+    explanation: >
+      A workflow runs a coding agent (claude-code-action, claude-code-base-action,
+      run-gemini-cli, codex-action, or the claude, gemini, codex, cline or aider
+      CLI) on an event that any GitHub user can cause, such as opening an issue
+      or posting a comment, and nothing limits who that user is. No if: on the
+      job, the step or a job it needs restricts author_association to OWNER,
+      MEMBER or COLLABORATOR or names the allowed actors, and the action's own
+      write-access check is absent or switched off. claude-code-action and
+      codex-action check for write access themselves; that check is treated as
+      switched off when allowed_non_write_users or allowed_bots is set to '*'
+      or when allow-users is set to '*'. The event's title, body and comments
+      reach the agent as input, so any user who can cause the event can give the
+      agent instructions.
+      Limits of this check: an if: expression is matched as text and is not
+      evaluated, so a condition that joins an allow-list with another branch
+      (A || allow-list) counts as gated. An actor check made in an earlier step,
+      an environment with required reviewers, and a label gate are not
+      recognised. A reusable workflow is followed one hop when it is a local
+      file; remote reusable workflows and composite actions are not followed.
+    fix: >
+      Add a job-level if: that admits trusted actors, for example
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+      github.event.comment.author_association). For claude-code-action and
+      codex-action, keep the built-in write-access check by removing '*' from
+      allowed_non_write_users, allowed_bots and allow-users.
+
+  - id: CI-002
+    title: Ungated agent job holds a write token or extra secrets
+    severity: critical
+    confidence: 0.75
+    applies_to:
+      - github_actions
+    scope: repo
+    match:
+      repo_ci_agent_untrusted_trigger_privileged: true
+    explanation: >
+      An agent job that any GitHub user can trigger, with no actor gate (the
+      CI-001 condition), also holds authority beyond the model key: its
+      GITHUB_TOKEN has write-all or write access to contents, pull-requests,
+      actions or packages; it references a secret outside the agent's
+      model-key input; or it passes secrets: inherit to a reusable workflow.
+      Instructions from the triggering event can then act with that token or
+      read that secret.
+      Limits of this check: permissions are read from the job, then the
+      workflow, then the calling job; when none of them declares a permissions
+      block nothing is flagged, because the repository default is not visible.
+      A secret counts as the model key by where it is referenced (the agent
+      step's model-key input, or a model-key environment variable such as
+      ANTHROPIC_API_KEY), not by its name. Secrets passed to a remote reusable
+      workflow are not seen. The write scopes counted are contents,
+      pull-requests, actions and packages; other scopes such as id-token are
+      not counted.
+    fix: >
+      Give the agent job a read token (permissions: contents: read) and pass it the
+      model key alone. Move any step that needs write access or another secret
+      into a separate job that runs after a trusted-actor check.

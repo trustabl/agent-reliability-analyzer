@@ -1,0 +1,92 @@
+policy:
+  id: ci_agent_hardening
+  name: Hardening of coding-agent jobs on untrusted GitHub Actions triggers
+  category: ci
+  description: >
+    Repo-scoped rules for coding-agent jobs in GitHub Actions workflows that
+    run on an event any GitHub user can cause, with or without an actor gate:
+    the content of the event is untrusted input either way. Covers persisted
+    checkout credentials, unrestricted shell and missing egress control. The
+    pack loads on each scan and each rule's predicate gates it. One finding
+    is reported per offending agent job.
+
+rules:
+  - id: CI-003
+    title: Checkout persists credentials in an agent job
+    severity: high
+    confidence: 0.7
+    applies_to:
+      - github_actions
+    scope: repo
+    match:
+      repo_ci_agent_checkout_persists_credentials: true
+    explanation: >
+      A job that runs a coding agent on an untrusted trigger checks out the
+      repository with actions/checkout and does not set persist-credentials:
+      false. The actions/checkout documentation describes persist-credentials
+      as whether to configure the token or SSH key with the local git config,
+      with a default of true. Commands run by an agent steered by the event's
+      content run on a runner where that configuration was applied.
+      Limits of this check: it reads persist-credentials on actions/checkout
+      steps in the same job as the agent step. A false value (boolean or the
+      string) is the sole value treated as safe, so an expression counts as
+      persisting. Credentials set up another way, such as git config in a run
+      step or a token passed to an action, are not seen.
+    fix: >
+      Set persist-credentials: false on each actions/checkout step in the agent
+      job. If the agent must push, give it a narrowly scoped token through the
+      action's own input instead of the checkout's stored credential.
+
+  - id: CI-004
+    title: Agent step grants unrestricted shell
+    severity: high
+    confidence: 0.8
+    applies_to:
+      - github_actions
+    scope: repo
+    match:
+      repo_ci_agent_unrestricted_shell: true
+    explanation: >
+      A coding agent on an untrusted trigger may run any shell command. Its
+      tool allow-list grants Bash with no pattern, Bash(*), or a pattern that
+      starts with a shell, interpreter or download tool (bash, sh, zsh, cmd,
+      powershell, pwsh, python, python3, node, curl, wget, nc, ncat); or the
+      step skips approvals or the sandbox (--dangerously-skip-permissions,
+      --permission-mode bypassPermissions, Gemini --yolo or a bare
+      run_shell_command, Codex --dangerously-bypass-approvals-and-sandbox,
+      sandbox: danger-full-access or safety-strategy: unsafe). Text from the
+      triggering event can then make the agent run arbitrary commands on the
+      runner with the job's token and secrets.
+    fix: >
+      Allow the exact commands the task needs, for example Bash(npm test) or
+      run_shell_command(git diff), and remove any flag that skips approvals or
+      the sandbox. Keep Codex on its default safety strategy with a workspace-write
+      sandbox.
+
+  - id: CI-005
+    title: Agent job with shell or web access has no egress restriction
+    severity: medium
+    confidence: 0.5
+    applies_to:
+      - github_actions
+    scope: repo
+    match:
+      repo_ci_agent_no_egress_restriction: true
+    explanation: >
+      A coding agent on an untrusted trigger can run shell commands or fetch
+      URLs (a Bash, WebFetch or WebSearch grant, a Gemini shell or web tool, or
+      a Codex full-access sandbox), and no step-security/harden-runner step with
+      egress-policy: block runs before it in the job. If the event's content
+      gets the agent to read a token or secret, nothing in the workflow stops
+      it sending the value to an outside host. This is an inference from the
+      workflow file alone.
+      Limits of this check: network controls outside the workflow file, such as
+      a self-hosted runner's network policy or organization settings, are not
+      visible. The harden-runner step is recognised by its action name and
+      egress-policy: block, and must come before the agent step in the same
+      job. An agent step with no tool configuration is counted as having
+      neither shell nor fetch access.
+    fix: >
+      Add step-security/harden-runner as the first step of the agent job with
+      egress-policy: block and allowed-endpoints limited to the model API and
+      GitHub, or run the agent on a runner whose network is restricted.
