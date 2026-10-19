@@ -153,7 +153,8 @@ func TestLoadFor_LoadsAgentConfigPackUnconditionally(t *testing.T) {
 
 // ci (GitHub Actions workflows running coding agents) reads files that exist
 // with no SDK code in the repo, so it loads unconditionally. A CI rule reports
-// one finding per offending agent job, each attributed to its own step.
+// one finding per step that runs an offending agent (per checkout step for
+// CI-003), each attributed to its own step.
 func TestLoadFor_LoadsCIPackUnconditionally(t *testing.T) {
 	reg, _, err := rules.LoadFor(fixtureFS(t), nil)
 	if err != nil {

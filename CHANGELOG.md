@@ -18,7 +18,8 @@ to follow Semantic Versioning once it reaches 1.0.
   token or extra secrets; CI-003..005 flag persisted checkout credentials,
   unrestricted shell and a missing egress restriction. `claude-code-action` and
   `codex-action` count as gated through their own write-access check unless a
-  `*` bypass input is set. One finding per agent job. `workflow_run` is not in
+  `*` bypass input is set. One finding per step that runs an offending agent (for CI-003, per
+  `actions/checkout` step in an agent job). `workflow_run` is not in
   the trigger set yet.
 
 ## [0.1.14] - 2026-10-16

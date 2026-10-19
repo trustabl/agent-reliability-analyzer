@@ -516,9 +516,11 @@ bypass input is set. A job-level `uses: ./.github/workflows/x.yml` is followed o
 hop (the callee inherits the caller's triggers, gate, permissions and
 `secrets: inherit`); remote reusable workflows, composite actions and matrix
 values are not resolved. Hits carry event, action and secret *names* only. Unlike
-`agent_config`, a CI rule reports one finding per offending agent job
-(`ciHitsFor` in `rule_detector.go`), attributed to the agent step (the checkout
-step for CI-003) with the job id in `ToolName`. The pack loads unconditionally
+`agent_config`, a CI rule reports one finding per step that runs an offending agent
+(`ciHitsFor` in `rule_detector.go`), attributed to that step with the job id in
+`ToolName`; CI-003 reports one per `actions/checkout` step in the agent's job.
+Two agents in one `run:` step share a line and give one finding. A local
+reusable workflow is evaluated once per caller job and callee job pair. The pack loads unconditionally
 and the `github_actions` `applies_to` token skips the SDK gate.
 
 ### Step 2 — Inventory ([internal/analysis/](internal/analysis/))

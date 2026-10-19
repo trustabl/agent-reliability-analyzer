@@ -713,7 +713,7 @@ rules:
 #       pull_request_target) a same-repo check, on the job, the step or a needs
 #       ancestor; claude-code-action and codex-action count as gated through
 #       their own write-access check unless a '*' bypass input is set. `if:`
-#       text is matched, never evaluated. One hit per agent job. CI-001.
+#       text is matched, never evaluated. One hit per agent step. CI-001.
 #   repo_ci_agent_untrusted_trigger_privileged: true | false
 #       The CI-001 condition plus a write token (write-all, or contents,
 #       pull-requests, actions or packages: write), a secret outside the agent's

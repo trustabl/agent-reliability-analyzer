@@ -8,7 +8,7 @@ policy:
     user can cause: issues, issue comments, pull request review comments,
     discussions, discussion comments and pull_request_target. The pack loads
     on each scan and each rule's predicate gates it. One finding is reported
-    per offending agent job.
+    for each step that runs an offending agent.
 
 rules:
   - id: CI-001

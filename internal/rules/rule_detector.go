@@ -150,8 +150,8 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 	if !d.rule.Match.EvaluateRepo(p, inv) {
 		return nil
 	}
-	// CI rules report one finding per offending agent job, attributed to its
-	// agent (or checkout) step, so two agents in one repo keep their own site.
+	// CI rules report one finding per step that runs an offending agent (per
+	// checkout step for CI-003), so two agents in one repo keep their own site.
 	if hits := ciHitsFor(d.rule.Match, inv.CIWorkflows); len(hits) > 0 {
 		out := make([]models.Finding, 0, len(hits))
 		for _, h := range hits {

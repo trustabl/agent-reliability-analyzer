@@ -150,7 +150,7 @@ type MatchExpr struct {
 	RepoMCPConfigLaunchesLocalCommand *bool `yaml:"repo_mcp_config_launches_local_command,omitempty"`
 
 	// CI workflow predicates (category ci). Each is true when the corresponding
-	// CIWorkflowFacts slice is non-empty (one hit per agent job).
+	// CIWorkflowFacts slice is non-empty (one hit per agent step; per checkout step for CI-003).
 	RepoCIAgentUntrustedTriggerUngated     *bool `yaml:"repo_ci_agent_untrusted_trigger_ungated,omitempty"`
 	RepoCIAgentUntrustedTriggerPrivileged  *bool `yaml:"repo_ci_agent_untrusted_trigger_privileged,omitempty"`
 	RepoCIAgentCheckoutPersistsCredentials *bool `yaml:"repo_ci_agent_checkout_persists_credentials,omitempty"`

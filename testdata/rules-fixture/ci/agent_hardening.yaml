@@ -8,7 +8,8 @@ policy:
     the content of the event is untrusted input either way. Covers persisted
     checkout credentials, unrestricted shell and missing egress control. The
     pack loads on each scan and each rule's predicate gates it. One finding
-    is reported per offending agent job.
+    is reported for each step that runs an offending agent; for CI-003, for
+    each actions/checkout step in an offending agent job.
 
 rules:
   - id: CI-003
