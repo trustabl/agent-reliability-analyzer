@@ -193,6 +193,21 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoOtelLabelsImplemented != nil && !PredRepoOtelLabelsImplemented(*e.RepoOtelLabelsImplemented, inv) {
 		return false
 	}
+	if e.RepoCIAgentUntrustedTriggerUngated != nil && (len(inv.CIWorkflows.UntrustedUngated) > 0) != *e.RepoCIAgentUntrustedTriggerUngated {
+		return false
+	}
+	if e.RepoCIAgentUntrustedTriggerPrivileged != nil && (len(inv.CIWorkflows.UntrustedPrivileged) > 0) != *e.RepoCIAgentUntrustedTriggerPrivileged {
+		return false
+	}
+	if e.RepoCIAgentCheckoutPersistsCredentials != nil && (len(inv.CIWorkflows.CheckoutPersists) > 0) != *e.RepoCIAgentCheckoutPersistsCredentials {
+		return false
+	}
+	if e.RepoCIAgentUnrestrictedShell != nil && (len(inv.CIWorkflows.UnrestrictedShell) > 0) != *e.RepoCIAgentUnrestrictedShell {
+		return false
+	}
+	if e.RepoCIAgentNoEgressRestriction != nil && (len(inv.CIWorkflows.NoEgressRestriction) > 0) != *e.RepoCIAgentNoEgressRestriction {
+		return false
+	}
 	if len(e.RepoClaudeDefaultModeIs) > 0 && !PredRepoClaudeDefaultModeIs(e.RepoClaudeDefaultModeIs, inv) {
 		return false
 	}
@@ -539,6 +554,11 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_workspace_env_overrides_trust":           true,
 		"repo_editor_agent_auto_approve":               true,
 		"repo_mcp_config_launches_local_command":       true,
+		"repo_ci_agent_untrusted_trigger_ungated":      true,
+		"repo_ci_agent_untrusted_trigger_privileged":   true,
+		"repo_ci_agent_checkout_persists_credentials":  true,
+		"repo_ci_agent_unrestricted_shell":             true,
+		"repo_ci_agent_no_egress_restriction":          true,
 	},
 }
 
@@ -632,6 +652,11 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoWorkspaceEnvOverridesTrust != nil, "repo_workspace_env_overrides_trust")
 	add(e.RepoEditorAgentAutoApprove != nil, "repo_editor_agent_auto_approve")
 	add(e.RepoMCPConfigLaunchesLocalCommand != nil, "repo_mcp_config_launches_local_command")
+	add(e.RepoCIAgentUntrustedTriggerUngated != nil, "repo_ci_agent_untrusted_trigger_ungated")
+	add(e.RepoCIAgentUntrustedTriggerPrivileged != nil, "repo_ci_agent_untrusted_trigger_privileged")
+	add(e.RepoCIAgentCheckoutPersistsCredentials != nil, "repo_ci_agent_checkout_persists_credentials")
+	add(e.RepoCIAgentUnrestrictedShell != nil, "repo_ci_agent_unrestricted_shell")
+	add(e.RepoCIAgentNoEgressRestriction != nil, "repo_ci_agent_no_egress_restriction")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")

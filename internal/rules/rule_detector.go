@@ -124,7 +124,7 @@ func (d repoRuleDetector) Applies(p models.RepoProfile, inv models.RepoInventory
 			continue
 		}
 		// "raw_llm_sdk" is likewise not an SDK; the rule's own predicate gates.
-		if k == "raw_llm_sdk" || k == "agent_config" {
+		if k == "raw_llm_sdk" || k == "agent_config" || k == "github_actions" {
 			return true
 		}
 		// The repo-scope applies_to tokens are category labels, which equal
@@ -150,8 +150,36 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 	if !d.rule.Match.EvaluateRepo(p, inv) {
 		return nil
 	}
+	// CI rules report one finding per offending agent job, attributed to its
+	// agent (or checkout) step, so two agents in one repo keep their own site.
+	if hits := ciHitsFor(d.rule.Match, inv.CIWorkflows); len(hits) > 0 {
+		out := make([]models.Finding, 0, len(hits))
+		for _, h := range hits {
+			out = append(out, findingFromRule(d.rule, models.ScopeRepo, h.FilePath, h.Line, h.EndLine, h.Job))
+		}
+		return out
+	}
 	file, line := configHitLocation(d.rule.Match, inv.ProjectConfig)
 	return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, file, line, line, "")}
+}
+
+// ciHitsFor returns the CI facts behind the CI predicate a rule asks for (set
+// to true), or nil for any other repo rule.
+func ciHitsFor(m MatchExpr, f models.CIWorkflowFacts) []models.CIHit {
+	on := func(b *bool) bool { return b != nil && *b }
+	switch {
+	case on(m.RepoCIAgentUntrustedTriggerUngated):
+		return f.UntrustedUngated
+	case on(m.RepoCIAgentUntrustedTriggerPrivileged):
+		return f.UntrustedPrivileged
+	case on(m.RepoCIAgentCheckoutPersistsCredentials):
+		return f.CheckoutPersists
+	case on(m.RepoCIAgentUnrestrictedShell):
+		return f.UnrestrictedShell
+	case on(m.RepoCIAgentNoEgressRestriction):
+		return f.NoEgressRestriction
+	}
+	return nil
 }
 
 // configHitLocation attributes an agent_config repo finding to the first
@@ -342,6 +370,10 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 		// agent_config (pre-trust harness config) is not an SDK either: the files
 		// it reads exist with no SDK code in the repo. Predicates do the gating.
 		"agent_config": true,
+		// ci (GitHub Actions workflows running coding agents) is not an SDK:
+		// the workflow files exist with no SDK code in the repo. The rule
+		// predicates do the gating.
+		"ci": true,
 	}
 	for _, sdk := range sdks {
 		switch sdk {
