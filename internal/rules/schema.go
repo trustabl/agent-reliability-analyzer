@@ -80,6 +80,10 @@ type MatchExpr struct {
 	ToolDecoratorKwargValue   *ToolDecoratorKwargValueExpr `yaml:"tool_decorator_kwarg_value,omitempty"`
 	ToolDecoratorKwargPresent []string                     `yaml:"tool_decorator_kwarg_present,omitempty"`
 
+	// ToolClaimUse: how the tool uses its EBTE-style `claim` argument; see
+	// PredToolClaimUse and validToolClaimUse.
+	ToolClaimUse []string `yaml:"tool_claim_use,omitempty"`
+
 	// Agent-scope predicates
 	AgentClass        []string `yaml:"agent_class,omitempty"`
 	AgentKwargPresent []string `yaml:"agent_kwarg_present,omitempty"`
