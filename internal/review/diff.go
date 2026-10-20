@@ -122,7 +122,7 @@ func (r *Renderer) Render(result models.ScanResult) string {
 	}
 	if n := harnessFileCount(result); n > 0 {
 		fmt.Fprintf(&b, "  Harness files:      %d %s\n", n,
-			styleDim.Render("(Codex hooks, OpenCode plugins and agents: inventoried, no rule judges their content yet)"))
+			styleDim.Render("(Codex hooks, OpenCode plugins, agents and harness guidance files: inventoried, no rule judges their content yet)"))
 	}
 	fmt.Fprintf(&b, "  Agents found:       %d\n", len(result.Agents))
 	fmt.Fprintf(&b, "  Findings:           %d\n", len(result.Findings))
@@ -549,7 +549,8 @@ func harnessFileCount(result models.ScanResult) int {
 	n := 0
 	for _, c := range result.Manifest.Components {
 		switch c.Kind {
-		case models.ComponentCodexHooks, models.ComponentOpencodePlugin, models.ComponentOpencodeAgent:
+		case models.ComponentCodexHooks, models.ComponentOpencodePlugin, models.ComponentOpencodeAgent,
+			models.ComponentHarnessGuidance:
 			n++
 		}
 	}

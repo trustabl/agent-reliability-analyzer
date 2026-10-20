@@ -43,6 +43,17 @@ to follow Semantic Versioning once it reaches 1.0.
   never echoed. `CLAUDE.md` is not read yet. **Release order:** this engine
   first, then the rules pack.
 
+- **The staged OpenCode harness layout is inventoried.** A directory holding a
+  `systemprompt.md` and a `guardrails.md` side by side is recognised as a staged
+  harness tree, the layout the Harness² adaptation framework writes for its
+  OpenCode executor. Its `systemprompt.md`, `guardrails.md`, `LongTermMEMORY.md`
+  and `tool_descriptions/*.md` are tagged `harness_guidance`, `plugin/*.{ts,js,mjs}`
+  is tagged `opencode_plugin` and `sub_agents/<name>/AGENT.md` is tagged
+  `opencode_agent`, and the `Harness files:` line counts them. The pair is the
+  signature: a lone `guardrails.md` or a bare `plugin/` directory is not labelled.
+  **No rule judges these files yet**, so a clean result over them is not a pass.
+  No schema change.
+
 ### Changed
 
 - **Scores can fall on repositories that keep skills under `.agents/`.** Those
