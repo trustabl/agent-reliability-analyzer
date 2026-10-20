@@ -18,6 +18,15 @@ to follow Semantic Versioning once it reaches 1.0.
   findings list over them is not a pass. A bare `plugin/` or `sub_agents/`
   directory outside `.opencode/` is deliberately not labelled. No schema change.
 
+### Changed
+
+- **Scores can fall on repositories that keep skills under `.agents/`.** Those
+  skills were never read before, so they now add findings and are scored. On
+  one large open-source repository with 18 such skills, 54 findings were added
+  (none removed) and the overall score fell by about six points, from 95.9% to
+  89.7%. Tool and agent counts did not change. `ScanID` changes, as with any
+  engine change. Repositories without `.agents/` or `.opencode/` are unaffected.
+
 ## [0.1.14] - 2026-10-16
 
 Rule schema 18 → 23 (`rules.SupportedSchemaVersion`). The rules fixture goes
