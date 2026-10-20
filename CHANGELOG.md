@@ -6,6 +6,17 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-10-20
+
+Rule schema 23 -> 26 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 340 to 343 rules (AGCFG-008, AGCFG-009 and AGCFG-010; none removed). The
+exit code and CLI flags are unchanged. `ScanID` changes, as with every schema
+bump, because it folds the engine's supported schema version. **Overall scores
+can fall on repositories that keep skills under `.agents/`** (see Changed).
+The rules pack already carries AGCFG-008, AGCFG-009 and AGCFG-010. Engines older
+than 0.1.15 skip them and report a degraded scan ("rules skipped") until they are
+upgraded.
+
 ### Added
 
 - **Codex and OpenCode harness files are now inventoried.** The file
