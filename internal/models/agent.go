@@ -367,6 +367,10 @@ type ProjectConfigFacts struct {
 	TrustOverrideEnv  []ConfigHit `json:"trust_override_env,omitempty"`  // AGCFG-006
 	EditorAutoApprove []ConfigHit `json:"editor_auto_approve,omitempty"` // AGCFG-007
 	LocalMCPLaunch    []ConfigHit `json:"local_mcp_launch,omitempty"`    // MCPCFG-002
+	// CodexRiskyHooks is kept apart from RiskyHooks on purpose: Codex skips a
+	// project hook until the user reviews and trusts it, so AGCFG-005's "runs
+	// before trust" claim does not hold for it. AGCFG-008 reads this list.
+	CodexRiskyHooks []ConfigHit `json:"codex_risky_hooks,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

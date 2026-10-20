@@ -703,6 +703,14 @@ rules:
 #       server with an interpreter plus inline code or a repo-relative script,
 #       or a command path inside the repo (ProjectConfigFacts.LocalMCPLaunch).
 #       Published packages and remote URL servers are not flagged. MCPCFG-002.
+#   repo_codex_hook_runs_repo_command: true | false
+#       True when a committed .codex/hooks.json command or commandWindows runs a
+#       repo-relative script (including the documented
+#       "$(git rev-parse --show-toplevel)/..." form), a curl/wget/nc/bash -c/
+#       python -c primitive, or references .ssh/.aws/.env
+#       (ProjectConfigFacts.CodexRiskyHooks). Kept apart from
+#       repo_project_hook_runs_untrusted_command because Codex skips a project
+#       hook until the user reviews and trusts it. AGCFG-008.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads

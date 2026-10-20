@@ -1,0 +1,44 @@
+policy:
+  id: agent_config_codex_hooks
+  name: Codex project hooks
+  category: agent_config
+  description: >
+    Repo-scoped rule for hooks committed to a repository's .codex/hooks.json.
+    Codex loads project hooks only from a trusted project layer and skips a hook
+    until the user has reviewed and trusted its exact definition, so this is not
+    a pre-trust execution rule like AGCFG-005. It flags a hook that, once
+    trusted, runs repo-controlled code or reaches the network or credential
+    files. The pack loads for every scan (the file it reads has no SDK import),
+    so the rule's own predicate does the gating. Fires once per scan,
+    attributed to the first offending hook.
+
+rules:
+  - id: AGCFG-008
+    title: Codex project hook runs a repo-controlled command once trusted
+    severity: medium
+    confidence: 0.55
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_codex_hook_runs_repo_command: true
+    explanation: >
+      A committed .codex/hooks.json declares a hook whose command or
+      commandWindows runs a script from the repo, uses a network or
+      inline-execution primitive such as curl, wget, nc, bash -c, sh -c or
+      python -c, or reads $HOME/.ssh, .aws or .env. Codex loads project hooks
+      only from a trusted project layer and skips a hook until the user has
+      reviewed and trusted its exact definition, so this does not run before
+      that review. Once trusted it runs on agent events with the developer's
+      privileges, and whoever controls the repo controls what it executes. The
+      documentation describes trust as recorded against the hook definition and
+      does not say whether editing a script the hook calls prompts a new
+      review. Hooks that only call a vetted binary outside the repo are not
+      flagged.
+    fix: >
+      Review each project hook before trusting it, and read the script it
+      calls. Prefer a command that is a vetted binary on the user's PATH over a
+      repo script, and never let a hook read credential files or call out to the
+      network. Keep personal hooks in ~/.codex/hooks.json instead of a file that
+      travels with the repo. If a project hook is unavoidable, review changes to
+      it and to the scripts it calls as you would a CI step.

@@ -3733,6 +3733,24 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{RiskyHooks: []models.ConfigHit{{Reason: "x"}}}},
 		false},
 
+	// ─── AGCFG-008 Codex project hooks (repo-scoped, no SDK gate) ────────────
+	{"AGCFG-008 fires on a risky Codex hook with no SDK detected", "AGCFG-008",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{CodexRiskyHooks: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGCFG-008 silent when no Codex hook fact exists", "AGCFG-008",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGCFG-008 silent when only a Claude/Gemini hook fact is present", "AGCFG-008",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{RiskyHooks: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	{"AGCFG-005 silent when only a Codex hook fact is present", "AGCFG-005",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{CodexRiskyHooks: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+
 	// ─── CSDK-202 session permission_mode bypass (repo-scoped) ───────────────
 	{"CSDK-202 fires when ClaudeAgentOptions permission_mode is bypassPermissions with no deny-list", "CSDK-202",
 		models.RepoProfile{},

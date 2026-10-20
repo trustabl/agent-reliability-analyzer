@@ -18,6 +18,19 @@ to follow Semantic Versioning once it reaches 1.0.
   findings list over them is not a pass. A bare `plugin/` or `sub_agents/`
   directory outside `.opencode/` is deliberately not labelled. No schema change.
 
+- **Codex project hooks (rule schema 23 -> 24).** New repo-scope predicate
+  `repo_codex_hook_runs_repo_command` and rule **AGCFG-008** (medium) flag a
+  committed `.codex/hooks.json` hook whose `command` or `commandWindows` runs a
+  repo script (including the documented `$(git rev-parse --show-toplevel)/...`
+  form), a network or inline-execution primitive, or a credential path. It is a
+  separate rule from AGCFG-005 because Codex skips a project hook until the user
+  reviews and trusts it, so the "runs before trust" claim does not apply. Codex
+  hooks never feed AGCFG-005. `mcp_tool`, `prompt` and `agent` handlers carry no
+  shell command and are skipped. Plugin `hooks/hooks.json` and inline `[hooks]`
+  tables in `config.toml` are not read yet. **Release order:** this engine first,
+  then the rules pack; a rule that needs a new predicate is skipped on an older
+  engine.
+
 ### Changed
 
 - **Scores can fall on repositories that keep skills under `.agents/`.** Those
