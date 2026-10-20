@@ -31,6 +31,18 @@ to follow Semantic Versioning once it reaches 1.0.
   then the rules pack; a rule that needs a new predicate is skipped on an older
   engine.
 
+- **Hidden text in `AGENTS.md` (rule schema 24 -> 25).** New repo-scope predicate
+  `repo_agents_md_has_hidden_text` and rule **AGCFG-009** (medium) flag an
+  `AGENTS.md` that contains zero-width characters, Unicode Tags-block characters
+  or bidirectional overrides, which can hide an instruction from a reviewer while
+  the model still reads it. It reuses the same character checks as the skill
+  injection markers and judges no wording. A leading byte order mark, emoji or
+  non-ASCII letters joined by a zero-width joiner or non-joiner, and
+  subdivision-flag emoji are not flagged; right-to-left prose that uses
+  bidirectional controls is, and is a known false positive. The hidden text is
+  never echoed. `CLAUDE.md` is not read yet. **Release order:** this engine
+  first, then the rules pack.
+
 ### Changed
 
 - **Scores can fall on repositories that keep skills under `.agents/`.** Those

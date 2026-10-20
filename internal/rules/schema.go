@@ -149,6 +149,7 @@ type MatchExpr struct {
 	RepoEditorAgentAutoApprove        *bool `yaml:"repo_editor_agent_auto_approve,omitempty"`
 	RepoMCPConfigLaunchesLocalCommand *bool `yaml:"repo_mcp_config_launches_local_command,omitempty"`
 	RepoCodexHookRunsRepoCommand      *bool `yaml:"repo_codex_hook_runs_repo_command,omitempty"`
+	RepoAgentsMdHasHiddenText         *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
 
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.

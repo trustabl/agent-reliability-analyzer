@@ -711,6 +711,13 @@ rules:
 #       (ProjectConfigFacts.CodexRiskyHooks). Kept apart from
 #       repo_project_hook_runs_untrusted_command because Codex skips a project
 #       hook until the user reviews and trusts it. AGCFG-008.
+#   repo_agents_md_has_hidden_text: true | false
+#       True when an AGENTS.md (any depth) contains invisible or
+#       direction-overriding characters: zero-width characters, Unicode
+#       Tags-block characters, or bidirectional overrides
+#       (ProjectConfigFacts.HiddenAgentText). Exempts a leading byte order mark,
+#       emoji and non-ASCII letter sequences joined by a zero-width (non-)joiner,
+#       and subdivision-flag emoji. Text is never echoed. AGCFG-009.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads
