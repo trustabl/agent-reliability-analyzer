@@ -57,6 +57,8 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 			f.EditorAutoApprove = append(f.EditorAutoApprove, editorHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentAgentEnvFile:
 			f.TrustOverrideEnv = append(f.TrustOverrideEnv, envHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
+		case models.ComponentAgentsMd:
+			f.HiddenAgentText = append(f.HiddenAgentText, hiddenTextHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentCodexHooks:
 			f.CodexRiskyHooks = append(f.CodexRiskyHooks, codexHooksHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentCodexConfig:
@@ -72,6 +74,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.EditorAutoApprove = sortHits(f.EditorAutoApprove)
 	f.LocalMCPLaunch = sortHits(f.LocalMCPLaunch)
 	f.CodexRiskyHooks = sortHits(f.CodexRiskyHooks)
+	f.HiddenAgentText = sortHits(f.HiddenAgentText)
 	return f
 }
 

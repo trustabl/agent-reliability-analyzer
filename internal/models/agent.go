@@ -371,6 +371,9 @@ type ProjectConfigFacts struct {
 	// project hook until the user reviews and trusts it, so AGCFG-005's "runs
 	// before trust" claim does not hold for it. AGCFG-008 reads this list.
 	CodexRiskyHooks []ConfigHit `json:"codex_risky_hooks,omitempty"`
+	// HiddenAgentText is invisible or direction-overriding text found in an
+	// agent guidance file (AGENTS.md). AGCFG-009 reads this list.
+	HiddenAgentText []ConfigHit `json:"hidden_agent_text,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

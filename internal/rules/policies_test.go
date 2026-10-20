@@ -3751,6 +3751,24 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{CodexRiskyHooks: []models.ConfigHit{{Reason: "x"}}}},
 		false},
 
+	// ─── AGCFG-009 AGENTS.md hidden text (repo-scoped, no SDK gate) ──────────
+	{"AGCFG-009 fires on hidden AGENTS.md text with no SDK detected", "AGCFG-009",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{HiddenAgentText: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGCFG-009 silent when no hidden-text fact exists", "AGCFG-009",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGCFG-009 silent when only a Codex hook fact is present", "AGCFG-009",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{CodexRiskyHooks: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	{"AGCFG-008 silent when only a hidden-text fact is present", "AGCFG-008",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{HiddenAgentText: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+
 	// ─── CSDK-202 session permission_mode bypass (repo-scoped) ───────────────
 	{"CSDK-202 fires when ClaudeAgentOptions permission_mode is bypassPermissions with no deny-list", "CSDK-202",
 		models.RepoProfile{},
