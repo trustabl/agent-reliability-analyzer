@@ -239,6 +239,11 @@ const (
 	ComponentEditorSettings ComponentKind = "editor_settings" // .vscode/settings.json, .cursor/*.json (not mcp.json)
 	ComponentAgentEnvFile   ComponentKind = "agent_env_file"  // .gemini/.env, root .env (key names only are ever read)
 	ComponentCodexConfig    ComponentKind = "codex_config"    // .codex/config.toml
+	// Codex and OpenCode harness files: inventoried so a scan reports them, but no
+	// rule judges their content yet (an empty findings list on them is not a pass).
+	ComponentCodexHooks     ComponentKind = "codex_hooks"     // .codex/hooks.json
+	ComponentOpencodePlugin ComponentKind = "opencode_plugin" // .opencode/plugin(s)/*.{ts,js,mjs}
+	ComponentOpencodeAgent  ComponentKind = "opencode_agent"  // .opencode/agent(s)/*.md
 )
 
 // AgentComponent is a non-tool agent-related artifact discovered during

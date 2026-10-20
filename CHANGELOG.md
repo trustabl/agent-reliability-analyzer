@@ -6,6 +6,18 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Codex and OpenCode harness files are now inventoried.** The file
+  walk enters `.agents/` and `.opencode/`, so a skill at
+  `.agents/skills/<name>/SKILL.md` is found like one under `skills/` or
+  `.claude/skills/`. `.codex/hooks.json` is tagged `codex_hooks`,
+  `.opencode/plugin(s)/*.{ts,js,mjs}` is tagged `opencode_plugin` and
+  `.opencode/agent(s)/*.md` is tagged `opencode_agent`. The scan summary gains a
+  `Harness files:` line. **No rule judges these files yet**, so an empty
+  findings list over them is not a pass. A bare `plugin/` or `sub_agents/`
+  directory outside `.opencode/` is deliberately not labelled. No schema change.
+
 ## [0.1.14] - 2026-10-16
 
 Rule schema 18 → 23 (`rules.SupportedSchemaVersion`). The rules fixture goes
