@@ -3769,6 +3769,24 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{HiddenAgentText: []models.ConfigHit{{Reason: "x"}}}},
 		false},
 
+	// ─── AGCFG-010 staged harness guidance hidden text (repo-scoped, no SDK gate) ──
+	{"AGCFG-010 fires on hidden harness guidance text with no SDK detected", "AGCFG-010",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{HiddenHarnessText: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGCFG-010 silent when no harness hidden-text fact exists", "AGCFG-010",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGCFG-010 silent when only an AGENTS.md hidden-text fact is present", "AGCFG-010",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{HiddenAgentText: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	{"AGCFG-009 silent when only a harness hidden-text fact is present", "AGCFG-009",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{HiddenHarnessText: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+
 	// ─── CSDK-202 session permission_mode bypass (repo-scoped) ───────────────
 	{"CSDK-202 fires when ClaudeAgentOptions permission_mode is bypassPermissions with no deny-list", "CSDK-202",
 		models.RepoProfile{},

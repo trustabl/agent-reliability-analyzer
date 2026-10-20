@@ -374,6 +374,10 @@ type ProjectConfigFacts struct {
 	// HiddenAgentText is invisible or direction-overriding text found in an
 	// agent guidance file (AGENTS.md). AGCFG-009 reads this list.
 	HiddenAgentText []ConfigHit `json:"hidden_agent_text,omitempty"`
+	// HiddenHarnessText is the same check over the guidance files of a staged
+	// OpenCode harness tree (systemprompt.md, guardrails.md, ...). AGCFG-010 reads
+	// this list; AGCFG-009 keeps reading HiddenAgentText only.
+	HiddenHarnessText []ConfigHit `json:"hidden_harness_text,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

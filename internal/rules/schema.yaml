@@ -718,6 +718,12 @@ rules:
 #       (ProjectConfigFacts.HiddenAgentText). Exempts a leading byte order mark,
 #       emoji and non-ASCII letter sequences joined by a zero-width (non-)joiner,
 #       and subdivision-flag emoji. Text is never echoed. AGCFG-009.
+#   repo_harness_guidance_has_hidden_text: true | false
+#       The AGCFG-009 character test over the guidance files of a staged OpenCode
+#       harness tree (systemprompt.md, guardrails.md, LongTermMEMORY.md,
+#       tool_descriptions/*.md; ProjectConfigFacts.HiddenHarnessText). Same
+#       exemptions, text never echoed. AGCFG-010. A separate predicate from
+#       repo_agents_md_has_hidden_text, which keeps its AGENTS.md-only meaning.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads

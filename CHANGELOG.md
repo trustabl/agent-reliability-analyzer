@@ -54,6 +54,15 @@ to follow Semantic Versioning once it reaches 1.0.
   **No rule judges these files yet**, so a clean result over them is not a pass.
   No schema change.
 
+- **Hidden text in staged harness guidance files (rule schema 25 -> 26).** New
+  repo-scope predicate `repo_harness_guidance_has_hidden_text` and rule
+  **AGCFG-010** (medium) apply the AGCFG-009 character test (zero-width
+  characters, Unicode Tags-block characters, bidirectional overrides, with the same
+  exemptions) to the `harness_guidance` files of a staged OpenCode harness tree.
+  It is a separate predicate and rule, so AGCFG-009 keeps its AGENTS.md-only
+  meaning. The hidden text is never echoed. **Release order:** this engine first,
+  then the rules pack.
+
 ### Changed
 
 - **Scores can fall on repositories that keep skills under `.agents/`.** Those
