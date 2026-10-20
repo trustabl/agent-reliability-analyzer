@@ -243,7 +243,11 @@ const (
 	// rule judges their content yet (an empty findings list on them is not a pass).
 	ComponentCodexHooks     ComponentKind = "codex_hooks"     // .codex/hooks.json
 	ComponentOpencodePlugin ComponentKind = "opencode_plugin" // .opencode/plugin(s)/*.{ts,js,mjs}
-	ComponentOpencodeAgent  ComponentKind = "opencode_agent"  // .opencode/agent(s)/*.md
+	ComponentOpencodeAgent  ComponentKind = "opencode_agent"  // .opencode/agent(s)/*.md, sub_agents/<name>/AGENT.md in a staged tree
+	// Guidance files of a staged OpenCode harness tree (systemprompt.md,
+	// guardrails.md, LongTermMEMORY.md, tool_descriptions/*.md), recognised only
+	// when systemprompt.md and guardrails.md sit side by side.
+	ComponentHarnessGuidance ComponentKind = "harness_guidance"
 )
 
 // AgentComponent is a non-tool agent-related artifact discovered during
