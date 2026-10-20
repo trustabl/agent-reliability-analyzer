@@ -120,6 +120,10 @@ func (r *Renderer) Render(result models.ScanResult) string {
 	if n := len(result.ClaudeSettings); n > 0 {
 		fmt.Fprintf(&b, "  Claude settings:    %d file(s)\n", n)
 	}
+	if n := harnessFileCount(result); n > 0 {
+		fmt.Fprintf(&b, "  Harness files:      %d %s\n", n,
+			styleDim.Render("(Codex hooks, OpenCode plugins and agents: inventoried, no rule judges their content yet)"))
+	}
 	fmt.Fprintf(&b, "  Agents found:       %d\n", len(result.Agents))
 	fmt.Fprintf(&b, "  Findings:           %d\n", len(result.Findings))
 	if n := len(result.RulesSkipped); n > 0 {
@@ -536,4 +540,18 @@ func wrapAt(s string, n int) string {
 		col += len(w)
 	}
 	return b.String()
+}
+
+// harnessFileCount counts the Codex and OpenCode harness files the walk found.
+// They are inventoried so a harness scan reports what it covered, but no rule
+// reads their content, so a zero-finding scan over them is not a pass.
+func harnessFileCount(result models.ScanResult) int {
+	n := 0
+	for _, c := range result.Manifest.Components {
+		switch c.Kind {
+		case models.ComponentCodexHooks, models.ComponentOpencodePlugin, models.ComponentOpencodeAgent:
+			n++
+		}
+	}
+	return n
 }

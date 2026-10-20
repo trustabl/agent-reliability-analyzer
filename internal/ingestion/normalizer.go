@@ -485,6 +485,23 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 	return manifest, nil
 }
 
+// inOpencodeDir reports whether p sits directly under .opencode/<one of names>/
+// at any depth of the repo (monorepos nest projects).
+func inOpencodeDir(p string, names ...string) bool {
+	parts := strings.Split(strings.ToLower(filepath.ToSlash(p)), "/")
+	for i := 0; i+2 < len(parts); i++ {
+		if parts[i] != ".opencode" {
+			continue
+		}
+		for _, n := range names {
+			if parts[i+1] == n {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func shouldSkipDir(name string) bool {
 	switch name {
 	case ".git", ".venv", "venv", "node_modules", "__pycache__",
@@ -498,6 +515,11 @@ func shouldSkipDir(name string) bool {
 	case ".gemini", ".vscode", ".cursor", ".codex":
 		// Other harnesses' project config (settings, hooks, MCP, env) that takes
 		// effect when the folder is opened — read by the agent_config rules.
+		return false
+	case ".agents", ".opencode":
+		// Codex keeps project skills under .agents/ and OpenCode keeps plugins and
+		// agents under .opencode/. Skipping them hid those files from the scan, so a
+		// harness scan read as empty.
 		return false
 	}
 	// Skip other dot-prefixed dirs (build caches, editor metadata, etc.).
@@ -604,6 +626,24 @@ func discoverComponents(root string, m models.ScanManifest, onFile func(string))
 		case base == "settings.json" && (dir == ".vscode" || strings.HasSuffix(dir, "/.vscode")),
 			base != "mcp.json" && (dir == ".cursor" || strings.HasSuffix(dir, "/.cursor")):
 			out = append(out, models.AgentComponent{Kind: models.ComponentEditorSettings, Path: p})
+		case base == "hooks.json" && (dir == ".codex" || strings.HasSuffix(dir, "/.codex")):
+			out = append(out, models.AgentComponent{Kind: models.ComponentCodexHooks, Path: p})
+		}
+	}
+
+	// OpenCode plugins and agents. Scoped to .opencode/ on purpose: a bare plugin/
+	// directory is too common to label as agent infrastructure without a real
+	// harness tree to check against.
+	for _, files := range [][]string{m.TypeScriptFiles, m.JavaScriptFiles} {
+		for _, p := range files {
+			if inOpencodeDir(p, "plugin", "plugins") {
+				out = append(out, models.AgentComponent{Kind: models.ComponentOpencodePlugin, Path: p})
+			}
+		}
+	}
+	for _, p := range m.MarkdownFiles {
+		if inOpencodeDir(p, "agent", "agents") {
+			out = append(out, models.AgentComponent{Kind: models.ComponentOpencodeAgent, Path: p})
 		}
 	}
 	for _, p := range m.ConfigFiles {
