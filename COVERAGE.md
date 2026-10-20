@@ -396,10 +396,11 @@ typed) are not modeled.
 | Gemini settings | `.gemini/settings.json`: hook commands (same walk; flat or nested) and `mcpServers` (AGCFG-005, MCPCFG-002) |
 | Env files | `.gemini/.env` (full key set) and root `.env` (narrow set), **key names only** (AGCFG-006) |
 | Codex config | `.codex/config.toml`: `sandbox_mode`, `approval_policy`, override keys, `[mcp_servers.*]` (AGCFG-006, MCPCFG-002) |
+| Codex hooks | `.codex/hooks.json`: `hooks.<Event>[].hooks[]` `command` and `commandWindows`, including the documented `$(git rev-parse --show-toplevel)/...` repo-root form; `mcp_tool`, `prompt` and `agent` handlers are skipped. Reported by **AGCFG-008** at medium, not by AGCFG-005, because Codex skips a project hook until the user reviews and trusts it. Plugin `hooks/hooks.json` and inline `[hooks]` tables in `config.toml` are not read yet |
 | Editor settings | `.vscode/settings.json` (JSONC), `.cursor/*.json`: boolean-true `*autoApprove*` / `*yolo*` keys, flat or nested (AGCFG-007) |
 | MCP client configs | `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` (`servers`), `claude_desktop_config.json`: interpreter + inline code / repo-relative script, or a repo-local command path (MCPCFG-002) |
 
-**v1 gaps:** the Gemini CLI hooks schema and Codex project-config trust behavior are unverified against vendor docs; `*autoApprove*` object-valued maps (per-command terminal allow-lists) are not flagged; remote MCP URLs without auth are not flagged by MCPCFG-002; nested `.env` files outside `.gemini/` are ignored.
+**v1 gaps:** the Gemini CLI hooks schema and Codex project-config trust behavior are unverified against vendor docs (the Codex hooks file shape and trust model were checked against OpenAI's documentation on 2026-10-20); `*autoApprove*` object-valued maps (per-command terminal allow-lists) are not flagged; remote MCP URLs without auth are not flagged by MCPCFG-002; nested `.env` files outside `.gemini/` are ignored.
 
 ### OpenShell — Python
 

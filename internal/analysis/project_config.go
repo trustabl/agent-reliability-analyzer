@@ -57,6 +57,8 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 			f.EditorAutoApprove = append(f.EditorAutoApprove, editorHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentAgentEnvFile:
 			f.TrustOverrideEnv = append(f.TrustOverrideEnv, envHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
+		case models.ComponentCodexHooks:
+			f.CodexRiskyHooks = append(f.CodexRiskyHooks, codexHooksHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentCodexConfig:
 			raw := readConfig(manifest.RepoRoot, c.Path)
 			f.TrustOverrideEnv = append(f.TrustOverrideEnv, codexTrustHits(c.Path, raw)...)
@@ -69,6 +71,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.TrustOverrideEnv = sortHits(f.TrustOverrideEnv)
 	f.EditorAutoApprove = sortHits(f.EditorAutoApprove)
 	f.LocalMCPLaunch = sortHits(f.LocalMCPLaunch)
+	f.CodexRiskyHooks = sortHits(f.CodexRiskyHooks)
 	return f
 }
 
@@ -254,8 +257,71 @@ func classifyHookCommand(cmd string) []string {
 }
 
 type hookEntry struct {
-	Command string      `json:"command"`
-	Hooks   []hookEntry `json:"hooks"`
+	Type           string      `json:"type"`
+	Command        string      `json:"command"`
+	CommandWindows string      `json:"commandWindows"`
+	Hooks          []hookEntry `json:"hooks"`
+}
+
+// codexRepoRootRe matches the repo-root form OpenAI documents for Codex hook
+// commands, "$(git rev-parse --show-toplevel)/.codex/hooks/x.py". The shared
+// repo-relative check ignores tokens that start with $, so without this the
+// documented idiom would produce no hit.
+var codexRepoRootRe = regexp.MustCompile(`\$\(\s*git\s+rev-parse\s+--show-toplevel\s*\)["']?/`)
+
+// classifyCodexHookCommand is classifyHookCommand plus the documented
+// repo-root form.
+func classifyCodexHookCommand(cmd string) []string {
+	r := classifyHookCommand(cmd)
+	if codexRepoRootRe.MatchString(cmd) {
+		for _, why := range r {
+			if why == "runs a repo-relative script" {
+				return r
+			}
+		}
+		r = append([]string{"runs a repo-relative script"}, r...)
+	}
+	return r
+}
+
+// codexHooksHits reads .codex/hooks.json (hooks.<Event>[].hooks[]). Only
+// "command" handlers (or an untyped one) carry a shell command; mcp_tool,
+// prompt and agent handlers are skipped. Both command and commandWindows are
+// judged, since either can run on the user's machine.
+func codexHooksHits(path string, raw []byte) []models.ConfigHit {
+	var doc struct {
+		Hooks map[string]json.RawMessage `json:"hooks"`
+	}
+	if !parseJSONC(raw, &doc) {
+		return nil
+	}
+	var out []models.ConfigHit
+	for event, msg := range doc.Hooks {
+		var entries []hookEntry
+		if json.Unmarshal(msg, &entries) != nil {
+			continue
+		}
+		var walk func(es []hookEntry)
+		walk = func(es []hookEntry) {
+			for _, e := range es {
+				if e.Type != "" && e.Type != "command" {
+					continue
+				}
+				for _, cmd := range []string{e.Command, e.CommandWindows} {
+					if cmd == "" {
+						continue
+					}
+					enc, _ := json.Marshal(cmd)
+					for _, why := range classifyCodexHookCommand(cmd) {
+						out = append(out, hit(path, lineOfText(raw, string(enc)), "hook "+event+" "+why))
+					}
+				}
+				walk(e.Hooks)
+			}
+		}
+		walk(entries)
+	}
+	return out
 }
 
 func hooksHits(path string, raw []byte) []models.ConfigHit {
