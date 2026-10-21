@@ -76,3 +76,39 @@ rules:
       genuinely research-oriented. If the subagent must search, keep its other
       grants read-only so injected search content cannot escalate into writes
       or shell, and treat its output as untrusted in the parent loop.
+
+  - id: CSDK-115
+    title: Subagent omits tools and inherits the full subagent tool pool
+    severity: high
+    confidence: 0.75
+    applies_to:
+      - claude_subagent
+    scope: subagent
+    match:
+      subagent_inherits_all_tools: true
+    explanation: >
+      This subagent file sits in a `.claude/agents/` directory and its
+      frontmatter has no `tools:` key and no `disallowedTools:` entries. Claude
+      Code documents that a subagent with `tools` omitted inherits all tools
+      available to subagents: the built-in tools and MCP tools of the main
+      conversation, less a short list Claude Code removes from all subagents.
+      The subagent therefore gets whichever of Bash, file-write, web-fetch and
+      MCP tools the main conversation has, whatever its description says its
+      job is. Claude Code documents that Claude decides when to delegate to a
+      subagent and composes the delegation message the subagent works from, so
+      instructions that steer the main conversation can reach this subagent
+      and the tools it holds.
+      Limits of this check: the rule reads the frontmatter alone and cannot see
+      which tools the main conversation has, so it cannot tell how wide the
+      inherited pool is. A `tools:` key with an empty or null value counts as
+      declared and stays silent. Any `disallowedTools:` entry silences the
+      rule, whatever it removes. Markdown files found outside `.claude/agents/`
+      (plugin `agents/` directories, flat collections) are not checked.
+      In-code `AgentDefinition` subagents are covered by CSDK-103 and CSDK-120
+      when they also set bypassPermissions, and are not checked here.
+    fix: >
+      Add a `tools:` list naming the tools the role needs, for example
+      `tools: Read, Grep, Glob` for a review or search role. If the subagent
+      needs most of the pool, keep `tools` omitted and add a `disallowedTools:`
+      list for the tools it must not reach, such as `Bash`, `Write`, `Edit` or
+      `mcp__*`.

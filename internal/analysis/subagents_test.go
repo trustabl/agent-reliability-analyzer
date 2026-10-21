@@ -52,7 +52,8 @@ tools: Read, Bash, Glob, Grep, mcp__email__search_inbox
 			{Tool: "Grep", Raw: "Grep"},
 			{Tool: "MCP", Pattern: "email__search_inbox", Raw: "mcp__email__search_inbox"},
 		},
-		Location: models.Location{FilePath: ".claude/agents/inbox-searcher.md", Line: 1, EndLine: 5},
+		Location:  models.Location{FilePath: ".claude/agents/inbox-searcher.md", Line: 1, EndLine: 5},
+		Canonical: true,
 	}
 	if !reflect.DeepEqual(got[0], want) {
 		t.Errorf("got  %+v\nwant %+v", got[0], want)
@@ -364,6 +365,46 @@ func TestSubagents_CanonicalWithoutToolsStillDiscovered(t *testing.T) {
 	got := analysis.DiscoverSubagents(manifest)
 	if len(got) != 1 || got[0].Name != "inheritor" {
 		t.Fatalf("canonical tool-less subagent not discovered: %+v", got)
+	}
+}
+
+func TestSubagents_ToolsOmittedAndCanonical(t *testing.T) {
+	dir := t.TempDir()
+	writeFixture(t, dir, ".claude/agents/omitted.md", "---\nname: omitted\ndescription: D\n---\n")
+	writeFixture(t, dir, ".claude/agents/emptylist.md", "---\nname: emptylist\ndescription: D\ntools: []\n---\n")
+	writeFixture(t, dir, ".claude/agents/nulltools.md", "---\nname: nulltools\ndescription: D\ntools:\n---\n")
+	writeFixture(t, dir, ".claude/agents/listed.md", "---\nname: listed\ndescription: D\ntools: Read\n---\n")
+	writeFixture(t, dir, "agents/planner.md", "---\nname: planner\ndescription: D\nmodel: sonnet\n---\n")
+	manifest := models.ScanManifest{
+		RepoRoot: dir,
+		Components: []models.AgentComponent{
+			{Kind: models.ComponentSubagent, Path: ".claude/agents/omitted.md"},
+			{Kind: models.ComponentSubagent, Path: ".claude/agents/emptylist.md"},
+			{Kind: models.ComponentSubagent, Path: ".claude/agents/nulltools.md"},
+			{Kind: models.ComponentSubagent, Path: ".claude/agents/listed.md"},
+		},
+		MarkdownFiles: []string{"agents/planner.md"},
+	}
+	want := map[string][2]bool{ // name -> {ToolsOmitted, Canonical}
+		"omitted":   {true, true},
+		"emptylist": {false, true},
+		"nulltools": {false, true},
+		"listed":    {false, true},
+		"planner":   {true, false},
+	}
+	got := analysis.DiscoverSubagents(manifest)
+	if len(got) != len(want) {
+		t.Fatalf("subagents = %d, want %d: %+v", len(got), len(want), got)
+	}
+	for _, s := range got {
+		w, ok := want[s.Name]
+		if !ok {
+			t.Errorf("unexpected subagent %q", s.Name)
+			continue
+		}
+		if s.ToolsOmitted != w[0] || s.Canonical != w[1] {
+			t.Errorf("%s: ToolsOmitted=%v Canonical=%v, want %v %v", s.Name, s.ToolsOmitted, s.Canonical, w[0], w[1])
+		}
 	}
 }
 

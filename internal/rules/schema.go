@@ -108,7 +108,8 @@ type MatchExpr struct {
 	AgentServerReachable *bool `yaml:"agent_server_reachable,omitempty"`
 
 	// Subagent-scope predicates
-	SubagentGrantsTool []string `yaml:"subagent_grants_tool,omitempty"`
+	SubagentGrantsTool       []string `yaml:"subagent_grants_tool,omitempty"`
+	SubagentInheritsAllTools *bool    `yaml:"subagent_inherits_all_tools,omitempty"`
 
 	// Skill-scope predicates
 	SkillAllowsUnrestrictedShell            *bool               `yaml:"skill_allows_unrestricted_shell,omitempty"`
