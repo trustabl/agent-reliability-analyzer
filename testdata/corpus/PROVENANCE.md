@@ -24,6 +24,7 @@ These were authored in this repository as test fixtures.
 | `skill-vuln-fixtures/` | Synthetic Claude Code Agent Skills (a deliberately-vulnerable `leak-helper` + a benign `safe-reader`) exercising enriched skill discovery and the CSKILL-* rule tests. No real payload; all hosts are `example.*` placeholders |
 | `preauth-config-fixture/` | Synthetic pre-trust harness config (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`) exercising the agent_config rules (AGCFG-004..007, MCPCFG-002). All values are fake placeholders |
 | `codex-hooks-fixture/` | Synthetic `.codex/hooks.json` in the shape OpenAI documents for Codex hooks (a repo script via the documented `$(git rev-parse --show-toplevel)` form, and a network call) exercising AGCFG-008. All values are fake placeholders |
+| `subagent-tools-inherit/` | Synthetic `.claude/agents/*.md` subagents (no `tools`, a listed `tools`, an empty `tools: []`, a `disallowedTools` denylist), a non-canonical `agents/planner.md`, and an in-code `AgentDefinition` with no `tools`, exercising CSDK-115. All values are fake placeholders |
 
 ## Vendored from `openai/openai-agents-python` (MIT)
 
