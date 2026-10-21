@@ -378,6 +378,10 @@ type ProjectConfigFacts struct {
 	// OpenCode harness tree (systemprompt.md, guardrails.md, ...). AGCFG-010 reads
 	// this list; AGCFG-009 keeps reading HiddenAgentText only.
 	HiddenHarnessText []ConfigHit `json:"hidden_harness_text,omitempty"`
+	// UserContentFetchAllow is a WebFetch allow rule in .claude/settings*.json
+	// that covers a host serving user-published content, not cancelled by a
+	// deny or ask rule in the same .claude/ folder. AGCFG-011 reads this list.
+	UserContentFetchAllow []ConfigHit `json:"user_content_fetch_allow,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

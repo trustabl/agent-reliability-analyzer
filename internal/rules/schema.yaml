@@ -724,6 +724,15 @@ rules:
 #       tool_descriptions/*.md; ProjectConfigFacts.HiddenHarnessText). Same
 #       exemptions, text never echoed. AGCFG-010. A separate predicate from
 #       repo_agents_md_has_hidden_text, which keeps its AGENTS.md-only meaning.
+#   repo_settings_preapprove_user_content_fetch: true | false
+#       A WebFetch rule in permissions.allow of .claude/settings.json or
+#       settings.local.json covers a host serving user-published content
+#       (github.com, gist.github.com, raw.githubusercontent.com, an arbitrary
+#       *.github.io site, huggingface.co, bitbucket.org, pastebin.com, an
+#       arbitrary *.readthedocs.io site), using Claude Code's domain: matching.
+#       Bare WebFetch and domain:* count. A deny or ask rule in the same .claude/
+#       folder covering the host cancels it (ProjectConfigFacts.UserContentFetchAllow).
+#       The entry is named in the hit's Reason, never in the finding text. AGCFG-011.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads

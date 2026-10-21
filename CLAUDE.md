@@ -350,6 +350,16 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Pre-approved fetch from a user-content host (2026-10-21, `schema_version` 26 -> 29, provisional; +1 rule):** **AGCFG-011** (high, 0.7, repo
+> scope, category `agent_config`, new pack file `agent_config/fetch_permissions.yaml`) over the new predicate
+> `repo_settings_preapprove_user_content_fetch`, backed by `ProjectConfigFacts.UserContentFetchAllow`. It flags a WebFetch rule in
+> `permissions.allow` of `.claude/settings.json` / `settings.local.json` that covers a fixed list of hosts where any account can publish
+> (github.com, gist.github.com, raw.githubusercontent.com, an arbitrary `*.github.io`, huggingface.co, bitbucket.org, pastebin.com, an
+> arbitrary `*.readthedocs.io`), using Claude Code's documented `domain:` matching; a bare `WebFetch` and `domain:*` count; a deny or ask
+> rule in the same `.claude/` folder cancels. The Reason names the entry; the finding text is static. Schema 27 is held by CSDK-115 and 28
+> by MCPCFG-003 on open branches, so 29 is provisional and the later merge renumbers. Rulebook doc is a separate round
+> (`docs/Policy/agent_config/fetch_permissions.md`). Not judged: user and managed settings, `WebFetch()`, WebSearch, Bash `curl`, MCP fetch tools.
+>
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
 > (`analysis.DiscoverProjectConfig`). The walk now enters `.gemini/`, `.vscode/`, `.cursor/`, `.codex/`. Env files are read for **key

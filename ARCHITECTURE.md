@@ -478,6 +478,11 @@ components: `mcp_config` (now also `.mcp.json`, `.cursor/mcp.json`,
 (`repo_project_mcp_autoenable`, `repo_project_hook_runs_untrusted_command`,
 `repo_workspace_env_overrides_trust`, `repo_editor_agent_auto_approve`,
 `repo_mcp_config_launches_local_command`) read by AGCFG-004..007 and MCPCFG-002.
+`repo_settings_preapprove_user_content_fetch` (AGCFG-011) reads the already-parsed
+`permissions.allow/deny/ask` rules (`DiscoverClaudeSettings`): `userContentFetchHits`
+matches each WebFetch allow entry against a fixed host list using the documented
+`domain:` rules (`webFetchCovers`), and a deny or ask rule in the same `.claude/`
+folder cancels it.
 Settings files are parsed as JSONC (comments and trailing commas stripped), Codex
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set

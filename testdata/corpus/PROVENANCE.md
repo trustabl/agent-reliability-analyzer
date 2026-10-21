@@ -24,6 +24,7 @@ These were authored in this repository as test fixtures.
 | `skill-vuln-fixtures/` | Synthetic Claude Code Agent Skills (a deliberately-vulnerable `leak-helper` + a benign `safe-reader`) exercising enriched skill discovery and the CSKILL-* rule tests. No real payload; all hosts are `example.*` placeholders |
 | `preauth-config-fixture/` | Synthetic pre-trust harness config (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`) exercising the agent_config rules (AGCFG-004..007, MCPCFG-002). All values are fake placeholders |
 | `codex-hooks-fixture/` | Synthetic `.codex/hooks.json` in the shape OpenAI documents for Codex hooks (a repo script via the documented `$(git rev-parse --show-toplevel)` form, and a network call) exercising AGCFG-008. All values are fake placeholders |
+| `fetch-permissions-fixture/` | Synthetic `.claude/settings.json` and `settings.local.json` pairing WebFetch allow rules for user-content hosts with a non-listed host, a single-account site and a same-folder deny, for AGCFG-011. All values are placeholders |
 
 ## Vendored from `openai/openai-agents-python` (MIT)
 
