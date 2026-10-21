@@ -32,3 +32,38 @@ rules:
       remote URL instead of a script in the repo. If a local server is needed,
       document how each developer installs and registers it in their own
       user-level config rather than committing the launch command.
+
+  - id: MCPCFG-003
+    title: Project MCP config launches an unpinned package
+    severity: high
+    confidence: 0.7
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_mcp_config_launches_unpinned_package: true
+    explanation: >
+      A committed MCP client config starts a server with a package runner (npx,
+      bunx, pnpm dlx, uvx, uv tool run, pipx run or docker run) on a package or
+      image that is not pinned to an exact version. npx installs a package that
+      is not in the local project into the npm cache, and bunx checks the
+      registry for newer versions once a day; in npm, a tag or a version range
+      names whichever published version it matches. uvx uses the latest version
+      on its first run, and pipx run fetches the latest version after its 14-day
+      cache expires. Docker uses the latest tag when no tag is given and
+      documents a digest as the way to pin an image. The code the client starts
+      can therefore change with no change to the repo, and it runs with the
+      developer's privileges when the server is enabled. Limits of this check:
+      it reads the command and args of each server entry and nothing else. A
+      version pinned in a lockfile or package manifest is not seen, and npx and
+      bunx prefer a copy installed in the local project, so a repo that
+      installs the package is still flagged. Git, URL, local-path and
+      environment-variable specs are not judged, nor is a runner started through
+      a shell (bash -c, cmd /c) or given a flag before its subcommand. A docker
+      image counts as pinned by an @sha256: digest, not by its tag. Remote URL
+      servers are out of scope, and a command inside the repo is MCPCFG-002's.
+    fix: >
+      Pin each server to an exact version: package@1.2.3 for npx, bunx and pnpm
+      dlx; package@1.2.3 or --from package==1.2.3 for uvx; --spec package==1.2.3
+      for pipx run; image@sha256:<digest> for docker run. Move the pin
+      deliberately when you decide to take a new release.

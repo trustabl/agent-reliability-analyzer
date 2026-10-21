@@ -350,6 +350,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Unpinned MCP package launch (2026-10-21, `schema_version` 26 → 28, provisional; +1 rule):** **MCPCFG-003** (high, 0.7, repo scope,
+> category `agent_config`) over the new predicate `repo_mcp_config_launches_unpinned_package`, backed by
+> `ProjectConfigFacts.UnpinnedMCPLaunch`. It flags an MCP client config entry started by `npx` / `bunx` / `pnpm dlx` / `uvx` /
+> `uv tool run` / `pipx run` / `docker run` on a package or image with no exact version (docker: an `@sha256:` digest). Git, URL,
+> local-path and `$VAR` specs are not judged; a command inside the repo stays with MCPCFG-002, so the two never judge one entry.
+> Schema 27 is held by CSDK-115 on an open branch, so this number is provisional and the later merge renumbers. The fixture holds
+> **344** rules (343 + 1; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`, a separate follow-up round.
+> Not judged and not built: git refs, `deno` / `podman` / `yarn dlx` / `npm exec` launchers, lockfile pins.
+>
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
 > (`analysis.DiscoverProjectConfig`). The walk now enters `.gemini/`, `.vscode/`, `.cursor/`, `.codex/`. Env files are read for **key

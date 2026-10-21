@@ -1,0 +1,3 @@
+[mcp_servers.fetch]
+command = "uvx"
+args = ["--from", "example-mcp-fetch>=1.0", "example-mcp-fetch"]

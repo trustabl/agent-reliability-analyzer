@@ -183,6 +183,104 @@ func TestProjectConfig_LocalMCPLaunch(t *testing.T) {
 	}
 }
 
+func TestProjectConfig_UnpinnedMCPLaunch(t *testing.T) {
+	srv := func(body string) string { return `{"mcpServers":{"s":` + body + `}}` }
+	digest := "sha256:" + strings.Repeat("0", 64)
+	fire := []string{
+		`{"command":"npx","args":["-y","@example/mcp-fs","/tmp"]}`,
+		`{"command":"npx","args":["-y","pkg@latest"]}`,
+		`{"command":"npx","args":["pkg@next"]}`,
+		`{"command":"npx","args":["pkg@^1.2.0"]}`,
+		`{"command":"npx","args":["pkg@~1.2"]}`,
+		`{"command":"npx","args":["pkg@1"]}`,
+		`{"command":"npx","args":["--package=@example/pkg","-c","srv"]}`,
+		`{"command":"npx","args":["--package","@example/pkg","-c","srv"]}`,
+		`{"command":"npx","args":["--registry","https://r.example.invalid","-y","pkg"]}`,
+		`{"command":"C:\\tools\\npx.exe","args":["-y","pkg"]}`,
+		`{"command":"bunx","args":["pkg"]}`,
+		`{"command":"pnpm","args":["dlx","pkg@latest"]}`,
+		`{"command":"uvx","args":["example-git"]}`,
+		`{"command":"uvx","args":["example-git@latest"]}`,
+		`{"command":"uvx","args":["--from","example-git>=0.6","example-git"]}`,
+		`{"command":"uvx","args":["--python","3.12","example-git"]}`,
+		`{"command":"uvx","args":["--from","example-git==0.*","example-git"]}`,
+		`{"command":"uv","args":["tool","run","example-fetch"]}`,
+		`{"command":"pipx","args":["run","example-time"]}`,
+		`{"command":"pipx","args":["run","--spec","pkg>=1","pkg"]}`,
+		`{"command":"docker","args":["run","-i","--rm","ghcr.io/example/srv"]}`,
+		`{"command":"docker","args":["run","-i","--rm","img:latest"]}`,
+		`{"command":"docker","args":["run","-i","--rm","-e","TOKEN","img:1.2.3"]}`,
+	}
+	for _, body := range fire {
+		f := discoverWith(t, ".mcp.json", srv(body), models.ComponentMCPConfig)
+		if len(f.UnpinnedMCPLaunch) != 1 {
+			t.Errorf("%s: want one unpinned hit, got %+v", body, f.UnpinnedMCPLaunch)
+		}
+		if len(f.LocalMCPLaunch) != 0 {
+			t.Errorf("%s: MCPCFG-002 must not also fire, got %+v", body, f.LocalMCPLaunch)
+		}
+	}
+	silent := []string{
+		`{"command":"npx","args":["-y","@example/pkg@1.2.3"]}`,
+		`{"command":"npx","args":["-y","pkg@1.2.3-beta.1"]}`,
+		`{"command":"npx","args":["--package=@example/pkg@1.2.3","-c","srv"]}`,
+		`{"command":"bunx","args":["pkg@1.2.3"]}`,
+		`{"command":"pnpm","args":["dlx","pkg@1.2.3"]}`,
+		`{"command":"uvx","args":["example-git@0.6.2"]}`,
+		`{"command":"uvx","args":["--from","example-git==0.6.2","example-git"]}`,
+		`{"command":"uvx","args":["example-git==0.6.2"]}`,
+		`{"command":"pipx","args":["run","--spec","pkg==1.0.0","pkg"]}`,
+		`{"command":"docker","args":["run","-i","--rm","img@` + digest + `"]}`,
+		`{"command":"docker","args":["run","-i","img:1.2@` + digest + `"]}`,
+		`{"url":"https://mcp.example.invalid/sse"}`,
+		`{"command":"npx","args":["-y","./local-srv"]}`,
+		`{"command":"npx","args":["github:user/repo"]}`,
+		`{"command":"npx","args":["user/repo"]}`,
+		`{"command":"npx","args":["pkg@github:user/repo"]}`,
+		`{"command":"npx","args":["-y","${PKG}"]}`,
+		`{"command":"uvx","args":["--from","git+https://example.invalid/r.git","srv"]}`,
+		`{"command":"uvx","args":["./local-tool"]}`,
+		`{"command":"docker","args":["run","-i","--rm","${IMAGE}"]}`,
+		`{"command":"npx"}`,
+		`{"command":"npx","args":["-c","echo hi"]}`,
+		`{"command":"node","args":["/opt/srv.js"]}`,
+		`{"command":"python","args":["-m","pkg.server"]}`,
+		`{"command":"docker","args":["compose","up"]}`,
+		`{"command":"pnpm","args":["--silent","dlx","pkg"]}`, // documented limit: a flag before the subcommand
+	}
+	for _, body := range silent {
+		if f := discoverWith(t, ".mcp.json", srv(body), models.ComponentMCPConfig); len(f.UnpinnedMCPLaunch) != 0 {
+			t.Errorf("%s: want silent, got %+v", body, f.UnpinnedMCPLaunch)
+		}
+	}
+
+	// A command inside the repo is MCPCFG-002's, never MCPCFG-003's.
+	f := discoverWith(t, ".mcp.json", srv(`{"command":"./node_modules/.bin/npx","args":["-y","pkg"]}`), models.ComponentMCPConfig)
+	if len(f.LocalMCPLaunch) == 0 || len(f.UnpinnedMCPLaunch) != 0 {
+		t.Errorf("repo-relative npx: want MCPCFG-002 only, got local=%+v unpinned=%+v", f.LocalMCPLaunch, f.UnpinnedMCPLaunch)
+	}
+
+	// The same classifier runs over every parsed config shape.
+	vs := `{"servers":{"s":{"command":"bunx","args":["pkg"]}}}`
+	if f := discoverWith(t, ".vscode/mcp.json", vs, models.ComponentMCPConfig); len(f.UnpinnedMCPLaunch) == 0 {
+		t.Error(".vscode/mcp.json servers: want a hit")
+	}
+	gem := `{"mcpServers":{"s":{"command":"npx","args":["pkg"]}}}`
+	if f := discoverWith(t, ".gemini/settings.json", gem, models.ComponentGeminiSettings); len(f.UnpinnedMCPLaunch) == 0 {
+		t.Error(".gemini/settings.json mcpServers: want a hit")
+	}
+	toml := "[mcp_servers.s]\ncommand = \"uvx\"\nargs = [\"pkg\"]\n"
+	if f := discoverWith(t, ".codex/config.toml", toml, models.ComponentCodexConfig); len(f.UnpinnedMCPLaunch) == 0 {
+		t.Error("codex mcp_servers: want a hit")
+	}
+
+	// The reason names the server and a fixed phrase, never the package spec.
+	f = discoverWith(t, ".mcp.json", srv(`{"command":"npx","args":["-y","@example/secret-name"]}`), models.ComponentMCPConfig)
+	if len(f.UnpinnedMCPLaunch) != 1 || strings.Contains(f.UnpinnedMCPLaunch[0].Reason, "secret-name") {
+		t.Errorf("reason must not echo the spec: %+v", f.UnpinnedMCPLaunch)
+	}
+}
+
 func TestProjectConfig_Deterministic(t *testing.T) {
 	body := `{"hooks":{"A":[{"command":"./a.sh"}],"B":[{"command":"./b.sh"}],"C":[{"command":"curl x"}]}}`
 	first, _ := json.Marshal(discoverWith(t, ".claude/settings.json", body, models.ComponentClaudeSettings))
