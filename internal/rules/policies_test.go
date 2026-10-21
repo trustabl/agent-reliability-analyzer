@@ -4640,6 +4640,22 @@ var policySubagentRuleCases = []policySubagentCase{
 	{"CSDK-112 silent without WebSearch", "CSDK-112",
 		models.SubagentDef{Name: "reader3", Location: models.Location{FilePath: ".claude/agents/reader3.md"},
 			Tools: []string{"Read", "Grep", "Glob"}}, models.RepoInventory{}, false},
+
+	{"CSDK-115 fires when canonical subagent omits tools", "CSDK-115",
+		models.SubagentDef{Name: "inheritor", Location: models.Location{FilePath: ".claude/agents/inheritor.md"},
+			ToolsOmitted: true, Canonical: true}, models.RepoInventory{}, true},
+	{"CSDK-115 silent when tools listed", "CSDK-115",
+		models.SubagentDef{Name: "reader", Location: models.Location{FilePath: ".claude/agents/reader.md"},
+			Tools: []string{"Read", "Grep"}, Canonical: true}, models.RepoInventory{}, false},
+	{"CSDK-115 silent on empty tools key", "CSDK-115",
+		models.SubagentDef{Name: "empty", Location: models.Location{FilePath: ".claude/agents/empty.md"},
+			Canonical: true}, models.RepoInventory{}, false},
+	{"CSDK-115 silent with disallowedTools denylist", "CSDK-115",
+		models.SubagentDef{Name: "denylist", Location: models.Location{FilePath: ".claude/agents/denylist.md"},
+			ToolsOmitted: true, Canonical: true, DisallowedTools: []string{"Bash", "Write"}}, models.RepoInventory{}, false},
+	{"CSDK-115 silent on shape-fallback file", "CSDK-115",
+		models.SubagentDef{Name: "planner", Location: models.Location{FilePath: "agents/planner.md"},
+			ToolsOmitted: true, Model: "sonnet"}, models.RepoInventory{}, false},
 }
 
 // policySkillRuleCases covers skill-scoped rules (CSKILL-*).

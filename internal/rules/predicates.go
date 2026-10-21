@@ -1050,6 +1050,16 @@ func PredSubagentGrantsTool(s models.SubagentDef, names []string) bool {
 	return false
 }
 
+// PredSubagentInheritsAllTools reports whether a .claude/agents/ subagent leaves
+// its tool pool unrestricted: no `tools` key and no disallowedTools entries.
+// Claude Code gives such a subagent all tools available to subagents. Files
+// found by the shape fallback (Canonical false) are excluded, since a markdown
+// file outside .claude/agents/ may belong to a harness with different
+// omitted-tools semantics.
+func PredSubagentInheritsAllTools(s models.SubagentDef) bool {
+	return s.Canonical && s.ToolsOmitted && len(s.Tools) == 0 && len(s.DisallowedTools) == 0
+}
+
 // ─── skill predicates ─────────────────────────────────────────────────────────
 
 // PredSkillModelInvocable reports whether the model can auto-invoke the skill

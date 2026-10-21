@@ -447,6 +447,14 @@ rules:
 #       in the list — e.g. tools: [Bash, Write, WebSearch]). Use for subagents
 #       that call system tools or manipulate files.
 #
+#   subagent_inherits_all_tools: true | false
+#       True when a subagent found in a .claude/agents/ directory has no
+#       `tools:` key in its frontmatter and no disallowedTools entries.
+#       Claude Code gives such a subagent all tools available to subagents.
+#       A `tools:` key with an empty or null value counts as declared (false).
+#       Files found by the frontmatter-shape fallback are excluded. Used by
+#       CSDK-115.
+#
 #
 # ━━━ SKILL-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # (used only in scope: skill rules — Claude Code Agent Skills, SKILL.md)
