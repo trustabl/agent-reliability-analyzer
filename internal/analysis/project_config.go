@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -43,6 +44,9 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 		}
 	}
 
+	// AGCFG-011: WebFetch allow rules that cover a user-content host.
+	f.UserContentFetchAllow = userContentFetchHits(manifest.RepoRoot, claude)
+
 	for _, c := range manifest.Components {
 		switch c.Kind {
 		case models.ComponentClaudeSettings, models.ComponentGeminiSettings:
@@ -78,6 +82,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.CodexRiskyHooks = sortHits(f.CodexRiskyHooks)
 	f.HiddenAgentText = sortHits(f.HiddenAgentText)
 	f.HiddenHarnessText = sortHits(f.HiddenHarnessText)
+	f.UserContentFetchAllow = sortHits(f.UserContentFetchAllow)
 	return f
 }
 
@@ -539,4 +544,106 @@ func codexTrustHits(path string, raw []byte) []models.ConfigHit {
 	}
 	walk(doc)
 	return out
+}
+
+// ── AGCFG-011: pre-approved fetches from user-content hosts ────────────────
+
+// userContentFetchProbes are the hosts AGCFG-011 treats as serving content any
+// account can publish, each sourced in the rulebook doc. A "*."-labelled entry
+// stands for an arbitrary account's site on that suffix, so a rule must cover
+// a subdomain no one account owns: WebFetch(domain:alice.github.io) is silent.
+var userContentFetchProbes = []struct{ host, label string }{
+	{"github.com", "github.com"},
+	{"gist.github.com", "gist.github.com"},
+	{"raw.githubusercontent.com", "raw.githubusercontent.com"},
+	{"any-account.github.io", "*.github.io"},
+	{"huggingface.co", "huggingface.co"},
+	{"bitbucket.org", "bitbucket.org"},
+	{"pastebin.com", "pastebin.com"},
+	{"any-project.readthedocs.io", "*.readthedocs.io"},
+}
+
+// webFetchCovers reports whether a permission rule matches a fetch to host,
+// per Claude Code's documented domain: matching: case-insensitive, trailing
+// "." ignored, bare "*" matches any host, a leading "*." matches subdomains at
+// any depth but not the apex, any other "*" stays within one label. The bare
+// tool name matches every fetch. WebFetch() and non-domain: specifiers are not
+// judged (their behavior is not documented).
+func webFetchCovers(r models.PermissionRule, host string) bool {
+	if r.Tool != "WebFetch" {
+		return false
+	}
+	if r.Raw == "WebFetch" {
+		return true
+	}
+	p, ok := strings.CutPrefix(strings.TrimSpace(r.Pattern), "domain:")
+	if !ok {
+		return false
+	}
+	p = strings.TrimSuffix(strings.ToLower(p), ".")
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if p == "*" {
+		return true
+	}
+	hl := strings.Split(host, ".")
+	if rest, sub := strings.CutPrefix(p, "*."); sub {
+		pl := strings.Split(rest, ".")
+		return len(hl) > len(pl) && labelsMatch(pl, hl[len(hl)-len(pl):])
+	}
+	return labelsMatch(strings.Split(p, "."), hl)
+}
+
+// labelsMatch compares domain labels pairwise; "*" inside a label matches any
+// run of characters within that label.
+func labelsMatch(pat, host []string) bool {
+	if len(pat) != len(host) {
+		return false
+	}
+	for i := range pat {
+		re := "^" + strings.ReplaceAll(regexp.QuoteMeta(pat[i]), `\*`, `[^.]*`) + "$"
+		if ok, _ := regexp.MatchString(re, host[i]); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// userContentFetchHits emits one hit per allow entry that covers a probe host
+// left uncovered by every deny and ask rule in the same .claude/ folder.
+// Claude Code merges settings.json and settings.local.json, and deny then ask
+// are evaluated before allow, so a restricting rule in either file wins.
+func userContentFetchHits(root string, claude []models.ClaudeSettings) []models.ConfigHit {
+	restrict := map[string][]models.PermissionRule{}
+	for _, cs := range claude {
+		dir := path.Dir(cs.FilePath)
+		restrict[dir] = append(restrict[dir], cs.Permissions.Deny...)
+		restrict[dir] = append(restrict[dir], cs.Permissions.Ask...)
+	}
+	var out []models.ConfigHit
+	for _, cs := range claude {
+		for _, r := range cs.Permissions.Allow {
+			for _, pr := range userContentFetchProbes {
+				if !webFetchCovers(r, pr.host) || anyCovers(restrict[path.Dir(cs.FilePath)], pr.host) {
+					continue
+				}
+				line := r.Line
+				if line < 1 {
+					enc, _ := json.Marshal(r.Raw)
+					line = lineOfText(readConfig(root, cs.FilePath), string(enc))
+				}
+				out = append(out, hit(cs.FilePath, line, "permissions.allow entry "+r.Raw+" pre-approves fetches from "+pr.label))
+				break
+			}
+		}
+	}
+	return out
+}
+
+func anyCovers(rules []models.PermissionRule, host string) bool {
+	for _, r := range rules {
+		if webFetchCovers(r, host) {
+			return true
+		}
+	}
+	return false
 }
