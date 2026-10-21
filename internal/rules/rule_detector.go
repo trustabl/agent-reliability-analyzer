@@ -171,6 +171,8 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.EditorAutoApprove
 	case m.RepoMCPConfigLaunchesLocalCommand != nil:
 		hits = pc.LocalMCPLaunch
+	case m.RepoMCPConfigLaunchesUnpinnedPackage != nil:
+		hits = pc.UnpinnedMCPLaunch
 	case m.RepoCodexHookRunsRepoCommand != nil:
 		hits = pc.CodexRiskyHooks
 	case m.RepoAgentsMdHasHiddenText != nil:

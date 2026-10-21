@@ -1,0 +1,6 @@
+{
+  "servers": {
+    "bun-unpinned": { "command": "bunx", "args": ["example-mcp-tool"] },
+    "pipx-pinned": { "command": "pipx", "args": ["run", "--spec", "example-mcp-time==1.0.0", "example-mcp-time"] }
+  }
+}

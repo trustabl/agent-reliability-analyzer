@@ -49,10 +49,14 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 			raw := readConfig(manifest.RepoRoot, c.Path)
 			f.RiskyHooks = append(f.RiskyHooks, hooksHits(c.Path, raw)...)
 			if c.Kind == models.ComponentGeminiSettings {
-				f.LocalMCPLaunch = append(f.LocalMCPLaunch, jsonMCPHits(c.Path, raw)...)
+				local, unpinned := jsonMCPHits(c.Path, raw)
+				f.LocalMCPLaunch = append(f.LocalMCPLaunch, local...)
+				f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, unpinned...)
 			}
 		case models.ComponentMCPConfig:
-			f.LocalMCPLaunch = append(f.LocalMCPLaunch, jsonMCPHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
+			local, unpinned := jsonMCPHits(c.Path, readConfig(manifest.RepoRoot, c.Path))
+			f.LocalMCPLaunch = append(f.LocalMCPLaunch, local...)
+			f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, unpinned...)
 		case models.ComponentEditorSettings:
 			f.EditorAutoApprove = append(f.EditorAutoApprove, editorHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentAgentEnvFile:
@@ -66,7 +70,9 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 		case models.ComponentCodexConfig:
 			raw := readConfig(manifest.RepoRoot, c.Path)
 			f.TrustOverrideEnv = append(f.TrustOverrideEnv, codexTrustHits(c.Path, raw)...)
-			f.LocalMCPLaunch = append(f.LocalMCPLaunch, codexMCPHits(c.Path, raw)...)
+			local, unpinned := codexMCPHits(c.Path, raw)
+			f.LocalMCPLaunch = append(f.LocalMCPLaunch, local...)
+			f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, unpinned...)
 		}
 	}
 
@@ -75,6 +81,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.TrustOverrideEnv = sortHits(f.TrustOverrideEnv)
 	f.EditorAutoApprove = sortHits(f.EditorAutoApprove)
 	f.LocalMCPLaunch = sortHits(f.LocalMCPLaunch)
+	f.UnpinnedMCPLaunch = sortHits(f.UnpinnedMCPLaunch)
 	f.CodexRiskyHooks = sortHits(f.CodexRiskyHooks)
 	f.HiddenAgentText = sortHits(f.HiddenAgentText)
 	f.HiddenHarnessText = sortHits(f.HiddenHarnessText)
@@ -409,39 +416,274 @@ func classifyMCPLaunch(s mcpServer) string {
 	return ""
 }
 
-func jsonMCPHits(path string, raw []byte) []models.ConfigHit {
+// mcpHit classifies one server entry: a repo-controlled launch (MCPCFG-002) or
+// an unpinned package launch (MCPCFG-003). The two classifiers never accept the
+// same entry, so at most one hit is returned.
+func mcpHit(s mcpServer, path string, line int, name string) (local, unpinned *models.ConfigHit) {
+	if why := classifyMCPLaunch(s); why != "" {
+		h := hit(path, line, "MCP server "+name+" "+why)
+		return &h, nil
+	}
+	if why := classifyMCPPin(s); why != "" {
+		h := hit(path, line, "MCP server "+name+" "+why)
+		return nil, &h
+	}
+	return nil, nil
+}
+
+func jsonMCPHits(path string, raw []byte) (local, unpinned []models.ConfigHit) {
 	var doc struct {
 		McpServers map[string]mcpServer `json:"mcpServers"`
 		Servers    map[string]mcpServer `json:"servers"`
 	}
 	if !parseJSONC(raw, &doc) {
-		return nil
+		return nil, nil
 	}
-	var out []models.ConfigHit
 	for _, m := range []map[string]mcpServer{doc.McpServers, doc.Servers} {
 		for name, s := range m {
-			if why := classifyMCPLaunch(s); why != "" {
-				out = append(out, hit(path, lineOfText(raw, `"`+name+`"`), "MCP server "+name+" "+why))
+			l, u := mcpHit(s, path, lineOfText(raw, `"`+name+`"`), name)
+			if l != nil {
+				local = append(local, *l)
+			}
+			if u != nil {
+				unpinned = append(unpinned, *u)
 			}
 		}
 	}
-	return out
+	return local, unpinned
 }
 
-func codexMCPHits(path string, raw []byte) []models.ConfigHit {
+func codexMCPHits(path string, raw []byte) (local, unpinned []models.ConfigHit) {
 	var doc struct {
 		McpServers map[string]mcpServer `toml:"mcp_servers"`
 	}
 	if len(raw) == 0 || toml.Unmarshal(raw, &doc) != nil {
-		return nil
+		return nil, nil
 	}
-	var out []models.ConfigHit
 	for name, s := range doc.McpServers {
-		if why := classifyMCPLaunch(s); why != "" {
-			out = append(out, hit(path, lineOfText(raw, "mcp_servers."+name), "MCP server "+name+" "+why))
+		l, u := mcpHit(s, path, lineOfText(raw, "mcp_servers."+name), name)
+		if l != nil {
+			local = append(local, *l)
+		}
+		if u != nil {
+			unpinned = append(unpinned, *u)
 		}
 	}
-	return out
+	return local, unpinned
+}
+
+// ── MCPCFG-003: unpinned package launches ───────────────────────────────────
+
+var (
+	exactSemverRe  = regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
+	pyExactPinRe   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*(\[[^\]]*\])?\s*===?\s*[^\s,*;<>!~=]+$`)
+	sha256DigestRe = regexp.MustCompile(`@sha256:[0-9a-f]{64}`)
+)
+
+// Flags that take a value, per runner. A flag outside these lists is read as
+// boolean, so an unlisted value flag can make the check read the wrong argument.
+var (
+	npxValueFlags = map[string]bool{
+		"-p": true, "--package": true, "-c": true, "--call": true, "-w": true, "--workspace": true,
+		"--registry": true, "--cache": true, "--userconfig": true, "--prefix": true,
+	}
+	// bunx and pnpm dlx: the package flag is the only one read; -c and
+	// --shell-mode only mark the command as a shell string.
+	bunxValueFlags = map[string]bool{"-p": true, "--package": true}
+	// uv tool run options that take a value, from the uv CLI reference.
+	uvValueFlags = map[string]bool{
+		"--allow-insecure-host": true, "--trusted-host": true, "--build-constraints": true,
+		"--build-constraint": true, "-b": true, "--cache-dir": true, "--color": true,
+		"--config-file": true, "--config-setting": true, "--config-settings": true, "-C": true,
+		"--config-settings-package": true, "--constraints": true, "--constraint": true, "-c": true,
+		"--default-index": true, "--directory": true, "--env-file": true, "--exclude-newer": true,
+		"--exclude-newer-package": true, "--extra-index-url": true, "--find-links": true, "-f": true,
+		"--fork-strategy": true, "--from": true, "--index": true, "--index-strategy": true,
+		"--index-url": true, "-i": true, "--keyring-provider": true, "--link-mode": true,
+		"--no-binary-package": true, "--no-build-isolation-package": true, "--no-build-package": true,
+		"--no-sources-package": true, "--overrides": true, "--override": true, "--prerelease": true,
+		"--prerelease-package": true, "--project": true, "--python": true, "-p": true,
+		"--python-platform": true, "--refresh-package": true, "--reinstall-package": true,
+		"--resolution": true, "--torch-backend": true, "--upgrade-group": true,
+		"--upgrade-package": true, "-P": true, "--with": true, "-w": true,
+		"--with-editable": true, "--with-requirements": true,
+	}
+	pipxValueFlags = map[string]bool{"--spec": true, "--python": true, "--pip-args": true, "--index-url": true, "-i": true, "--path": true}
+
+	npmPackageFlags = map[string]bool{"-p": true, "--package": true}
+	npmShellFlags   = map[string]bool{"-c": true, "--call": true}
+	pnpmShellFlags  = map[string]bool{"-c": true, "--shell-mode": true}
+	uvFromFlags     = map[string]bool{"--from": true}
+	pipxSpecFlags   = map[string]bool{"--spec": true}
+)
+
+// runnerArgs is what scanRunnerArgs reads from a package runner's arguments.
+type runnerArgs struct {
+	flagSpecs  []string // values of the spec flag (--package, --from, --spec)
+	positional string   // first positional argument, "" when none
+	shellCmd   bool     // the command was given as a shell string (-c)
+}
+
+// scanRunnerArgs walks args up to the first positional argument, which is where
+// a package runner stops reading its own flags. specFlags name the package;
+// valueFlags consume the next argument; shellFlags mark a shell-string command.
+func scanRunnerArgs(args []string, specFlags, valueFlags, shellFlags map[string]bool) runnerArgs {
+	var r runnerArgs
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			if i+1 < len(args) {
+				r.positional = args[i+1]
+			}
+			break
+		}
+		if !strings.HasPrefix(a, "-") || a == "-" {
+			r.positional = a
+			break
+		}
+		name, val, hasEq := strings.Cut(a, "=")
+		if shellFlags[name] {
+			r.shellCmd = true
+		}
+		if specFlags[name] {
+			switch {
+			case hasEq:
+				r.flagSpecs = append(r.flagSpecs, val)
+			case i+1 < len(args):
+				r.flagSpecs = append(r.flagSpecs, args[i+1])
+				i++
+			}
+			continue
+		}
+		if valueFlags[name] && !hasEq {
+			i++
+		}
+	}
+	return r
+}
+
+// npmSpecPinned judges one npm-style package spec. judged is false for a spec
+// that is not a registry name (path, git, URL, alias, interpolation), which is
+// neither pinned nor unpinned.
+func npmSpecPinned(spec string) (pinned, judged bool) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" || strings.Contains(spec, "$") || strings.Contains(spec, "://") {
+		return false, false
+	}
+	for _, p := range []string{".", "/", "~", "file:", "link:", "git+", "git:", "github:", "gitlab:", "bitbucket:", "gist:", "npm:", "workspace:"} {
+		if strings.HasPrefix(spec, p) {
+			return false, false
+		}
+	}
+	if !strings.HasPrefix(spec, "@") && strings.Contains(spec, "/") { // user/repo shorthand
+		return false, false
+	}
+	body := strings.TrimPrefix(spec, "@")
+	i := strings.IndexByte(body, '@')
+	if i < 0 {
+		return false, true
+	}
+	ver := body[i+1:]
+	if strings.ContainsAny(ver, ":/") {
+		return false, false
+	}
+	return exactSemverRe.MatchString(ver), true
+}
+
+// pySpecPinned judges one Python package spec. atExact credits uv's name@X
+// form, which uv documents as exact-only.
+func pySpecPinned(spec string, atExact bool) (pinned, judged bool) {
+	spec = strings.TrimSpace(strings.SplitN(spec, ";", 2)[0])
+	low := strings.ToLower(spec)
+	if spec == "" || strings.ContainsAny(spec, "$/\\") || strings.Contains(spec, "://") ||
+		strings.HasPrefix(low, "git+") || strings.HasPrefix(spec, ".") || strings.HasPrefix(spec, "~") ||
+		strings.Contains(spec, " @ ") || strings.HasSuffix(low, ".whl") || strings.HasSuffix(low, ".tar.gz") || strings.HasSuffix(low, ".zip") {
+		return false, false
+	}
+	if pyExactPinRe.MatchString(spec) {
+		return true, true
+	}
+	if atExact {
+		if name, ver, ok := strings.Cut(spec, "@"); ok && name != "" && ver != "" && ver != "latest" {
+			return true, true
+		}
+	}
+	return false, true
+}
+
+// anyUnpinned reports whether some judged spec is not pinned.
+func anyUnpinned(specs []string, pinned func(string) (bool, bool)) bool {
+	for _, sp := range specs {
+		if p, judged := pinned(sp); judged && !p {
+			return true
+		}
+	}
+	return false
+}
+
+// classifyMCPPin returns a fixed-phrase reason when the server is started by a
+// package runner on a registry package or image that is not pinned to an exact
+// version (a digest for docker), or "" otherwise. A url server, a command
+// inside the repo (MCPCFG-002's), and a spec that is a path, git source, URL or
+// interpolation are not judged. The spec is never echoed into the reason.
+func classifyMCPPin(s mcpServer) string {
+	if s.URL != "" || s.HTTPURL != "" || s.Command == "" || isRepoRelativePath(s.Command) {
+		return ""
+	}
+	base := strings.ToLower(filepath.Base(strings.ReplaceAll(s.Command, `\`, "/")))
+	base = strings.TrimSuffix(base, ".exe")
+	a := s.Args
+	reason := func(label string) string {
+		return "launches a " + label + " package that is not pinned to an exact version"
+	}
+	npm := func(label string, args []string, value, shell map[string]bool) string {
+		r := scanRunnerArgs(args, npmPackageFlags, value, shell)
+		specs := r.flagSpecs
+		switch {
+		case len(specs) > 0:
+		case r.shellCmd || r.positional == "":
+			return ""
+		default:
+			specs = []string{r.positional}
+		}
+		if anyUnpinned(specs, npmSpecPinned) {
+			return reason(label)
+		}
+		return ""
+	}
+	py := func(label string, args []string, from, value map[string]bool, atExact bool) string {
+		r := scanRunnerArgs(args, from, value, nil)
+		specs := r.flagSpecs
+		if len(specs) == 0 && r.positional != "" {
+			specs = []string{r.positional}
+		}
+		if anyUnpinned(specs, func(sp string) (bool, bool) { return pySpecPinned(sp, atExact) }) {
+			return reason(label)
+		}
+		return ""
+	}
+	switch {
+	case base == "npx":
+		return npm("npx", a, npxValueFlags, npmShellFlags)
+	case base == "bunx":
+		return npm("bunx", a, bunxValueFlags, npmShellFlags)
+	case base == "pnpm" && len(a) > 0 && a[0] == "dlx":
+		return npm("pnpm dlx", a[1:], bunxValueFlags, pnpmShellFlags)
+	case base == "uvx":
+		return py("uvx", a, uvFromFlags, uvValueFlags, true)
+	case base == "uv" && len(a) > 1 && a[0] == "tool" && a[1] == "run":
+		return py("uv tool run", a[2:], uvFromFlags, uvValueFlags, true)
+	case base == "pipx" && len(a) > 0 && a[0] == "run":
+		return py("pipx run", a[1:], pipxSpecFlags, pipxValueFlags, false)
+	case base == "docker" && len(a) > 1 && a[0] == "run":
+		for _, x := range a[1:] {
+			if sha256DigestRe.MatchString(x) || strings.Contains(x, "$") {
+				return ""
+			}
+		}
+		return "runs a docker image that is not pinned by digest"
+	}
+	return ""
 }
 
 // ── AGCFG-007: editor auto-approve ──────────────────────────────────────────

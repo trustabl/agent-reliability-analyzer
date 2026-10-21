@@ -6,6 +6,25 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Unpinned MCP package launches (rule schema 26 -> 28, provisional).** New
+  repo-scope predicate `repo_mcp_config_launches_unpinned_package` and rule
+  **MCPCFG-003** (high, 0.7) flag a committed MCP client config
+  (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`,
+  `claude_desktop_config.json`, `.gemini/settings.json`, `.codex/config.toml`)
+  that starts a server with `npx`, `bunx`, `pnpm dlx`, `uvx`, `uv tool run`,
+  `pipx run` or `docker run` on a package or image with no exact version: an
+  exact semver for npm, `==` (or uv's `name@version`) for uv and pipx, an
+  `@sha256:` digest for docker. Git, URL, local-path and `$VAR` specs are not
+  judged, and a command inside the repo stays with MCPCFG-002, so the two rules
+  never judge the same server entry. Lockfile pins are not seen. The package or
+  image name is never echoed. MCPCFG-002's explanation no longer implies that an
+  unpinned package might be flagged by it. **Release order:** this engine first,
+  then the rules pack; a rule that needs a new predicate is skipped on an older
+  engine. The schema number is provisional; whichever of this and CSDK-115 (27)
+  merges later renumbers.
+
 ### Fixed
 
 - The `Harness files:` line in the scan summary no longer says that no rule judges
