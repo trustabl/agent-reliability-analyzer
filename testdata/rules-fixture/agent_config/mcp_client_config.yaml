@@ -24,8 +24,9 @@ rules:
       with inline code (-c), or by running a command path inside the repo. The
       client executes that command with the developer's privileges when the
       server is enabled, so the repo's author controls what runs on every
-      machine that opens it. A server pinned to a published package or reached
-      over an authenticated remote URL is not flagged.
+      machine that opens it. A server started from a published package (npx,
+      uvx and similar) or reached over a remote URL is not flagged by this
+      rule; MCPCFG-003 checks whether such a package is pinned.
     fix: >
       Point the server at a published, version-pinned package (for example an
       npx or uvx invocation with an exact version) or at an authenticated
