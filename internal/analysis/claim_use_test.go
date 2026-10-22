@@ -196,3 +196,114 @@ def send_email(to: str, claim: dict) -> str:
 		})
 	}
 }
+
+// claimUseOfLangChainFactory discovers the single factory-built LangChain tool
+// in src and returns its claim_use fact ("" when the fact is not stamped).
+func claimUseOfLangChainFactory(t *testing.T, src string) string {
+	t.Helper()
+	tools := analysis.DiscoverLangChainTools([]analysis.ParsedFile{parsePyFile(t, "tools.py", src)})
+	if len(tools) != 1 {
+		t.Fatalf("expected 1 tool, got %d: %+v", len(tools), tools)
+	}
+	return tools[0].Facts[models.FactClaimUse]
+}
+
+func TestClaimUse_LangChainFactory(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "from_function, claim never read",
+			src: `
+from langchain_core.tools import StructuredTool
+
+def send_email(to: str, claim: dict) -> str:
+    """Send an email."""
+    return "ok"
+
+send_email_tool = StructuredTool.from_function(send_email)
+`,
+			want: models.ClaimUseUnused,
+		},
+		{
+			name: "from_function, claim only printed",
+			src: `
+from langchain_core.tools import StructuredTool
+
+def send_email(to: str, claim: dict) -> str:
+    """Send an email."""
+    print(claim)
+    return "ok"
+
+send_email_tool = StructuredTool.from_function(send_email)
+`,
+			want: models.ClaimUsePassthrough,
+		},
+		{
+			name: "from_function, claim checked",
+			src: `
+from langchain_core.tools import StructuredTool
+
+def send_email(to: str, claim: dict) -> str:
+    """Send an email."""
+    if verify_claim(claim) != "allow":
+        raise PermissionError("claim does not match route")
+    return "ok"
+
+send_email_tool = StructuredTool.from_function(send_email)
+`,
+			want: models.ClaimUseChecked,
+		},
+		{
+			name: "constructor with func=, claim never read",
+			src: `
+from langchain_core.tools import StructuredTool
+
+def send_email(to: str, claim: dict) -> str:
+    """Send an email."""
+    return "ok"
+
+send_email_tool = StructuredTool(func=send_email, name="send_email", description="Send an email.")
+`,
+			want: models.ClaimUseUnused,
+		},
+		{
+			// No decorator registers a factory-built tool, so any decorator on
+			// the wrapped function may check the claim.
+			name: "from_function over a decorated function: wrapped",
+			src: `
+from langchain_core.tools import StructuredTool
+
+@mediated
+def send_email(to: str, claim: dict) -> str:
+    """Send an email."""
+    return "ok"
+
+send_email_tool = StructuredTool.from_function(send_email)
+`,
+			want: models.ClaimUseWrapped,
+		},
+		{
+			name: "from_function, no claim param: fact not stamped",
+			src: `
+from langchain_core.tools import StructuredTool
+
+def send_email(to: str) -> str:
+    """Send an email."""
+    return "ok"
+
+send_email_tool = StructuredTool.from_function(send_email)
+`,
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := claimUseOfLangChainFactory(t, tc.src); got != tc.want {
+				t.Errorf("claim_use = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

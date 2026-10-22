@@ -96,3 +96,41 @@ send_email.tool_input_guardrails = [check_claim]
 		}
 	}
 }
+
+// A LangChain tool built with StructuredTool.from_function gets the claim_use
+// fact from its wrapped function, so the unused and passthrough rungs reach it.
+func TestScan_ToolCallClaims_LangChainFactory(t *testing.T) {
+	manifest := "[project]\nname = \"f\"\ndependencies = [\"langchain-core\"]\n"
+	tool := func(body string) map[string]string {
+		return map[string]string{
+			"pyproject.toml": manifest,
+			"tools.py": `from langchain_core.tools import StructuredTool
+
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+` + body + `    return "ok"
+
+send_email_tool = StructuredTool.from_function(send_email)
+`,
+		}
+	}
+	cases := []struct {
+		name  string
+		files map[string]string
+		fires map[string]bool
+	}{
+		{"unused", tool(""), map[string]bool{"LC-028": false, "LC-029": true, "LC-030": false}},
+		{"passthrough", tool("    print(claim)\n"), map[string]bool{"LC-028": false, "LC-029": false, "LC-030": true}},
+		{"checked", tool("    if verify_claim(claim) != \"allow\":\n        raise PermissionError(\"no\")\n"),
+			map[string]bool{"LC-028": false, "LC-029": false, "LC-030": false}},
+	}
+	for _, tc := range cases {
+		for id, want := range tc.fires {
+			t.Run(tc.name+"/"+id, func(t *testing.T) {
+				if got := scanFires(t, tc.files, id); got != want {
+					t.Errorf("%s on a %s claim: fired=%v, want %v", id, tc.name, got, want)
+				}
+			})
+		}
+	}
+}

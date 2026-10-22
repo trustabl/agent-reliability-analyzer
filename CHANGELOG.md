@@ -74,6 +74,15 @@ argument. They never fail `--strict`, and they lower the score only slightly.
   `actions/checkout` step in an agent job). `workflow_run` is not in
   the trigger set yet.
 
+### Changed
+
+- **Tool-call claims reach LangChain factory tools.** A tool built with
+  `StructuredTool.from_function(fn)`, `StructuredTool(func=fn)` or
+  `Tool.from_function(fn)` now gets the `claim_use` fact from its wrapped
+  function, so LC-029 and LC-030 apply to it. A decorator on the wrapped
+  function counts as a possible mediator, since no decorator registers these
+  tools. No schema change.
+
 ### Fixed
 
 - The `Harness files:` line in the scan summary no longer says that no rule judges

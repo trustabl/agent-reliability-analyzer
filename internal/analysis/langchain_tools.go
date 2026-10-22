@@ -287,6 +287,19 @@ func buildLangChainTool(n *sitter.Node, callee string, pf ParsedFile, funcs map[
 		if pythonBodyShellsOut(fnDef, pf.Source) {
 			facts["shells_out"] = "true"
 		}
+		if use := wrappedFuncClaimUse(fnDef, nil, pf.Source); use != "" {
+			facts[models.FactClaimUse] = use
+		}
+	} else if wrappedName != "" {
+		// A decorated wrapped function is not in funcs. Read only its
+		// parameters and claim fact, so a claim checked by its decorator is
+		// not reported as absent.
+		if decFn, dec := topLevelDecoratedFunction(pf.Tree.RootNode(), wrappedName, pf.Source); decFn != nil {
+			params = toolParamNames(decFn, pf.Source)
+			if use := wrappedFuncClaimUse(decFn, dec, pf.Source); use != "" {
+				facts[models.FactClaimUse] = use
+			}
+		}
 	}
 
 	// Point the location at the wrapped function body when resolved (mirrors ADK
