@@ -352,7 +352,7 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 
 > **Tool-call claims, EBTE (2026-10-19, `schema_version` 26 → 27; +9 rules):** new tool-scope predicate `tool_claim_use` over the
 > `claim_use` fact that Python decorated-tool discovery stamps on a tool declaring a `claim` parameter (`internal/analysis/claim_use.go`;
-> `absent` is decided from `ParamNames`). A three-rung ladder per SDK: **OAI-034 / MCP-033 / LC-028** (low, 0.5) side-effecting tool with
+> `absent` is decided from `ParamNames`). A three-rung ladder per SDK: **OAI-034 / MCP-033 / LC-028** (info, 0.5; the pack's first info rules) side-effecting tool with
 > no claim, **OAI-035 / MCP-034 / LC-029** (medium, 0.6) claim never read, **OAI-036 / MCP-035 / LC-030** (medium, 0.55) claim only
 > printed / logged / serialized / returned. A second decorator, or an OpenAI tool input guardrail, makes the fact `wrapped` (silent). Rules
 > live in `<sdk>/tool_call_claims.yaml`; rulebook docs in `docs/Policy/<sdk>/tool_call_claims.md`. Python only; TypeScript, Claude SDK,

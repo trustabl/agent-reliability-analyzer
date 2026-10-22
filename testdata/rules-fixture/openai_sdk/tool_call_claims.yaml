@@ -17,7 +17,7 @@ policy:
 rules:
   - id: OAI-034
     title: Side-effecting tool takes no structured claim for its calls
-    severity: low
+    severity: info
     confidence: 0.5
     language: python
     applies_to:
