@@ -223,9 +223,10 @@ type ToolDef struct {
 
 // FactClaimUse is the ToolDef.Facts key for how a tool uses its EBTE-style
 // `claim` argument (a typed ToolInvocationExplanation the model fills in with
-// each call). It is stamped only on a Python decorated tool that declares a
-// parameter named `claim`; a tool with no such parameter carries no fact, so
-// scan output for repos that do not use claims is unchanged.
+// each call). It is stamped only on a tool that declares `claim` (a parameter,
+// a Claude input-schema key, or a TypeScript parameters key) on a discovery
+// path that classifies it; a tool with no claim carries no fact, so scan
+// output for repos that do not use claims is unchanged.
 const FactClaimUse = "claim_use"
 
 // ClaimUse* are the values of FactClaimUse.
