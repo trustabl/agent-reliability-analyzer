@@ -56,8 +56,8 @@ procedure.
 
 ## Tool-Call Claims
 
-This section binds every tool call to a typed action claim and a check that
-runs before the call has any effect. It follows Explanation-Bound Tool
+This section binds every tool call that has an effect to a typed action claim
+and a check that runs before the call has any effect. It follows Explanation-Bound Tool
 Execution (EBTE, arXiv 2607.25364): the decision-relevant part of the model's
 reasoning becomes a small typed object, and code outside the model compares
 that object with facts the model cannot change.
@@ -70,9 +70,18 @@ reason to stop.
 
 ### The claim
 
-Every tool the agent can call takes one extra argument, `claim`, typed as
-`ToolInvocationExplanation`. Keep the enforced fields small, typed and
-categorical. Free text is advisory only and no check reads it.
+Every tool with an effect takes one extra argument, `claim`, typed as
+`ToolInvocationExplanation`. A tool has an effect when it creates, changes,
+deletes, sends, pays, deploys or runs anything, or sends data the model chose
+to a destination outside the application. A tool that only reads data the
+application already holds, for the current user, may skip the claim. Mark each
+tool in the tool registry as needing a claim or not, so the mediation step can
+tell a skipped claim from a missing one. Tools the application does not define
+(built-in SDK tools, third-party MCP servers) cannot take the argument; they
+keep the existing controls only.
+
+Keep the enforced fields small, typed and categorical. Free text is advisory
+only and no check reads it.
 
 ```
 ToolInvocationExplanation
@@ -113,8 +122,9 @@ It is a function the model cannot call or skip, and it runs on every call.
    that can change the arguments, remove `claim` before the tool function is
    called. A hook that can only allow or reject leaves it in place. Either
    way, nothing after the step acts on the claim.
-2. Validate the claim against the schema. A missing or malformed claim is a
-   deny.
+2. Validate the claim against the schema. A missing claim on a tool that needs
+   one, a malformed claim, or an unknown `schema_version` is a deny. The model
+   gets the coarse reason and can call again with a valid claim.
 3. Resolve the facts from the server side, never from the claim or the
    conversation: the tool registry entry, the task's authorized intent, the
    current policy, the route the call is allowed to take, and the context-risk
@@ -170,14 +180,14 @@ review to the tool's `needs_approval` gate.
 Before moving on, confirm each of these. If one does not hold, say which one
 and why, rather than working around it.
 
-- Every tool takes a `claim` argument, and the mediation step reads it before
+- Every tool with an effect takes a `claim` argument, and the mediation step reads it before
   the tool has any effect. Nothing after the step acts on the claim.
 - The mediation step runs on every call path, including retries, handoffs and
   sub-agents. A tool that can be reached without it is not covered.
 - Every fact the step compares against comes from the server side. Nothing in
   the claim, the prompt or a tool result decides which facts are used.
-- A missing claim is a deny, an unresolved fact is a review, and only allow
-  runs the tool.
+- A missing claim on a tool that needs one is a deny, an unresolved fact is a
+  review, and only allow runs the tool.
 - The claim check is combined with the existing controls, and the most
   restrictive outcome wins. It never turns another control's deny or review
   into allow.

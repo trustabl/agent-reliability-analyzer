@@ -1,5 +1,5 @@
-This section binds every tool call to a typed action claim and a check that
-runs before the call has any effect. It follows Explanation-Bound Tool
+This section binds every tool call that has an effect to a typed action claim
+and a check that runs before the call has any effect. It follows Explanation-Bound Tool
 Execution (EBTE, arXiv 2607.25364): the decision-relevant part of the model's
 reasoning becomes a small typed object, and code outside the model compares
 that object with facts the model cannot change.

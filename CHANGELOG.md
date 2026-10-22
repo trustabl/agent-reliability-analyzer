@@ -10,8 +10,8 @@ to follow Semantic Versioning once it reaches 1.0.
 
 - **Forge: Tool-Call Claims section (template 3 → 4).** `trustabl forge` now
   emits a `## Tool-Call Claims` section after the apply loop. It tells the
-  coding agent to give every tool a typed `claim` argument (an EBTE
-  `ToolInvocationExplanation`) and to wire a mediation step that checks it
+  coding agent to give every tool with an effect a typed `claim` argument (an
+  EBTE `ToolInvocationExplanation`; pure reads may skip it) and to wire a mediation step that checks it
   against server-held facts before the call has any effect, with placement for
   each detected SDK. The claim never grants authority. Every skill generated
   by template 3 now reads as outdated in `trustabl forge check`; regenerate

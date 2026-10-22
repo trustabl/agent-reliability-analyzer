@@ -1,6 +1,15 @@
-Every tool the agent can call takes one extra argument, `claim`, typed as
-`ToolInvocationExplanation`. Keep the enforced fields small, typed and
-categorical. Free text is advisory only and no check reads it.
+Every tool with an effect takes one extra argument, `claim`, typed as
+`ToolInvocationExplanation`. A tool has an effect when it creates, changes,
+deletes, sends, pays, deploys or runs anything, or sends data the model chose
+to a destination outside the application. A tool that only reads data the
+application already holds, for the current user, may skip the claim. Mark each
+tool in the tool registry as needing a claim or not, so the mediation step can
+tell a skipped claim from a missing one. Tools the application does not define
+(built-in SDK tools, third-party MCP servers) cannot take the argument; they
+keep the existing controls only.
+
+Keep the enforced fields small, typed and categorical. Free text is advisory
+only and no check reads it.
 
 ```
 ToolInvocationExplanation

@@ -2794,7 +2794,7 @@ writing any SDK code.
    name any violation by rule ID, apply that rule's directive, and log the
    repair. It then emits `## Tool-Call Claims` (`internal/forge/claims.go`):
    a reserved `claim` argument typed as an EBTE `ToolInvocationExplanation` on
-   every tool, the mediation step that checks it against server-held facts
+   every tool with an effect (pure reads may skip it), the mediation step that checks it against server-held facts
    (deny on conflict, review on unknown, most restrictive wins), one placement
    block per selected SDK from the `claimPlacements` table, and a check list.
    Its text is embedded from `internal/forge/claimtext/`; it is omitted when

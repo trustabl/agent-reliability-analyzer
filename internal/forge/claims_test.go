@@ -62,7 +62,11 @@ func TestGenerateCombined_EmitsToolCallClaims(t *testing.T) {
 		// The non-negotiable EBTE properties: untrusted, cannot widen
 		// authority, conflict denies, unknown reviews, most restrictive wins.
 		"never grants authority",
-		"A missing or malformed claim is a\n   deny.",
+		"a malformed claim, or an unknown `schema_version` is a deny.",
+		// The claim is required where there is an effect; pure reads may
+		// skip it, and the registry tells a skipped claim from a missing one.
+		"Every tool with an effect takes one extra argument, `claim`",
+		"may skip the claim",
 		"Unknown is never a match.",
 		"Deny beats review, review beats allow.",
 		"Only allow runs the tool.",

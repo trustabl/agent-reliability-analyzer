@@ -1155,7 +1155,7 @@ Multiple categories are comma-separated: `--policy openai_sdk,mcp`.
   by rule ID, apply that rule's directive, and log the repair. This is a
   self-check the model performs — it does not run `trustabl scan` itself;
   scanning the resulting code remains a separate step.
-- A `## Tool-Call Claims` section: every tool call carries a small typed
+- A `## Tool-Call Claims` section: every tool call with an effect carries a small typed
   claim (`ToolInvocationExplanation`: intent class, selected tool, expected
   effect, risk tier, uncertainty, untrusted-context dependencies, evidence
   digests), and a mediation step outside the model checks it against

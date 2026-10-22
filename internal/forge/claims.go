@@ -71,9 +71,9 @@ func writeClaimText(b *strings.Builder, name string) {
 }
 
 // emitToolCallClaims writes the Tool-Call Claims section: every tool call
-// carries a typed ToolInvocationExplanation, and a mediation step outside the
-// model checks it against server-held facts before any effect. It is a no-op
-// when no selected category has tool calls to bind.
+// with an effect carries a typed ToolInvocationExplanation, and a mediation
+// step outside the model checks it against server-held facts before any
+// effect. It is a no-op when no selected category has tool calls to bind.
 //
 // Placement blocks are filtered from claimPlacements rather than taken in
 // caller order, so emit order never depends on the order categories were

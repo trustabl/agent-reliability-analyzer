@@ -5,8 +5,9 @@ It is a function the model cannot call or skip, and it runs on every call.
    that can change the arguments, remove `claim` before the tool function is
    called. A hook that can only allow or reject leaves it in place. Either
    way, nothing after the step acts on the claim.
-2. Validate the claim against the schema. A missing or malformed claim is a
-   deny.
+2. Validate the claim against the schema. A missing claim on a tool that needs
+   one, a malformed claim, or an unknown `schema_version` is a deny. The model
+   gets the coarse reason and can call again with a valid claim.
 3. Resolve the facts from the server side, never from the claim or the
    conversation: the tool registry entry, the task's authorized intent, the
    current policy, the route the call is allowed to take, and the context-risk
