@@ -1,9 +1,13 @@
 package scanner_test
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 // TestScan_ToolCallClaims runs the tool-call-claims ladder (OAI-034..036,
-// MCP-033..035, LC-028..030, CREW-016..018, PYD-016..018) through real
+// MCP-033..035, LC-028..030, CREW-016..018, PYD-016..018; the other SDKs have
+// their own tests below) through real
 // discovery, so a change that stops
 // discovery from stamping claim_use fails here rather than silently killing
 // the rules. The per-rule table in policies_test.go sets the fact by hand.
@@ -261,6 +265,57 @@ export const sendEmail = tool({
 			map[string]bool{"OAI-037": false, "OAI-038": false, "OAI-039": false}},
 		{"input guardrail", tool(withClaim, "\n  inputGuardrails: [checkClaim],", `async ({ to, claim }) => mailer.send(to)`),
 			map[string]bool{"OAI-037": false, "OAI-038": false, "OAI-039": false}},
+	}
+	for _, tc := range cases {
+		for id, want := range tc.fires {
+			t.Run(tc.name+"/"+id, func(t *testing.T) {
+				if got := scanFires(t, tc.files, id); got != want {
+					t.Errorf("%s: fired=%v, want %v", id, got, want)
+				}
+			})
+		}
+	}
+}
+
+// ADK FunctionTool(fn) and AutoGen register_function(fn) tools get the claim
+// fact from the wrapped function; an ADK before_tool_callback silences the
+// unused rung.
+func TestScan_ToolCallClaims_ADKAndAutoGen(t *testing.T) {
+	const fn = `def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+%s    return "ok"
+`
+	adk := func(body string) map[string]string {
+		return map[string]string{
+			"pyproject.toml": "[project]\nname = \"f\"\ndependencies = [\"google-adk\"]\n",
+			"tools.py": "from google.adk.tools import FunctionTool\n\n" + fmt.Sprintf(fn, body) +
+				"\nsend_email_tool = FunctionTool(send_email)\n",
+		}
+	}
+	ag2 := func(body string) map[string]string {
+		return map[string]string{
+			"pyproject.toml": "[project]\nname = \"f\"\ndependencies = [\"ag2\"]\n",
+			"tools.py": "from autogen import register_function\n\n" + fmt.Sprintf(fn, body) +
+				"\nregister_function(send_email, caller=assistant, executor=user_proxy, description=\"Send an email.\")\n",
+		}
+	}
+	hooked := adk("")
+	hooked["agent.py"] = `from google.adk.agents import LlmAgent
+
+root_agent = LlmAgent(name="mailer", model="gemini-2.5-flash", tools=[send_email_tool], before_tool_callback=check_claim)
+`
+	cases := []struct {
+		name  string
+		files map[string]string
+		fires map[string]bool
+	}{
+		{"adk unused", adk(""), map[string]bool{"ADK-024": false, "ADK-025": true, "ADK-026": false}},
+		{"adk passthrough", adk("    print(claim)\n"), map[string]bool{"ADK-024": false, "ADK-025": false, "ADK-026": true}},
+		{"adk before_tool_callback", hooked, map[string]bool{"ADK-024": false, "ADK-025": false, "ADK-026": false}},
+		{"autogen unused", ag2(""), map[string]bool{"AG2-023": false, "AG2-024": true, "AG2-025": false}},
+		{"autogen passthrough", ag2("    logger.info(\"claim %s\", claim)\n"), map[string]bool{"AG2-023": false, "AG2-024": false, "AG2-025": true}},
+		{"autogen checked", ag2("    if verify_claim(claim) != \"allow\":\n        raise PermissionError(\"no\")\n"),
+			map[string]bool{"AG2-023": false, "AG2-024": false, "AG2-025": false}},
 	}
 	for _, tc := range cases {
 		for id, want := range tc.fires {

@@ -49,4 +49,6 @@ package rules
 // Claude Agent SDK tool's input schema.
 //
 // Schema 35 adds the claim_use fact on TypeScript OpenAI Agents tools.
-const SupportedSchemaVersion = 35
+//
+// Schema 36 adds the claim_use fact on Google ADK FunctionTool and AutoGen tools.
+const SupportedSchemaVersion = 36

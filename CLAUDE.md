@@ -402,6 +402,12 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > destructured local or `input.claim` / `input["claim"]`. Mediator: the tool's own `inputGuardrails` property (confirmed in the JS
 > SDK guardrails guide). The fixture holds **376** rules (re-derive).
 >
+> **Tool-call claims for Google ADK and AutoGen (2026-10-22, `schema_version` 35 → 36; +6 rules):** **ADK-024..026**
+> (`google_adk/tool_call_claims.yaml`) and **AG2-023..025** (`autogen/tool_call_claims.yaml`). ADK `FunctionTool(fn)` and AutoGen
+> `register_function(fn)` stamp via `wrappedFuncClaimUse`; AutoGen decorator tools via `autoGenClaimUse`, which skips the
+> registering decorators. Mediator arm: an ADK `before_tool_callback=` kwarg or plugin method (`fileHasADKToolHook`). AutoGen has no
+> arm. ADK bare functions in `tools=[...]` stay undiscovered. The fixture holds **382** rules (re-derive).
+>
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
 > (`analysis.DiscoverProjectConfig`). The walk now enters `.gemini/`, `.vscode/`, `.cursor/`, `.codex/`. Env files are read for **key

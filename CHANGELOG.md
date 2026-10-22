@@ -6,11 +6,12 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 35 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 376 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
-CSDK-026 fire at **info** on every side-effecting Python OpenAI Agents, MCP,
-LangChain, CrewAI, Pydantic AI or Claude Agent SDK tool that takes no `claim`
-argument, and OAI-037 on every side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
+Rule schema 31 → 36 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 382 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
+OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
+ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
+side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
 
@@ -51,6 +52,13 @@ argument, and OAI-037 on every side-effecting TypeScript OpenAI Agents tool. The
   `({ claim: c })`) or as `input.claim` / `input["claim"]`; output calls are
   `console.*`, `JSON.stringify`, `String` and logger methods. A tool with
   `inputGuardrails: [...]` counts as possibly mediated.
+- **Tool-call claims for Google ADK and AutoGen (schema 36).** ADK-024..026
+  over `FunctionTool(fn)` and AG2-023..025 over `register_function(fn)` and
+  `register_for_llm` / `register_for_execution` tools, with the fact taken from
+  the wrapped function. The AutoGen registering decorators are not counted as
+  mediators; any other decorator is. An ADK `before_tool_callback` (an agent
+  keyword, or a plugin method) anywhere in the repo marks ADK claims as possibly
+  mediated. AutoGen has no pre-tool hook.
 - **A one-time star line after the first interactive scan.** `trustabl scan`
   prints "⭐ Found this useful? Star Agent Reliability Analyzer" with the
   repository link to stderr once, after the first successful scan with human

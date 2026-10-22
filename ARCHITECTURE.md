@@ -583,6 +583,14 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   with a whole-`input` read counting as a claim read. A tool with
   `inputGuardrails: [...]` is `wrapped` unless the claim is checked. Read by
   OAI-037..039.
+- **ADK and AutoGen tool claims** (schema 36) — `discoverADKToolsInFile`
+  (`FunctionTool(fn)`) and AutoGen's `register_function(fn)` path stamp
+  `claim_use` with `wrappedFuncClaimUse`; AutoGen's decorator path uses
+  `autoGenClaimUse` (`autogen_tools.go`), which does not count
+  `register_for_llm` / `register_for_execution` as mediators.
+  `ApplyClaimMediators` credits ADK tools when the repo sets a
+  `before_tool_callback` (agent keyword or plugin method). Read by ADK-024..026
+  and AG2-023..025.
 - **DiscoverAgents** (`agents.go`) — finds `Agent(...)` / `SandboxAgent(...)` /
   `AgentDefinition(...)` constructor calls; captures all constructor kwargs into
   a typed `KwargTree`; sets `Opaque=true` for `Agent(**config)` or
@@ -2191,7 +2199,7 @@ internal/
 │   │                            passthrough / checked / wrapped), plus
 │   │                            openAIToolHasInputGuardrail, stampFactoryClaim.
 │   ├── claim_mediators.go       ApplyClaimMediators: repo-level CrewAI / Pydantic AI /
-│   │                            Claude pre-tool hooks mark a claim as wrapped.
+│   │                            Claude / ADK pre-tool hooks mark a claim as wrapped.
 │   ├── claude_claim.go          claudeInputKeys / claudeClaimUse: the claim as a
 │   │                            Claude @tool input-schema key read from args.
 │   ├── ts_claim_use.go          stampTSOpenAIClaim / tsClaimUse: claim_use on a

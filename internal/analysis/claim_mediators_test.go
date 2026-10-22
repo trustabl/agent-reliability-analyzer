@@ -7,9 +7,9 @@ import (
 	"github.com/trustabl/trustabl/internal/models"
 )
 
-// mediatedClaimUse discovers the tools in files (decorated tools and Pydantic AI
-// Tool(fn) factories), applies the mediator pass, and returns the claim_use
-// fact of the tool named name.
+// mediatedClaimUse discovers the tools in files (decorated tools, Pydantic AI
+// Tool(fn) factories, ADK FunctionTool(fn) and AutoGen registrations), applies
+// the mediator pass, and returns the claim_use fact of the tool named name.
 func mediatedClaimUse(t *testing.T, files map[string]string, name string) string {
 	t.Helper()
 	var parsed []analysis.ParsedFile
@@ -18,6 +18,8 @@ func mediatedClaimUse(t *testing.T, files map[string]string, name string) string
 	}
 	tools := analysis.DiscoverToolsFromParsed(parsed)
 	tools = append(tools, analysis.DiscoverPydanticAITools(parsed)...)
+	tools = append(tools, analysis.DiscoverADKTools(parsed)...)
+	tools = append(tools, analysis.DiscoverAutoGenTools(parsed)...)
 	analysis.ApplyClaimMediators(tools, parsed)
 	for _, td := range tools {
 		if td.Name == name {

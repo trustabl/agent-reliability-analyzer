@@ -30,9 +30,14 @@ import (
 //     ClaudeAgentOptions(can_use_tool=...) when the same call sets neither
 //     allowed_tools= nor permission_mode="bypassPermissions" (both approve
 //     calls without running the callback).
+//   - Google ADK: a before_tool_callback= kwarg (on an agent), or a
+//     before_tool_callback method (a plugin). AutoGen has no pre-tool hook.
 func ApplyClaimMediators(tools []models.ToolDef, files []ParsedFile) {
-	crewHook, pydHook, claudeHook := false, false, false
+	crewHook, pydHook, claudeHook, adkHook := false, false, false, false
 	for _, pf := range files {
+		if !adkHook && fileImportsGoogleADK(pf) && fileHasADKToolHook(pf) {
+			adkHook = true
+		}
 		if !claudeHook && fileImportsClaudeSDK(pf) && fileHasClaudeToolHook(pf) {
 			claudeHook = true
 		}
@@ -58,6 +63,8 @@ func ApplyClaimMediators(tools []models.ToolDef, files []ParsedFile) {
 			mediated = pydHook || validator
 		case models.KindClaudeSDKTool:
 			mediated = claudeHook
+		case models.KindADKFunctionTool:
+			mediated = adkHook
 		}
 		if mediated {
 			t.Facts[models.FactClaimUse] = models.ClaimUseWrapped
@@ -152,6 +159,45 @@ func fileHasClaudeToolHook(pf ParsedFile) bool {
 		return !found
 	})
 	return found
+}
+
+// fileHasADKToolHook reports whether the file sets a Google ADK
+// before_tool_callback: as a keyword argument (Agent(before_tool_callback=f)),
+// or as a method, the plugin form (class P(BasePlugin): def
+// before_tool_callback(...)). Both receive the tool's arguments and can return
+// a result in place of running the tool.
+func fileHasADKToolHook(pf ParsedFile) bool {
+	found := false
+	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
+		if found {
+			return false
+		}
+		switch n.Type() {
+		case "call":
+			if _, ok := astutil.KwargValue(n, pf.Source, "before_tool_callback"); ok {
+				found = true
+			}
+		case "function_definition":
+			if astutil.FunctionName(n, pf.Source) == "before_tool_callback" && enclosingClass(n) {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
+}
+
+// enclosingClass reports whether n is defined inside a class body.
+func enclosingClass(n *sitter.Node) bool {
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		switch p.Type() {
+		case "class_definition":
+			return true
+		case "function_definition":
+			return false
+		}
+	}
+	return false
 }
 
 func lastSegment(dotted string) string {
