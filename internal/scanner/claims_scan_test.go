@@ -224,3 +224,51 @@ options = ClaudeAgentOptions(hooks={"PreToolUse": [HookMatcher(matcher="mcp__too
 		}
 	}
 }
+
+// A TypeScript OpenAI Agents tool declares its claim as a parameters key and
+// reads it in execute; an attached tool input guardrail silences the unused
+// rung.
+func TestScan_ToolCallClaims_TSOpenAI(t *testing.T) {
+	manifest := `{"name": "f", "dependencies": {"@openai/agents": "^0.3.0", "zod": "^3.25.0"}}`
+	tool := func(params, extra, execute string) map[string]string {
+		return map[string]string{
+			"package.json": manifest,
+			"src/tools.ts": `import { tool } from "@openai/agents";
+import { z } from "zod";
+
+export const sendEmail = tool({
+  name: "send_email",
+  description: "Send an email.",
+  parameters: z.object({ ` + params + ` }),` + extra + `
+  execute: ` + execute + `,
+});
+`,
+		}
+	}
+	const withClaim = `to: z.string(), claim: z.any()`
+	cases := []struct {
+		name  string
+		files map[string]string
+		fires map[string]bool
+	}{
+		{"absent", tool(`to: z.string()`, "", `async ({ to }) => mailer.send(to)`),
+			map[string]bool{"OAI-037": true, "OAI-038": false, "OAI-039": false}},
+		{"unused", tool(withClaim, "", `async ({ to, claim }) => mailer.send(to)`),
+			map[string]bool{"OAI-037": false, "OAI-038": true, "OAI-039": false}},
+		{"passthrough", tool(withClaim, "", `async ({ to, claim }) => { console.log(claim); return mailer.send(to); }`),
+			map[string]bool{"OAI-037": false, "OAI-038": false, "OAI-039": true}},
+		{"checked", tool(withClaim, "", `async ({ to, claim: c }) => { if (!verify(c)) throw new Error("no"); return mailer.send(to); }`),
+			map[string]bool{"OAI-037": false, "OAI-038": false, "OAI-039": false}},
+		{"input guardrail", tool(withClaim, "\n  inputGuardrails: [checkClaim],", `async ({ to, claim }) => mailer.send(to)`),
+			map[string]bool{"OAI-037": false, "OAI-038": false, "OAI-039": false}},
+	}
+	for _, tc := range cases {
+		for id, want := range tc.fires {
+			t.Run(tc.name+"/"+id, func(t *testing.T) {
+				if got := scanFires(t, tc.files, id); got != want {
+					t.Errorf("%s: fired=%v, want %v", id, got, want)
+				}
+			})
+		}
+	}
+}

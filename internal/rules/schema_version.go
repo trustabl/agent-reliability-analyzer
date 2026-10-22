@@ -47,4 +47,6 @@ package rules
 //
 // Schema 34 adds ToolDef.InputKeys, so tool_claim_use sees a claim declared in a
 // Claude Agent SDK tool's input schema.
-const SupportedSchemaVersion = 34
+//
+// Schema 35 adds the claim_use fact on TypeScript OpenAI Agents tools.
+const SupportedSchemaVersion = 35

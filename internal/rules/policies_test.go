@@ -3566,7 +3566,7 @@ def summarize(state):
 `, wantFires: false},
 
 	// ─── Tool-call claims (EBTE): OAI-034..036, MCP-033..035, LC-028..030,
-	// CREW-016..018, PYD-016..018, CSDK-026..028 ──
+	// CREW-016..018, PYD-016..018, CSDK-026..028, OAI-037..039 (TypeScript) ──
 	// claim_use is a discovery fact and parsePy does not run discovery, so
 	// these cases set it through toolFacts. TestScan_ToolCallClaims runs the
 	// same shapes through real discovery.
@@ -3865,6 +3865,46 @@ def send_email(to: str, body: str, claim: dict) -> str:
     """Send an email."""
     return mailer.send(to, body)
 `, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}, wantFires: false},
+	{name: "OAI-037 fires on a side-effecting TS tool with no claim", ruleID: "OAI-037", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: true, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "send_email", description: "Send an email.", parameters: z.object({ to: z.string() }), execute: async ({ to }) => mailer.send(to) });
+`},
+	{name: "OAI-037 silent on a read-only TS tool with no claim", ruleID: "OAI-037", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "get_weather", description: "Get the weather.", parameters: z.object({ city: z.string() }), execute: async ({ city }) => city });
+`},
+	{name: "OAI-037 silent when the TS tool takes a claim", ruleID: "OAI-037", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "send_email", description: "Send an email.", parameters: z.object({ to: z.string(), claim: z.any() }), execute: async ({ to, claim }) => { if (!verify(claim)) throw new Error("no"); return mailer.send(to); } });
+`},
+	{name: "OAI-038 fires on an unused TS claim", ruleID: "OAI-038", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: true, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "send_email", description: "Send an email.", parameters: z.object({ to: z.string(), claim: z.any() }), execute: async ({ to, claim }) => mailer.send(to) });
+`},
+	{name: "OAI-038 silent on a checked TS claim", ruleID: "OAI-038", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "send_email", description: "Send an email.", parameters: z.object({ to: z.string(), claim: z.any() }), execute: async ({ to, claim: c }) => { if (!verify(c)) throw new Error("no"); return mailer.send(to); } });
+`},
+	{name: "OAI-038 silent with a tool input guardrail", ruleID: "OAI-038", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "send_email", description: "Send an email.", parameters: z.object({ to: z.string(), claim: z.any() }), inputGuardrails: [checkClaim], execute: async ({ to, claim }) => mailer.send(to) });
+`},
+	{name: "OAI-039 fires on a TS claim that is only logged", ruleID: "OAI-039", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: true, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "send_email", description: "Send an email.", parameters: z.object({ to: z.string(), claim: z.any() }), execute: async (input) => { console.log(input.claim); return mailer.send(input.to); } });
+`},
+	{name: "OAI-039 silent on an unused TS claim", ruleID: "OAI-039", kind: models.KindOpenAITool, lang: models.LanguageTypeScript, wantFires: false, src: `
+import { tool } from "@openai/agents";
+import { z } from "zod";
+export const sendEmail = tool({ name: "send_email", description: "Send an email.", parameters: z.object({ to: z.string(), claim: z.any() }), execute: async ({ to, claim }) => mailer.send(to) });
+`},
 	{name: "CSDK-026 fires on a side-effecting tool with no claim", ruleID: "CSDK-026", kind: models.KindClaudeSDKTool, src: `
 def send_email(to: str, body: str) -> str:
     """Send an email."""

@@ -100,6 +100,7 @@ func extractTSOpenAITool(call *sitter.Node, pf ParsedFile) (models.ToolDef, bool
 			td.Facts = facts
 		}
 	}
+	td.Facts = stampTSOpenAIClaim(opts, td.ParamNames, td.Facts, pf.Source)
 	// Config: flatten every non-consumed kwarg, including nested objects with
 	// dot-joined keys (matching the Claude path's flattenKwargs). The leaf-only
 	// loop this replaces silently dropped nested config like `annotations.*`.

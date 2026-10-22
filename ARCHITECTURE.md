@@ -575,6 +575,14 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   `args["claim"]` / `args.get("claim")` reads the way `pythonClaimUse`
   classifies a `claim` parameter; a whole-`args` read counts as a claim read.
   `tool_claim_use` treats `claim` in `InputKeys` as declared.
+- **TypeScript OpenAI tool claims** (`ts_claim_use.go`, schema 35) —
+  `extractTSOpenAITool` calls `stampTSOpenAIClaim`, which stamps `claim_use`
+  when the zod `parameters` declare `claim` and `execute` is an inline function
+  (or method shorthand). `tsClaimUse` reads the first parameter: a destructured
+  binding (`({ claim: c })` binds `c`) or `input.claim` / `input["claim"]`,
+  with a whole-`input` read counting as a claim read. A tool with
+  `inputGuardrails: [...]` is `wrapped` unless the claim is checked. Read by
+  OAI-037..039.
 - **DiscoverAgents** (`agents.go`) — finds `Agent(...)` / `SandboxAgent(...)` /
   `AgentDefinition(...)` constructor calls; captures all constructor kwargs into
   a typed `KwargTree`; sets `Opaque=true` for `Agent(**config)` or
@@ -2186,6 +2194,8 @@ internal/
 │   │                            Claude pre-tool hooks mark a claim as wrapped.
 │   ├── claude_claim.go          claudeInputKeys / claudeClaimUse: the claim as a
 │   │                            Claude @tool input-schema key read from args.
+│   ├── ts_claim_use.go          stampTSOpenAIClaim / tsClaimUse: claim_use on a
+│   │                            TS OpenAI Agents tool({...}) execute function.
 │   ├── agents.go                Python agent / guardrail / session discovery and
 │   │                            edge resolution (DiscoverAgents, DiscoverGuardrails,
 │   │                            DiscoverSessions, ResolveEdges, SessionClasses).

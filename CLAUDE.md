@@ -396,6 +396,12 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > and no `bypassPermissions` (the callback does not run for auto-approved calls). Settings-file hooks are not credited. The fixture
 > holds **373** rules (re-derive).
 >
+> **Tool-call claims for TypeScript OpenAI Agents (2026-10-22, `schema_version` 34 → 35; +3 rules):** **OAI-037..039**
+> (`language: typescript`) appended to `openai_sdk/tool_call_claims.yaml`. `ts_claim_use.go`: `stampTSOpenAIClaim` (called from
+> `extractTSOpenAITool`) stamps `claim_use` when `claim` is a `parameters` key and `execute` is inline; `tsClaimUse` follows the
+> destructured local or `input.claim` / `input["claim"]`. Mediator: the tool's own `inputGuardrails` property (confirmed in the JS
+> SDK guardrails guide). The fixture holds **376** rules (re-derive).
+>
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
 > (`analysis.DiscoverProjectConfig`). The walk now enters `.gemini/`, `.vscode/`, `.cursor/`, `.codex/`. Env files are read for **key

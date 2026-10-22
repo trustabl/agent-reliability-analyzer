@@ -6,11 +6,11 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 34 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 373 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+Rule schema 31 → 35 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 376 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
 CSDK-026 fire at **info** on every side-effecting Python OpenAI Agents, MCP,
 LangChain, CrewAI, Pydantic AI or Claude Agent SDK tool that takes no `claim`
-argument. They never fail `--strict`, and they lower the score only slightly.
+argument, and OAI-037 on every side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
 
@@ -44,6 +44,13 @@ argument. They never fail `--strict`, and they lower the score only slightly.
   another call counts as checked. A `"PreToolUse"` hooks entry, or
   `ClaudeAgentOptions(can_use_tool=...)` on a call without `allowed_tools=` or
   `bypassPermissions`, counts as a possible mediator.
+- **Tool-call claims for TypeScript OpenAI Agents (schema 35).** OAI-037..039
+  (`language: typescript`) apply the rungs to `tool({...})` definitions from
+  `@openai/agents` whose zod `parameters` declare `claim`. The claim is read in
+  the inline `execute` function as a destructured binding (`({ claim })`,
+  `({ claim: c })`) or as `input.claim` / `input["claim"]`; output calls are
+  `console.*`, `JSON.stringify`, `String` and logger methods. A tool with
+  `inputGuardrails: [...]` counts as possibly mediated.
 - **A one-time star line after the first interactive scan.** `trustabl scan`
   prints "⭐ Found this useful? Star Agent Reliability Analyzer" with the
   repository link to stderr once, after the first successful scan with human
