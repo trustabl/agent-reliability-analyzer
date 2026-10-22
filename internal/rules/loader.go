@@ -270,6 +270,13 @@ func loadPolicies(fsys fs.FS, lenient bool) ([]PolicyFile, []string, error) {
 					errs = append(errs, fmt.Errorf("%s: repo_has_sdk_in_code value %q is not a known SDK token (want one of: claude_agent_sdk, openai_agents, google_adk, mcp, langchain, openshell)", tag, sdk))
 				}
 			}
+			// tool_claim_use matches a closed value set; a typo silently never
+			// matches, so the rule never fires.
+			for _, v := range rule.Match.toolClaimUseValues() {
+				if !validToolClaimUse(v) {
+					errs = append(errs, fmt.Errorf("%s: tool_claim_use value %q is not known (want one of: absent, unused, passthrough, checked, wrapped)", tag, v))
+				}
+			}
 			// A degenerate combinator (empty any/all list, or not: over an empty
 			// expression) is an authoring mistake, not intent.
 			if degen := rule.Match.degenerateCombinators(); len(degen) > 0 {

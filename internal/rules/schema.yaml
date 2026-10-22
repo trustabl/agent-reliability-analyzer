@@ -218,6 +218,21 @@ rules:
 #       Reserve new uses for a known constant that has no structural
 #       signature.
 #
+#   tool_claim_use: [absent | unused | passthrough | checked | wrapped, ...]
+#       How the tool uses its EBTE-style `claim` argument (a typed
+#       ToolInvocationExplanation the model fills in with each call). True when
+#       the tool's use is any listed value. `absent`: no parameter named
+#       `claim` (read from param_names, so it holds for every discovery path).
+#       The other values come from the claim_use fact, which only Python
+#       decorated-tool discovery stamps: `unused` (never read), `passthrough`
+#       (every read is an argument to print / a logger method / json.dumps /
+#       str / repr, or part of a return value), `checked` (some read feeds a
+#       verifier call, a comparison or a condition), `wrapped` (an extra
+#       decorator besides the registering one, which may mediate; not
+#       verified; for an OpenAI Agents SDK tool an attached tool input guardrail
+#       counts too). A tool that declares `claim` without the fact matches no
+#       value. The loader rejects any other value.
+#
 #   has_description_text: [substring, substring, ...]
 #       The tool's description (docstring for Python, the explicit
 #       description argument for TypeScript) contains any listed substring.

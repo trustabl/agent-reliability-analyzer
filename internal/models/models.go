@@ -212,6 +212,30 @@ type ToolDef struct {
 	Config         map[string]string `json:"config,omitempty"` // decorator kwargs
 }
 
+// FactClaimUse is the ToolDef.Facts key for how a tool uses its EBTE-style
+// `claim` argument (a typed ToolInvocationExplanation the model fills in with
+// each call). It is stamped only on a Python decorated tool that declares a
+// parameter named `claim`; a tool with no such parameter carries no fact, so
+// scan output for repos that do not use claims is unchanged.
+const FactClaimUse = "claim_use"
+
+// ClaimUse* are the values of FactClaimUse.
+const (
+	// ClaimUseUnused: the body never reads `claim`.
+	ClaimUseUnused = "unused"
+	// ClaimUsePassthrough: every read of `claim` is an argument to an output
+	// call (print, a logger method, json.dumps, str, repr) or part of a return
+	// value, so nothing decides on it.
+	ClaimUsePassthrough = "passthrough"
+	// ClaimUseChecked: at least one read of `claim` feeds something other than
+	// an output call — a verifier call, a comparison, a condition.
+	ClaimUseChecked = "checked"
+	// ClaimUseWrapped: something outside the body may mediate the claim — a
+	// decorator besides the one that registers the tool, or (OpenAI Agents SDK)
+	// an attached tool input guardrail. Not verified.
+	ClaimUseWrapped = "wrapped"
+)
+
 // ComponentKind labels the type of an agent component the normalizer found
 // outside of the tool function itself. Components are surfaced for context
 // and for future detection passes; today's rule engine only fires against

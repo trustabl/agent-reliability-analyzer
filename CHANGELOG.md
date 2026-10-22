@@ -6,6 +6,25 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+Rule schema 26 → 27 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 343 to 352 rules. OAI-034 / MCP-033 / LC-028 fire at **info** on every
+side-effecting Python OpenAI Agents, MCP or LangChain tool that takes no `claim`
+argument. They never fail `--strict`, and they lower the score only slightly.
+
+### Added
+
+- **Tool-call claims (EBTE, schema 27).** Nine tool-scope rules for Python
+  OpenAI Agents, MCP and LangChain tools, over the new `tool_claim_use`
+  predicate and `claim_use` discovery fact: OAI-034 / MCP-033 / LC-028 (info)
+  flag a side-effecting tool with no `claim` argument, OAI-035 / MCP-034 /
+  LC-029 (medium) a `claim` nothing reads, and OAI-036 / MCP-035 / LC-030
+  (medium) a `claim` that is only printed, logged, serialized or returned. A
+  second decorator, or an OpenAI tool input guardrail, counts as a possible
+  mediator. The fact is stamped only on tools that declare `claim`, so scan
+  output for repos that do not use claims is unchanged apart from the new
+  OAI-034 / MCP-033 / LC-028 findings. **Release order:** this engine first,
+  then the rules pack.
+
 ### Fixed
 
 - The `Harness files:` line in the scan summary no longer says that no rule judges
