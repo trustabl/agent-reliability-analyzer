@@ -117,7 +117,15 @@ func toolsInFile(pf ParsedFile) []models.ToolDef {
 		}
 		tool := buildTool(fn, pf, kind)
 		tool.Config = extractDecoratorKwargs(dec, pf.Source)
-		if use := pythonClaimUse(fn, dec, pf.Source); use != "" {
+		use := ""
+		if kind == models.KindClaudeSDKTool {
+			// The handler takes one args dict; the claim is an input key.
+			tool.InputKeys = claudeInputKeys(dec, root, pf.Source)
+			use = claudeClaimUse(fn, dec, tool.InputKeys, pf.Source)
+		} else {
+			use = pythonClaimUse(fn, dec, pf.Source)
+		}
+		if use != "" {
 			if kind == models.KindOpenAITool && use != models.ClaimUseChecked &&
 				openAIToolHasInputGuardrail(tool, root, pf.Source) {
 				use = models.ClaimUseWrapped

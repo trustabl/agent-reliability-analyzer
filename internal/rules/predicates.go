@@ -372,7 +372,9 @@ const ClaimUseAbsent = "absent"
 func PredToolClaimUse(uses []string, t models.ToolDef) bool {
 	got := t.Facts[models.FactClaimUse]
 	declared := false
-	for _, p := range t.ParamNames {
+	// A Claude Agent SDK handler takes one args dict, so its claim is an input
+	// schema key rather than a parameter.
+	for _, p := range append(append([]string(nil), t.ParamNames...), t.InputKeys...) {
 		if p == "claim" {
 			declared = true
 			break

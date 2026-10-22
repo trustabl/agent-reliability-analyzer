@@ -26,9 +26,16 @@ import (
 //   - Pydantic AI: @<hooks>.on.before_tool_execute / .on.tool_execute,
 //     Hooks(before_tool_execute=...) / Hooks(tool_execute=...), and a tool's
 //     own args_validator=.
+//   - Claude Agent SDK: a "PreToolUse" key in a hooks dict, or
+//     ClaudeAgentOptions(can_use_tool=...) when the same call sets neither
+//     allowed_tools= nor permission_mode="bypassPermissions" (both approve
+//     calls without running the callback).
 func ApplyClaimMediators(tools []models.ToolDef, files []ParsedFile) {
-	crewHook, pydHook := false, false
+	crewHook, pydHook, claudeHook := false, false, false
 	for _, pf := range files {
+		if !claudeHook && fileImportsClaudeSDK(pf) && fileHasClaudeToolHook(pf) {
+			claudeHook = true
+		}
 		if !crewHook && fileImportsCrewAI(pf) && fileHasCrewAIToolHook(pf) {
 			crewHook = true
 		}
@@ -49,6 +56,8 @@ func ApplyClaimMediators(tools []models.ToolDef, files []ParsedFile) {
 		case models.KindPydanticAITool:
 			_, validator := t.Config["args_validator"]
 			mediated = pydHook || validator
+		case models.KindClaudeSDKTool:
+			mediated = claudeHook
 		}
 		if mediated {
 			t.Facts[models.FactClaimUse] = models.ClaimUseWrapped
@@ -106,6 +115,39 @@ func fileHasPydanticAIToolHook(pf ParsedFile) bool {
 					found = true
 				}
 			}
+		}
+		return !found
+	})
+	return found
+}
+
+// fileHasClaudeToolHook reports whether the file registers a Claude Agent SDK
+// hook or permission callback that sees a tool call's input before it runs.
+func fileHasClaudeToolHook(pf ParsedFile) bool {
+	found := false
+	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
+		if found {
+			return false
+		}
+		switch n.Type() {
+		case "pair":
+			if k, ok := pyStringLiteral(astutil.NodeText(n.ChildByFieldName("key"), pf.Source)); ok && k == "PreToolUse" {
+				found = true
+			}
+		case "call":
+			if lastSegment(astutil.NodeText(n.ChildByFieldName("function"), pf.Source)) != "ClaudeAgentOptions" {
+				return true
+			}
+			if _, ok := astutil.KwargValue(n, pf.Source, "can_use_tool"); !ok {
+				return true
+			}
+			if _, ok := astutil.KwargValue(n, pf.Source, "allowed_tools"); ok {
+				return true
+			}
+			if mode, _ := astutil.KwargValue(n, pf.Source, "permission_mode"); mode == `"bypassPermissions"` || mode == `'bypassPermissions'` {
+				return true
+			}
+			found = true
 		}
 		return !found
 	})

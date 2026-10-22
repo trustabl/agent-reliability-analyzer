@@ -173,3 +173,54 @@ def check_claim(context):
 		}
 	}
 }
+
+// A Claude Agent SDK handler takes one args dict, so its claim is a key of the
+// @tool input schema, read as args["claim"]. The three rungs follow the schema
+// and those reads, and a PreToolUse hook silences the unused rung.
+func TestScan_ToolCallClaims_Claude(t *testing.T) {
+	manifest := "[project]\nname = \"f\"\ndependencies = [\"claude-agent-sdk\"]\n"
+	tool := func(schema, body string) map[string]string {
+		return map[string]string{
+			"pyproject.toml": manifest,
+			"tools.py": `from claude_agent_sdk import tool
+
+@tool("send_email", "Send an email", ` + schema + `)
+async def send_email(args):
+` + body + `    return {"content": [{"type": "text", "text": mailer.send(args["to"])}]}
+`,
+		}
+	}
+	const withClaim = `{"to": str, "claim": dict}`
+	cases := []struct {
+		name  string
+		files map[string]string
+		fires map[string]bool
+	}{
+		{"absent", tool(`{"to": str}`, ""), map[string]bool{"CSDK-026": true, "CSDK-027": false, "CSDK-028": false}},
+		{"unused", tool(withClaim, ""), map[string]bool{"CSDK-026": false, "CSDK-027": true, "CSDK-028": false}},
+		{"JSON-schema form, unused", tool(`{"type": "object", "properties": {"to": {"type": "string"}, "claim": {"type": "object"}}}`, ""),
+			map[string]bool{"CSDK-026": false, "CSDK-027": true, "CSDK-028": false}},
+		{"passthrough", tool(withClaim, "    print(args[\"claim\"])\n"), map[string]bool{"CSDK-026": false, "CSDK-027": false, "CSDK-028": true}},
+		{"checked", tool(withClaim, "    if verify_claim(args.get(\"claim\")) != \"allow\":\n        return {\"is_error\": True}\n"),
+			map[string]bool{"CSDK-026": false, "CSDK-027": false, "CSDK-028": false}},
+	}
+	hooked := tool(withClaim, "")
+	hooked["agent.py"] = `from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
+
+options = ClaudeAgentOptions(hooks={"PreToolUse": [HookMatcher(matcher="mcp__tools__send_email", hooks=[check_claim])]})
+`
+	cases = append(cases, struct {
+		name  string
+		files map[string]string
+		fires map[string]bool
+	}{"PreToolUse hook", hooked, map[string]bool{"CSDK-026": false, "CSDK-027": false, "CSDK-028": false}})
+	for _, tc := range cases {
+		for id, want := range tc.fires {
+			t.Run(tc.name+"/"+id, func(t *testing.T) {
+				if got := scanFires(t, tc.files, id); got != want {
+					t.Errorf("%s: fired=%v, want %v", id, got, want)
+				}
+			})
+		}
+	}
+}

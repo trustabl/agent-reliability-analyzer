@@ -3566,7 +3566,7 @@ def summarize(state):
 `, wantFires: false},
 
 	// ─── Tool-call claims (EBTE): OAI-034..036, MCP-033..035, LC-028..030,
-	// CREW-016..018, PYD-016..018 ──
+	// CREW-016..018, PYD-016..018, CSDK-026..028 ──
 	// claim_use is a discovery fact and parsePy does not run discovery, so
 	// these cases set it through toolFacts. TestScan_ToolCallClaims runs the
 	// same shapes through real discovery.
@@ -3861,6 +3861,65 @@ def send_email(to: str, body: str, claim: dict) -> str:
     return mailer.send(to, body)
 `, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
 	{name: "PYD-018 silent on an unused claim", ruleID: "PYD-018", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}, wantFires: false},
+	{name: "CSDK-026 fires on a side-effecting tool with no claim", ruleID: "CSDK-026", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, wantFires: true},
+	{name: "CSDK-026 fires on a shell tool with no claim", ruleID: "CSDK-026", kind: models.KindClaudeSDKTool, src: `
+def run_report(name: str) -> str:
+    """Build a report."""
+    import subprocess
+    return subprocess.run(["make", name]).stdout
+`, wantFires: true},
+	{name: "CSDK-026 silent on a read-only tool with no claim", ruleID: "CSDK-026", kind: models.KindClaudeSDKTool, src: `
+def get_weather(city: str) -> str:
+    """Get the weather."""
+    return city
+`, wantFires: false},
+	{name: "CSDK-026 silent when the tool takes a claim", ruleID: "CSDK-026", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "CSDK-027 fires on an unused claim", ruleID: "CSDK-027", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}, wantFires: true},
+	{name: "CSDK-027 silent on a checked claim", ruleID: "CSDK-027", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    verify_claim(claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "CSDK-027 silent on a wrapped claim", ruleID: "CSDK-027", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseWrapped}, wantFires: false},
+	{name: "CSDK-027 silent with no claim at all", ruleID: "CSDK-027", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, wantFires: false},
+	{name: "CSDK-028 fires on a claim that is only logged", ruleID: "CSDK-028", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    logger.info("claim %s", claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUsePassthrough}, wantFires: true},
+	{name: "CSDK-028 silent on a checked claim", ruleID: "CSDK-028", kind: models.KindClaudeSDKTool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    verify_claim(claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "CSDK-028 silent on an unused claim", ruleID: "CSDK-028", kind: models.KindClaudeSDKTool, src: `
 def send_email(to: str, body: str, claim: dict) -> str:
     """Send an email."""
     return mailer.send(to, body)

@@ -44,4 +44,7 @@ package rules
 //
 // Schema 33 adds the claim_use fact on CrewAI and Pydantic AI tools and the
 // repo-level claim mediator pass (analysis.ApplyClaimMediators).
-const SupportedSchemaVersion = 33
+//
+// Schema 34 adds ToolDef.InputKeys, so tool_claim_use sees a claim declared in a
+// Claude Agent SDK tool's input schema.
+const SupportedSchemaVersion = 34

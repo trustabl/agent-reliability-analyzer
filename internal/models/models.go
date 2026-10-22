@@ -204,16 +204,21 @@ func ValidLanguage(l Language) bool {
 // ToolDef is one discovered surface that an agent can invoke at runtime.
 // Mirrors the Tool Discovery node in architecture §2.
 type ToolDef struct {
-	Name           string            `json:"name"`
-	VarName        string            `json:"var_name,omitempty"` // const-binding name (TS); empty for Python where Name and binding name coincide
-	Kind           ToolKind          `json:"kind"`
-	Language       Language          `json:"language"`
-	Location                         // file_path / start_line / end_line (flat in JSON via anonymous embed)
-	Description    string            `json:"description,omitempty"`
-	HasTypedParams bool              `json:"has_typed_params"`
-	ParamNames     []string          `json:"param_names,omitempty"`
-	Facts          map[string]string `json:"facts,omitempty"`
-	Config         map[string]string `json:"config,omitempty"` // decorator kwargs
+	Name           string   `json:"name"`
+	VarName        string   `json:"var_name,omitempty"` // const-binding name (TS); empty for Python where Name and binding name coincide
+	Kind           ToolKind `json:"kind"`
+	Language       Language `json:"language"`
+	Location                // file_path / start_line / end_line (flat in JSON via anonymous embed)
+	Description    string   `json:"description,omitempty"`
+	HasTypedParams bool     `json:"has_typed_params"`
+	ParamNames     []string `json:"param_names,omitempty"`
+	// InputKeys are the keys of a Claude Agent SDK Python tool's input schema
+	// (the third argument of @tool(name, description, schema)). The handler
+	// takes one args dict, so these are the model-facing argument names; kept
+	// apart from ParamNames, which the CSDK rules read as the signature.
+	InputKeys []string          `json:"input_keys,omitempty"`
+	Facts     map[string]string `json:"facts,omitempty"`
+	Config    map[string]string `json:"config,omitempty"` // decorator kwargs
 }
 
 // FactClaimUse is the ToolDef.Facts key for how a tool uses its EBTE-style

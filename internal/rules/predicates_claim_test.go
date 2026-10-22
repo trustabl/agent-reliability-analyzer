@@ -34,6 +34,10 @@ func TestPredToolClaimUse(t *testing.T) {
 		// unknown is never a match, for any value.
 		{"declared claim with no fact matches nothing", []string{"absent", "unused", "passthrough", "checked", "wrapped"}, withClaim(""), false},
 		// A stale fact on a tool with no claim param cannot match.
+		// A Claude Agent SDK handler takes one args dict; the claim is an input
+		// schema key, not a parameter.
+		{"claim as a Claude input key is declared", []string{"absent"}, models.ToolDef{ParamNames: []string{"args"}, InputKeys: []string{"to", "claim"}}, false},
+		{"claim as a Claude input key matches its fact", []string{"unused"}, models.ToolDef{ParamNames: []string{"args"}, InputKeys: []string{"claim"}, Facts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}}, true},
 		{"fact without param is ignored", []string{"unused"}, models.ToolDef{Facts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}}, false},
 	}
 	for _, tc := range cases {

@@ -563,7 +563,18 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   `Hooks(before_tool_execute=...)` / `Hooks(tool_execute=...)`), or the Pydantic
   AI tool has its own `args_validator=`. The credit is repo-wide per SDK: hooks
   are global, per crew or per agent and may filter by tool name, so a tool is
-  not linked to the hook that covers it.
+  not linked to the hook that covers it. Claude Agent SDK tools (schema 34) are
+  credited by a `"PreToolUse"` hooks-dict key, or by
+  `ClaudeAgentOptions(can_use_tool=...)` on a call without `allowed_tools=` or
+  `permission_mode="bypassPermissions"`, since the callback does not run for
+  calls those approve.
+- **Claude tool claims** (`claude_claim.go`) — a Claude Agent SDK handler takes
+  one `args` dict, so `claudeInputKeys` records the `@tool` input schema's keys
+  in `ToolDef.InputKeys` (short dict, JSON-schema `properties`, or a same-file
+  TypedDict class or dict variable), and `claudeClaimUse` classifies
+  `args["claim"]` / `args.get("claim")` reads the way `pythonClaimUse`
+  classifies a `claim` parameter; a whole-`args` read counts as a claim read.
+  `tool_claim_use` treats `claim` in `InputKeys` as declared.
 - **DiscoverAgents** (`agents.go`) — finds `Agent(...)` / `SandboxAgent(...)` /
   `AgentDefinition(...)` constructor calls; captures all constructor kwargs into
   a typed `KwargTree`; sets `Opaque=true` for `Agent(**config)` or
@@ -2171,8 +2182,10 @@ internal/
 │   │                            tool with a `claim` parameter (unused /
 │   │                            passthrough / checked / wrapped), plus
 │   │                            openAIToolHasInputGuardrail, stampFactoryClaim.
-│   ├── claim_mediators.go       ApplyClaimMediators: repo-level CrewAI / Pydantic AI
-│   │                            pre-tool hooks mark a claim as wrapped.
+│   ├── claim_mediators.go       ApplyClaimMediators: repo-level CrewAI / Pydantic AI /
+│   │                            Claude pre-tool hooks mark a claim as wrapped.
+│   ├── claude_claim.go          claudeInputKeys / claudeClaimUse: the claim as a
+│   │                            Claude @tool input-schema key read from args.
 │   ├── agents.go                Python agent / guardrail / session discovery and
 │   │                            edge resolution (DiscoverAgents, DiscoverGuardrails,
 │   │                            DiscoverSessions, ResolveEdges, SessionClasses).

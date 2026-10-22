@@ -6,10 +6,11 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 33 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 370 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 fire at
-**info** on every side-effecting Python OpenAI Agents, MCP, LangChain, CrewAI or
-Pydantic AI tool that takes no `claim` argument. They never fail `--strict`, and they lower the score only slightly.
+Rule schema 31 → 34 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 373 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+CSDK-026 fire at **info** on every side-effecting Python OpenAI Agents, MCP,
+LangChain, CrewAI, Pydantic AI or Claude Agent SDK tool that takes no `claim`
+argument. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
 
@@ -34,6 +35,15 @@ Pydantic AI tool that takes no `claim` argument. They never fail `--strict`, and
   `@<hooks>.on.before_tool_execute` / `.on.tool_execute` or
   `Hooks(before_tool_execute=...)` / `Hooks(tool_execute=...)`, or a tool's own
   `args_validator=`. The credit is per SDK across the repo, not per tool.
+- **Tool-call claims for the Claude Agent SDK (schema 34).** CSDK-026..028
+  apply the rungs to Python `@tool` handlers. The handler takes one `args`
+  dict, so discovery records the input schema's keys in a new
+  `ToolDef.InputKeys` (`input_keys` in JSON; short dict, JSON-schema
+  `properties`, or a same-file TypedDict / dict variable) and reads the claim
+  as `args["claim"]` / `args.get("claim")`; a whole-`args` read handed to
+  another call counts as checked. A `"PreToolUse"` hooks entry, or
+  `ClaudeAgentOptions(can_use_tool=...)` on a call without `allowed_tools=` or
+  `bypassPermissions`, counts as a possible mediator.
 - **A one-time star line after the first interactive scan.** `trustabl scan`
   prints "⭐ Found this useful? Star Agent Reliability Analyzer" with the
   repository link to stderr once, after the first successful scan with human

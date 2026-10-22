@@ -389,6 +389,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > offending agent, and for CI-003 one per `actions/checkout` step in that job (not one per scan). Hits carry event, action and secret names only, never a `with` / `env` / `run` value. Rulebook docs (`docs/Policy/ci/`) are a
 > separate follow-up. Built in parallel with the otel-labels correctness batch, which merged first and took 26 → 27, so this batch takes 28. The fixture holds **352** rules (347 + 5; re-derive, do not trust this figure).
 >
+> **Tool-call claims for the Claude Agent SDK (2026-10-22, `schema_version` 33 → 34; +3 rules):** **CSDK-026..028** in
+> `claude_sdk/tool_call_claims.yaml`. Claude handlers take one `args` dict, so the claim is an input-schema key: discovery fills
+> `ToolDef.InputKeys` (`claude_claim.go`: `claudeInputKeys`, `claudeClaimUse`), and `tool_claim_use` treats `claim` in `InputKeys` as
+> declared. Mediator arm: a `"PreToolUse"` dict key, or `can_use_tool=` on a `ClaudeAgentOptions(...)` call with no `allowed_tools=`
+> and no `bypassPermissions` (the callback does not run for auto-approved calls). Settings-file hooks are not credited. The fixture
+> holds **373** rules (re-derive).
+>
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
 > (`analysis.DiscoverProjectConfig`). The walk now enters `.gemini/`, `.vscode/`, `.cursor/`, `.codex/`. Env files are read for **key
