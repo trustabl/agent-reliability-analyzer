@@ -41,4 +41,7 @@ package rules
 //
 // Schema 32 adds the tool_claim_use predicate (tool scope) and the claim_use
 // discovery fact.
-const SupportedSchemaVersion = 32
+//
+// Schema 33 adds the claim_use fact on CrewAI and Pydantic AI tools and the
+// repo-level claim mediator pass (analysis.ApplyClaimMediators).
+const SupportedSchemaVersion = 33

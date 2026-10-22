@@ -3565,7 +3565,8 @@ def summarize(state):
     return {"summary": state["text"][:100]}
 `, wantFires: false},
 
-	// ─── Tool-call claims (EBTE): OAI-034..036, MCP-033..035, LC-028..030 ──
+	// ─── Tool-call claims (EBTE): OAI-034..036, MCP-033..035, LC-028..030,
+	// CREW-016..018, PYD-016..018 ──
 	// claim_use is a discovery fact and parsePy does not run discovery, so
 	// these cases set it through toolFacts. TestScan_ToolCallClaims runs the
 	// same shapes through real discovery.
@@ -3742,6 +3743,124 @@ def send_email(to: str, body: str, claim: dict) -> str:
     return mailer.send(to, body)
 `, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
 	{name: "LC-030 silent on an unused claim", ruleID: "LC-030", kind: models.KindLangChainTool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}, wantFires: false},
+	{name: "CREW-016 fires on a side-effecting tool with no claim", ruleID: "CREW-016", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, wantFires: true},
+	{name: "CREW-016 fires on a shell tool with no claim", ruleID: "CREW-016", kind: models.KindCrewAITool, src: `
+def run_report(name: str) -> str:
+    """Build a report."""
+    import subprocess
+    return subprocess.run(["make", name]).stdout
+`, wantFires: true},
+	{name: "CREW-016 silent on a read-only tool with no claim", ruleID: "CREW-016", kind: models.KindCrewAITool, src: `
+def get_weather(city: str) -> str:
+    """Get the weather."""
+    return city
+`, wantFires: false},
+	{name: "CREW-016 silent when the tool takes a claim", ruleID: "CREW-016", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "CREW-017 fires on an unused claim", ruleID: "CREW-017", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}, wantFires: true},
+	{name: "CREW-017 silent on a checked claim", ruleID: "CREW-017", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    verify_claim(claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "CREW-017 silent on a wrapped claim", ruleID: "CREW-017", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseWrapped}, wantFires: false},
+	{name: "CREW-017 silent with no claim at all", ruleID: "CREW-017", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, wantFires: false},
+	{name: "CREW-018 fires on a claim that is only logged", ruleID: "CREW-018", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    logger.info("claim %s", claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUsePassthrough}, wantFires: true},
+	{name: "CREW-018 silent on a checked claim", ruleID: "CREW-018", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    verify_claim(claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "CREW-018 silent on an unused claim", ruleID: "CREW-018", kind: models.KindCrewAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}, wantFires: false},
+	{name: "PYD-016 fires on a side-effecting tool with no claim", ruleID: "PYD-016", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, wantFires: true},
+	{name: "PYD-016 fires on a shell tool with no claim", ruleID: "PYD-016", kind: models.KindPydanticAITool, src: `
+def run_report(name: str) -> str:
+    """Build a report."""
+    import subprocess
+    return subprocess.run(["make", name]).stdout
+`, wantFires: true},
+	{name: "PYD-016 silent on a read-only tool with no claim", ruleID: "PYD-016", kind: models.KindPydanticAITool, src: `
+def get_weather(city: str) -> str:
+    """Get the weather."""
+    return city
+`, wantFires: false},
+	{name: "PYD-016 silent when the tool takes a claim", ruleID: "PYD-016", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "PYD-017 fires on an unused claim", ruleID: "PYD-017", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseUnused}, wantFires: true},
+	{name: "PYD-017 silent on a checked claim", ruleID: "PYD-017", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    verify_claim(claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "PYD-017 silent on a wrapped claim", ruleID: "PYD-017", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseWrapped}, wantFires: false},
+	{name: "PYD-017 silent with no claim at all", ruleID: "PYD-017", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str) -> str:
+    """Send an email."""
+    return mailer.send(to, body)
+`, wantFires: false},
+	{name: "PYD-018 fires on a claim that is only logged", ruleID: "PYD-018", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    logger.info("claim %s", claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUsePassthrough}, wantFires: true},
+	{name: "PYD-018 silent on a checked claim", ruleID: "PYD-018", kind: models.KindPydanticAITool, src: `
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    verify_claim(claim)
+    return mailer.send(to, body)
+`, toolFacts: map[string]string{models.FactClaimUse: models.ClaimUseChecked}, wantFires: false},
+	{name: "PYD-018 silent on an unused claim", ruleID: "PYD-018", kind: models.KindPydanticAITool, src: `
 def send_email(to: str, body: str, claim: dict) -> str:
     """Send an email."""
     return mailer.send(to, body)

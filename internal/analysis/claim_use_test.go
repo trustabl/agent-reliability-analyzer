@@ -307,3 +307,64 @@ send_email_tool = StructuredTool.from_function(send_email)
 		})
 	}
 }
+
+func TestClaimUse_PydanticAIFactory(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "Tool(fn), claim never read",
+			src: `
+from pydantic_ai import Agent, Tool
+
+def send_email(to: str, claim: dict) -> str:
+    """Send an email."""
+    return "ok"
+
+agent = Agent("openai:gpt-5", tools=[Tool(send_email)])
+`,
+			want: models.ClaimUseUnused,
+		},
+		{
+			name: "Tool(fn), claim checked",
+			src: `
+from pydantic_ai import Agent, Tool
+
+def send_email(to: str, claim: dict) -> str:
+    """Send an email."""
+    if verify_claim(claim) != "allow":
+        raise PermissionError("claim does not match route")
+    return "ok"
+
+agent = Agent("openai:gpt-5", tools=[Tool(send_email)])
+`,
+			want: models.ClaimUseChecked,
+		},
+		{
+			name: "Tool(fn), no claim param: fact not stamped",
+			src: `
+from pydantic_ai import Agent, Tool
+
+def send_email(to: str) -> str:
+    """Send an email."""
+    return "ok"
+
+agent = Agent("openai:gpt-5", tools=[Tool(send_email)])
+`,
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tools := analysis.DiscoverPydanticAITools([]analysis.ParsedFile{parsePyFile(t, "tools.py", tc.src)})
+			if len(tools) != 1 {
+				t.Fatalf("expected 1 tool, got %d: %+v", len(tools), tools)
+			}
+			if got := tools[0].Facts[models.FactClaimUse]; got != tc.want {
+				t.Errorf("claim_use = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

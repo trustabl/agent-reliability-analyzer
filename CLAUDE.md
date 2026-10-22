@@ -356,7 +356,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > no claim, **OAI-035 / MCP-034 / LC-029** (medium, 0.6) claim never read, **OAI-036 / MCP-035 / LC-030** (medium, 0.55) claim only
 > printed / logged / serialized / returned. A second decorator, or an OpenAI tool input guardrail, makes the fact `wrapped` (silent). Rules
 > live in `<sdk>/tool_call_claims.yaml`; rulebook docs in `docs/Policy/<sdk>/tool_call_claims.md`. Python only; TypeScript, Claude SDK,
-> ADK, CrewAI, Pydantic AI, AutoGen and Vercel AI are follow-ups. The fixture holds **364** rules (355 + 9; re-derive).
+> ADK, AutoGen and Vercel AI are follow-ups. The fixture holds **364** rules (355 + 9; re-derive).
+>
+> **Tool-call claims for CrewAI and Pydantic AI (2026-10-22, `schema_version` 32 → 33; +6 rules):** **CREW-016..018** and
+> **PYD-016..018**, same rungs, in `crewai/` and `pydantic_ai/tool_call_claims.yaml`. `analysis.ApplyClaimMediators`
+> (`claim_mediators.go`, run in the scanner after tool discovery) upgrades `unused` / `passthrough` to `wrapped` when the repo has the
+> SDK's pre-tool hook (CrewAI `@before_tool_call` / `register_before_tool_call_hook` / `@on(InterceptionPoint.PRE_TOOL_CALL)`;
+> Pydantic AI `.on.before_tool_execute` / `.on.tool_execute` / `Hooks(before_tool_execute=|tool_execute=)` / the tool's
+> `args_validator=`). Repo-wide per SDK by design. LangChain factory tools get the fact from the wrapped function
+> (`stampFactoryClaim`). The fixture holds **370** rules (re-derive).
 >
 > **Pre-approved fetch from a user-content host (2026-10-21, `schema_version` 30 -> 31, provisional; +1 rule):** **AGCFG-011** (high, 0.7, repo
 > scope, category `agent_config`, new pack file `agent_config/fetch_permissions.yaml`) over the new predicate

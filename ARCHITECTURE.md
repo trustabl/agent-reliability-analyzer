@@ -550,7 +550,20 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   mediate). A tool with no `claim` parameter carries no fact, so scan output for
   repos that do not use claims is unchanged. The `tool_claim_use` predicate
   (`schema_version` 32) reads it; its `absent` value is decided from
-  `ParamNames`. Read by OAI-034..036, MCP-033..035 and LC-028..030.
+  `ParamNames`. Read by OAI-034..036, MCP-033..035 and LC-028..030, and (schema
+  33) by CREW-016..018 and PYD-016..018. LangChain and Pydantic AI factory tools
+  (`StructuredTool.from_function(fn)`, `Tool(fn)`) get the fact from the wrapped
+  function via `stampFactoryClaim`.
+- **ApplyClaimMediators** (`claim_mediators.go`) — runs in the scanner after
+  every tool discovery pass. It upgrades a CrewAI or Pydantic AI tool's
+  `claim_use` from `unused` / `passthrough` to `wrapped` when the repo registers
+  that SDK's pre-tool hook (CrewAI `@before_tool_call`,
+  `register_before_tool_call_hook(...)`, `@on(InterceptionPoint.PRE_TOOL_CALL)`;
+  Pydantic AI `@<hooks>.on.before_tool_execute` / `.on.tool_execute`,
+  `Hooks(before_tool_execute=...)` / `Hooks(tool_execute=...)`), or the Pydantic
+  AI tool has its own `args_validator=`. The credit is repo-wide per SDK: hooks
+  are global, per crew or per agent and may filter by tool name, so a tool is
+  not linked to the hook that covers it.
 - **DiscoverAgents** (`agents.go`) — finds `Agent(...)` / `SandboxAgent(...)` /
   `AgentDefinition(...)` constructor calls; captures all constructor kwargs into
   a typed `KwargTree`; sets `Opaque=true` for `Agent(**config)` or
@@ -2157,7 +2170,9 @@ internal/
 │   ├── claim_use.go             pythonClaimUse: the claim_use fact on a decorated
 │   │                            tool with a `claim` parameter (unused /
 │   │                            passthrough / checked / wrapped), plus
-│   │                            openAIToolHasInputGuardrail.
+│   │                            openAIToolHasInputGuardrail, stampFactoryClaim.
+│   ├── claim_mediators.go       ApplyClaimMediators: repo-level CrewAI / Pydantic AI
+│   │                            pre-tool hooks mark a claim as wrapped.
 │   ├── agents.go                Python agent / guardrail / session discovery and
 │   │                            edge resolution (DiscoverAgents, DiscoverGuardrails,
 │   │                            DiscoverSessions, ResolveEdges, SessionClasses).

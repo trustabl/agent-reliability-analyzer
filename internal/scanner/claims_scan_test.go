@@ -3,7 +3,8 @@ package scanner_test
 import "testing"
 
 // TestScan_ToolCallClaims runs the tool-call-claims ladder (OAI-034..036,
-// MCP-033..035, LC-028..030) through real discovery, so a change that stops
+// MCP-033..035, LC-028..030, CREW-016..018, PYD-016..018) through real
+// discovery, so a change that stops
 // discovery from stamping claim_use fails here rather than silently killing
 // the rules. The per-rule table in policies_test.go sets the fact by hand.
 func TestScan_ToolCallClaims(t *testing.T) {
@@ -29,6 +30,18 @@ func TestScan_ToolCallClaims(t *testing.T) {
 			header:    "from langchain_core.tools import tool\n",
 			decorator: "@tool",
 			absent:    "LC-028", unused: "LC-029", passthrough: "LC-030",
+		},
+		"crewai": {
+			manifest:  "[project]\nname = \"f\"\ndependencies = [\"crewai\"]\n",
+			header:    "from crewai.tools import tool\n",
+			decorator: "@tool(\"Send email\")",
+			absent:    "CREW-016", unused: "CREW-017", passthrough: "CREW-018",
+		},
+		"pydantic_ai": {
+			manifest:  "[project]\nname = \"f\"\ndependencies = [\"pydantic-ai\"]\n",
+			header:    "from pydantic_ai import Agent\nagent = Agent(\"test\")\n",
+			decorator: "@agent.tool_plain",
+			absent:    "PYD-016", unused: "PYD-017", passthrough: "PYD-018",
 		},
 	}
 	bodies := map[string]string{
@@ -131,6 +144,32 @@ send_email_tool = StructuredTool.from_function(send_email)
 					t.Errorf("%s on a %s claim: fired=%v, want %v", id, tc.name, got, want)
 				}
 			})
+		}
+	}
+}
+
+// A CrewAI tool whose claim is read by a before_tool_call hook elsewhere in
+// the repo is not an unchecked claim.
+func TestScan_ToolCallClaims_CrewAIHookSilencesUnused(t *testing.T) {
+	files := map[string]string{
+		"pyproject.toml": "[project]\nname = \"f\"\ndependencies = [\"crewai\"]\n",
+		"tools.py": `from crewai.tools import tool
+
+@tool("Send email")
+def send_email(to: str, body: str, claim: dict) -> str:
+    """Send an email."""
+    return "ok"
+`,
+		"hooks.py": `from crewai.hooks import before_tool_call
+
+@before_tool_call
+def check_claim(context):
+    return verify(context.tool_input.get("claim"))
+`,
+	}
+	for _, id := range []string{"CREW-016", "CREW-017", "CREW-018"} {
+		if scanFires(t, files, id) {
+			t.Errorf("%s fired on a tool whose claim is mediated by a before_tool_call hook", id)
 		}
 	}
 }

@@ -6,10 +6,10 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 32 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 364 rules. OAI-034 / MCP-033 / LC-028 fire at **info** on every
-side-effecting Python OpenAI Agents, MCP or LangChain tool that takes no `claim`
-argument. They never fail `--strict`, and they lower the score only slightly.
+Rule schema 31 → 33 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 370 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 fire at
+**info** on every side-effecting Python OpenAI Agents, MCP, LangChain, CrewAI or
+Pydantic AI tool that takes no `claim` argument. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
 
@@ -24,6 +24,16 @@ argument. They never fail `--strict`, and they lower the score only slightly.
   output for repos that do not use claims is unchanged apart from the new
   OAI-034 / MCP-033 / LC-028 findings. **Release order:** this engine first,
   then the rules pack.
+- **Tool-call claims for CrewAI and Pydantic AI (schema 33).** CREW-016..018
+  and PYD-016..018 apply the same three rungs to CrewAI `@tool` functions and
+  Pydantic AI `@agent.tool` / `@agent.tool_plain` / `Tool(fn)` tools. A new
+  repo-level pass, `analysis.ApplyClaimMediators`, marks a claim as possibly
+  mediated (`wrapped`, silent) when the repo registers the SDK's pre-tool hook:
+  CrewAI `@before_tool_call`, `register_before_tool_call_hook(...)` or
+  `@on(InterceptionPoint.PRE_TOOL_CALL)`; Pydantic AI
+  `@<hooks>.on.before_tool_execute` / `.on.tool_execute` or
+  `Hooks(before_tool_execute=...)` / `Hooks(tool_execute=...)`, or a tool's own
+  `args_validator=`. The credit is per SDK across the repo, not per tool.
 - **A one-time star line after the first interactive scan.** `trustabl scan`
   prints "⭐ Found this useful? Star Agent Reliability Analyzer" with the
   repository link to stderr once, after the first successful scan with human

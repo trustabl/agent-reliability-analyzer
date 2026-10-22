@@ -103,6 +103,29 @@ func wrappedFuncClaimUse(fn, dec *sitter.Node, src []byte) string {
 	return pythonClaimUse(fn, nil, src)
 }
 
+// stampFactoryClaim sets the claim_use fact for a tool a factory call builds
+// from the same-file function wrappedName, and returns the tool's parameter
+// names. fnDef is the resolved undecorated function, or nil. A decorated
+// wrapped function is not in indexTopLevelFunctions, so it is looked up here
+// for its parameters and claim fact only, and a claim checked by its decorator
+// is not reported as absent.
+func stampFactoryClaim(fnDef *sitter.Node, wrappedName string, pf ParsedFile, params []string, facts map[string]string) []string {
+	fn, dec := fnDef, (*sitter.Node)(nil)
+	if fn == nil && wrappedName != "" {
+		fn, dec = topLevelDecoratedFunction(pf.Tree.RootNode(), wrappedName, pf.Source)
+		if fn != nil {
+			params = toolParamNames(fn, pf.Source)
+		}
+	}
+	if fn == nil {
+		return params
+	}
+	if use := wrappedFuncClaimUse(fn, dec, pf.Source); use != "" {
+		facts[models.FactClaimUse] = use
+	}
+	return params
+}
+
 // topLevelDecoratedFunction finds the module-level decorated function named
 // name, returning the function_definition and its decorated_definition, or
 // nils. indexTopLevelFunctions indexes undecorated functions only; this lookup
