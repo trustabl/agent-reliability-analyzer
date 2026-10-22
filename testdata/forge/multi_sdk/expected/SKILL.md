@@ -109,7 +109,10 @@ Rules for the schema:
 Put one mediation step between the model's tool call and the tool's effect.
 It is a function the model cannot call or skip, and it runs on every call.
 
-1. Take `claim` out of the arguments, so the tool body never sees it.
+1. Read `claim` from the call's arguments. When the step runs in a wrapper
+   that can change the arguments, remove `claim` before the tool function is
+   called. A hook that can only allow or reject leaves it in place. Either
+   way, nothing after the step acts on the claim.
 2. Validate the claim against the schema. A missing or malformed claim is a
    deny.
 3. Resolve the facts from the server side, never from the claim or the
@@ -167,8 +170,8 @@ review to the tool's `needs_approval` gate.
 Before moving on, confirm each of these. If one does not hold, say which one
 and why, rather than working around it.
 
-- Every tool takes a `claim` argument, and the mediation step removes it
-  before the tool body runs.
+- Every tool takes a `claim` argument, and the mediation step reads it before
+  the tool has any effect. Nothing after the step acts on the claim.
 - The mediation step runs on every call path, including retries, handoffs and
   sub-agents. A tool that can be reached without it is not covered.
 - Every fact the step compares against comes from the server side. Nothing in

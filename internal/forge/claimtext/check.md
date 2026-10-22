@@ -1,5 +1,5 @@
-- Every tool takes a `claim` argument, and the mediation step removes it
-  before the tool body runs.
+- Every tool takes a `claim` argument, and the mediation step reads it before
+  the tool has any effect. Nothing after the step acts on the claim.
 - The mediation step runs on every call path, including retries, handoffs and
   sub-agents. A tool that can be reached without it is not covered.
 - Every fact the step compares against comes from the server side. Nothing in
