@@ -488,7 +488,7 @@ file and line (`configHitLocation` in `rule_detector.go`), so `pathclass` can ta
 a vendored fixture as test-origin. The pack loads unconditionally and the
 `agent_config` `applies_to` token skips the SDK gate.
 
-**GitHub Actions workflows (category `ci`, `schema_version` 24).** The walk
+**GitHub Actions workflows (category `ci`, `schema_version` 30).** The walk
 enters `.github/` only at the scan root and, inside it, only `.github/workflows/`
 (a nested `.github` and the other `.github` subdirectories are skipped like any
 dot-directory). Files `.github/workflows/*.yml|yaml` go to

@@ -199,6 +199,12 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.EditorAutoApprove
 	case m.RepoMCPConfigLaunchesLocalCommand != nil:
 		hits = pc.LocalMCPLaunch
+	case m.RepoCodexHookRunsRepoCommand != nil:
+		hits = pc.CodexRiskyHooks
+	case m.RepoAgentsMdHasHiddenText != nil:
+		hits = pc.HiddenAgentText
+	case m.RepoHarnessGuidanceHasHiddenText != nil:
+		hits = pc.HiddenHarnessText
 	}
 	if len(hits) == 0 {
 		return "", 0

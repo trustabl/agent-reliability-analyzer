@@ -148,6 +148,9 @@ type MatchExpr struct {
 	RepoWorkspaceEnvOverridesTrust    *bool `yaml:"repo_workspace_env_overrides_trust,omitempty"`
 	RepoEditorAgentAutoApprove        *bool `yaml:"repo_editor_agent_auto_approve,omitempty"`
 	RepoMCPConfigLaunchesLocalCommand *bool `yaml:"repo_mcp_config_launches_local_command,omitempty"`
+	RepoCodexHookRunsRepoCommand      *bool `yaml:"repo_codex_hook_runs_repo_command,omitempty"`
+	RepoAgentsMdHasHiddenText         *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
+	RepoHarnessGuidanceHasHiddenText  *bool `yaml:"repo_harness_guidance_has_hidden_text,omitempty"`
 
 	// CI workflow predicates (category ci). Each is true when the corresponding
 	// CIWorkflowFacts slice is non-empty (one hit per agent step; per checkout step for CI-003).

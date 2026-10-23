@@ -1,0 +1,40 @@
+policy:
+  id: agent_config_agents_md
+  name: AGENTS.md hidden text
+  category: agent_config
+  description: >
+    Repo-scoped rule for agent guidance files committed to a repository.
+    Agents read AGENTS.md as instructions while humans review it as rendered
+    text, so characters that are invisible or that reorder what a reviewer
+    sees can carry instructions only the model reads. The rule is an objective
+    code-point test; it does not judge what the instructions say. The pack
+    loads for every scan (the file has no SDK import), so the rule's own
+    predicate does the gating. Fires once per scan, attributed to the first
+    offending file.
+
+rules:
+  - id: AGCFG-009
+    title: AGENTS.md contains invisible or direction-overriding text
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_agents_md_has_hidden_text: true
+    explanation: >
+      A committed AGENTS.md contains zero-width characters, Unicode Tags-block
+      characters (U+E0000 to U+E007F), or bidirectional override characters.
+      Agents read AGENTS.md as instructions, but a reviewer sees only the
+      rendered text, so any of these can hide an instruction from a human while
+      the model still reads it. Tags-block characters mirror ASCII invisibly and
+      are the usual carrier for this attack. A byte order mark at the start of
+      the file, emoji joined by a zero-width joiner, and subdivision-flag emoji
+      are not flagged. Right-to-left prose that uses bidirectional controls is
+      flagged and is a known false positive. The characters themselves are never
+      echoed.
+    fix: >
+      Remove the invisible or direction-overriding characters, and retype any
+      line that contained them, because they are easy to paste back in. Review
+      AGENTS.md changes in pull requests with a tool that shows hidden
+      characters, and keep instructions in plain visible text.

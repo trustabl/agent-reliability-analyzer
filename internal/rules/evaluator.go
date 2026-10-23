@@ -184,6 +184,15 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoMCPConfigLaunchesLocalCommand != nil && (len(inv.ProjectConfig.LocalMCPLaunch) > 0) != *e.RepoMCPConfigLaunchesLocalCommand {
 		return false
 	}
+	if e.RepoCodexHookRunsRepoCommand != nil && (len(inv.ProjectConfig.CodexRiskyHooks) > 0) != *e.RepoCodexHookRunsRepoCommand {
+		return false
+	}
+	if e.RepoAgentsMdHasHiddenText != nil && (len(inv.ProjectConfig.HiddenAgentText) > 0) != *e.RepoAgentsMdHasHiddenText {
+		return false
+	}
+	if e.RepoHarnessGuidanceHasHiddenText != nil && (len(inv.ProjectConfig.HiddenHarnessText) > 0) != *e.RepoHarnessGuidanceHasHiddenText {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -554,6 +563,9 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_workspace_env_overrides_trust":           true,
 		"repo_editor_agent_auto_approve":               true,
 		"repo_mcp_config_launches_local_command":       true,
+		"repo_codex_hook_runs_repo_command":            true,
+		"repo_agents_md_has_hidden_text":               true,
+		"repo_harness_guidance_has_hidden_text":        true,
 		"repo_ci_agent_untrusted_trigger_ungated":      true,
 		"repo_ci_agent_untrusted_trigger_privileged":   true,
 		"repo_ci_agent_checkout_persists_credentials":  true,
@@ -652,6 +664,9 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoWorkspaceEnvOverridesTrust != nil, "repo_workspace_env_overrides_trust")
 	add(e.RepoEditorAgentAutoApprove != nil, "repo_editor_agent_auto_approve")
 	add(e.RepoMCPConfigLaunchesLocalCommand != nil, "repo_mcp_config_launches_local_command")
+	add(e.RepoCodexHookRunsRepoCommand != nil, "repo_codex_hook_runs_repo_command")
+	add(e.RepoAgentsMdHasHiddenText != nil, "repo_agents_md_has_hidden_text")
+	add(e.RepoHarnessGuidanceHasHiddenText != nil, "repo_harness_guidance_has_hidden_text")
 	add(e.RepoCIAgentUntrustedTriggerUngated != nil, "repo_ci_agent_untrusted_trigger_ungated")
 	add(e.RepoCIAgentUntrustedTriggerPrivileged != nil, "repo_ci_agent_untrusted_trigger_privileged")
 	add(e.RepoCIAgentCheckoutPersistsCredentials != nil, "repo_ci_agent_checkout_persists_credentials")

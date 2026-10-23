@@ -367,6 +367,17 @@ type ProjectConfigFacts struct {
 	TrustOverrideEnv  []ConfigHit `json:"trust_override_env,omitempty"`  // AGCFG-006
 	EditorAutoApprove []ConfigHit `json:"editor_auto_approve,omitempty"` // AGCFG-007
 	LocalMCPLaunch    []ConfigHit `json:"local_mcp_launch,omitempty"`    // MCPCFG-002
+	// CodexRiskyHooks is kept apart from RiskyHooks on purpose: Codex skips a
+	// project hook until the user reviews and trusts it, so AGCFG-005's "runs
+	// before trust" claim does not hold for it. AGCFG-008 reads this list.
+	CodexRiskyHooks []ConfigHit `json:"codex_risky_hooks,omitempty"`
+	// HiddenAgentText is invisible or direction-overriding text found in an
+	// agent guidance file (AGENTS.md). AGCFG-009 reads this list.
+	HiddenAgentText []ConfigHit `json:"hidden_agent_text,omitempty"`
+	// HiddenHarnessText is the same check over the guidance files of a staged
+	// OpenCode harness tree (systemprompt.md, guardrails.md, ...). AGCFG-010 reads
+	// this list; AGCFG-009 keeps reading HiddenAgentText only.
+	HiddenHarnessText []ConfigHit `json:"hidden_harness_text,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

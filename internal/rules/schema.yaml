@@ -704,6 +704,27 @@ rules:
 #       server with an interpreter plus inline code or a repo-relative script,
 #       or a command path inside the repo (ProjectConfigFacts.LocalMCPLaunch).
 #       Published packages and remote URL servers are not flagged. MCPCFG-002.
+#   repo_codex_hook_runs_repo_command: true | false
+#       True when a committed .codex/hooks.json command or commandWindows runs a
+#       repo-relative script (including the documented
+#       "$(git rev-parse --show-toplevel)/..." form), a curl/wget/nc/bash -c/
+#       python -c primitive, or references .ssh/.aws/.env
+#       (ProjectConfigFacts.CodexRiskyHooks). Kept apart from
+#       repo_project_hook_runs_untrusted_command because Codex skips a project
+#       hook until the user reviews and trusts it. AGCFG-008.
+#   repo_agents_md_has_hidden_text: true | false
+#       True when an AGENTS.md (any depth) contains invisible or
+#       direction-overriding characters: zero-width characters, Unicode
+#       Tags-block characters, or bidirectional overrides
+#       (ProjectConfigFacts.HiddenAgentText). Exempts a leading byte order mark,
+#       emoji and non-ASCII letter sequences joined by a zero-width (non-)joiner,
+#       and subdivision-flag emoji. Text is never echoed. AGCFG-009.
+#   repo_harness_guidance_has_hidden_text: true | false
+#       The AGCFG-009 character test over the guidance files of a staged OpenCode
+#       harness tree (systemprompt.md, guardrails.md, LongTermMEMORY.md,
+#       tool_descriptions/*.md; ProjectConfigFacts.HiddenHarnessText). Same
+#       exemptions, text never echoed. AGCFG-010. A separate predicate from
+#       repo_agents_md_has_hidden_text, which keeps its AGENTS.md-only meaning.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,
