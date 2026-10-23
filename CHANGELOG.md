@@ -6,6 +6,22 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Coding agents in GitHub Actions workflows (rule schema 26 -> 30, provisional).** A new
+  unconditionally loaded `ci` category (CI-001..005) with five repo-scope
+  predicates backed by `RepoInventory.CIWorkflows`. The walk now reads the
+  repo-root `.github/workflows/*.yml|yaml` into `ScanManifest.WorkflowFiles` and
+  `github_workflow` components. CI-001 and CI-002 flag an agent job on an
+  untrusted trigger (issues, issue and review comments, discussions,
+  `pull_request_target`) with no actor gate, CI-002 when it also holds a write
+  token or extra secrets; CI-003..005 flag persisted checkout credentials,
+  unrestricted shell and a missing egress restriction. `claude-code-action` and
+  `codex-action` count as gated through their own write-access check unless a
+  `*` bypass input is set. One finding per step that runs an offending agent (for CI-003, per
+  `actions/checkout` step in an agent job). `workflow_run` is not in
+  the trigger set yet.
+
 ### Fixed
 
 - The `Harness files:` line in the scan summary no longer says that no rule judges

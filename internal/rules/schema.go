@@ -152,6 +152,14 @@ type MatchExpr struct {
 	RepoAgentsMdHasHiddenText         *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
 	RepoHarnessGuidanceHasHiddenText  *bool `yaml:"repo_harness_guidance_has_hidden_text,omitempty"`
 
+	// CI workflow predicates (category ci). Each is true when the corresponding
+	// CIWorkflowFacts slice is non-empty (one hit per agent step; per checkout step for CI-003).
+	RepoCIAgentUntrustedTriggerUngated     *bool `yaml:"repo_ci_agent_untrusted_trigger_ungated,omitempty"`
+	RepoCIAgentUntrustedTriggerPrivileged  *bool `yaml:"repo_ci_agent_untrusted_trigger_privileged,omitempty"`
+	RepoCIAgentCheckoutPersistsCredentials *bool `yaml:"repo_ci_agent_checkout_persists_credentials,omitempty"`
+	RepoCIAgentUnrestrictedShell           *bool `yaml:"repo_ci_agent_unrestricted_shell,omitempty"`
+	RepoCIAgentNoEgressRestriction         *bool `yaml:"repo_ci_agent_no_egress_restriction,omitempty"`
+
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
 	RepoHasObservability             *bool    `yaml:"repo_has_observability,omitempty"`
