@@ -350,13 +350,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **Tool-call claims, EBTE (2026-10-19, `schema_version` 26 → 27; +9 rules):** new tool-scope predicate `tool_claim_use` over the
+> **Tool-call claims, EBTE (2026-10-19, `schema_version` 27 → 28; +9 rules; main took 27 for OBS-009..012):** new tool-scope predicate `tool_claim_use` over the
 > `claim_use` fact that Python decorated-tool discovery stamps on a tool declaring a `claim` parameter (`internal/analysis/claim_use.go`;
 > `absent` is decided from `ParamNames`). A three-rung ladder per SDK: **OAI-034 / MCP-033 / LC-028** (info, 0.5; the pack's first info rules) side-effecting tool with
 > no claim, **OAI-035 / MCP-034 / LC-029** (medium, 0.6) claim never read, **OAI-036 / MCP-035 / LC-030** (medium, 0.55) claim only
 > printed / logged / serialized / returned. A second decorator, or an OpenAI tool input guardrail, makes the fact `wrapped` (silent). Rules
 > live in `<sdk>/tool_call_claims.yaml`; rulebook docs in `docs/Policy/<sdk>/tool_call_claims.md`. Python only; TypeScript, Claude SDK,
-> ADK, CrewAI, Pydantic AI, AutoGen and Vercel AI are follow-ups. The fixture holds **352** rules (343 + 9; re-derive).
+> ADK, CrewAI, Pydantic AI, AutoGen and Vercel AI are follow-ups. The fixture holds **356** rules (347 + 9; re-derive).
 >
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
@@ -394,6 +394,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > **rank 2** (required span attributes — the SDK or instrumentor writes them, so a well-instrumented repo has no literals to find, and the
 > OTel GenAI semconv is still Development with renamed keys), and **rank 4** (run-level correlation id — session / `group_id` — needs a
 > run-call kwarg predicate, tracked with the HTTP-entrypoint design ticket). See `COVERAGE.md`.
+>
+> **agent-reliability-otel-labels correctness, Batch 1 (2026-10-08, `schema_version` 26 → 27):** the fixture now holds **347** rules
+> (343 + 4; re-derive, do not trust this figure). Built in parallel with LC-116 (21 → 22) and the `agent_config` pack (22 → 26), which merged first, so this batch takes 27. **OBS-009** (shared `Run`) / **OBS-010** (tool span labelled only on success) /
+> **OBS-011** (constant `attempt`) / **OBS-012** (run end only on success) read new facts on `OtelLabelsSignal`; test-file
+> signals never count and findings point at the offending call. Hand-written `trustabl.*` keys now credit OBS-006..008.
+> Spec: `.superpowers/specs/2026-10-04-otel-labels-correctness-rules-design.md`. Not built: the handoff rule (spec O7),
+> the `side_effect` rules (Batch 2). OBS-009..012 must not reach production before library 0.1.1 is published (spec O1): the 0.1.0 README example trips all four.
 >
 > **agent-reliability-otel-labels batch (2026-10-04, `schema_version` 20 → 21):** the fixture now holds **333** rules
 > (330 + 3; re-derive, do not trust this figure). Built in parallel with the HTTPS-only batch, which had already taken

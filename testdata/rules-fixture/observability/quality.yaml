@@ -269,3 +269,147 @@ rules:
       "error" on the exception path. Verify by exporting one run and checking
       for trustabl.tool.input_fp on each tool span and trustabl.exit_reason on
       the root span.
+
+  # ─── agent-reliability-otel-labels label correctness (OBS-009..012) ────────
+  # OBS-006..008 prove the labels are written; these prove they are right.
+  # Each is gated where its labels must exist, and a single correct call
+  # credits the repo (spec D6), so partial misuse is accepted as a miss. Test
+  # files never decide one (D8). Findings carry the offending call's file and
+  # line.
+  - id: OBS-009
+    title: One agent-reliability-otel-labels Run is shared by every agent run
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_observability_initialized: true
+        - repo_otel_labels_initialized: true
+        - repo_otel_labels_run_shared: true
+    explanation: >
+      A Run is built once instead of once per agent run: at module scope, in a
+      class body, or as a default argument, or it is given a fixed run id.
+      Every run then writes the same trustabl.run_id, and the step counter keeps
+      counting across runs. Two users' separate requests read as one run, and
+      two identical questions read as a loop, so any check that groups tool
+      calls by run draws the wrong conclusion, and nothing in the trace shows
+      the labels are wrong.
+    fix: >
+      Create the Run inside the function that handles one agent run, with run =
+      Run() (const run = new Run() in TypeScript) as its first line, and pass it
+      to the code that labels spans. Do not keep a Run at module scope, as a
+      class attribute, or as a default argument, and leave run_id unset or pass
+      a per-request id. Verify by exporting two runs and checking that their
+      root spans carry different trustabl.run_id values.
+
+  - id: OBS-010
+    title: Tool spans are labelled only when the tool succeeds
+    severity: low
+    confidence: 0.55
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_observability_initialized: true
+        - repo_otel_labels_implemented: true
+        - repo_otel_labels_tool_span_failure_unsafe: true
+    explanation: >
+      Every mark_tool_span call runs after the tool returns, outside any
+      finally or except block, so a tool call that raises is never labelled.
+      Failed calls are the ones a retry storm is made of: a tool that fails and
+      is retried ten times leaves one labelled span, without the fingerprints
+      and attempt counts that would show the repetition.
+    fix: >
+      Set result = None before calling the tool, call it inside try, and call
+      mark_tool_span in the finally block (in TypeScript, let result; try { ... }
+      finally { markToolSpan(...) }, or .finally(() => markToolSpan(...)) on the
+      promise). Pass error_class when the failure type is known. Verify by
+      forcing one tool call to fail and checking that its span carries
+      trustabl.tool.input_fp.
+
+  - id: OBS-011
+    title: The tool-call attempt count is a constant
+    severity: low
+    confidence: 0.7
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_observability_initialized: true
+        - repo_otel_labels_implemented: true
+        - repo_otel_labels_attempt_constant: true
+    explanation: >
+      Every mark_tool_span call passes attempt as a fixed number, usually 1, so
+      every call reports as a first attempt. trustabl.tool.attempt exists to
+      show retries; with a constant it never can, and an agent that calls the
+      same tool with the same arguments again and again looks like a series of
+      fresh calls.
+    fix: >
+      Count attempts per run: keep a dict (a Map in TypeScript) created next to
+      the Run, keyed by canonical_fp(args) (canonicalFp in TypeScript),
+      increment it before each call, and pass the count as attempt. Verify by
+      calling one tool twice with the same arguments in one run and checking
+      that the second span carries trustabl.tool.attempt = 2.
+
+  - id: OBS-012
+    title: The run's end is recorded only when the run succeeds
+    severity: low
+    confidence: 0.55
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_observability_initialized: true
+        - repo_otel_labels_implemented: true
+        - repo_otel_labels_run_end_success_only: true
+    explanation: >
+      Every mark_run_end call records a fixed success reason such as
+      "final_answer", on the success path or in a finally block, and none
+      records "error". A run that raises then ends with no trustabl.exit_reason,
+      or is recorded as finished. Separating failed runs from completed ones is
+      what the exit reason is for, so every check on how runs end reports
+      success.
+    fix: >
+      Call mark_run_end(root, exit_reason="final_answer") at the end of the try
+      block and mark_run_end(root, exit_reason="error") in the except block
+      before re-raising (markRunEnd(root, "error") in catch in TypeScript). Use
+      "max_steps" or "policy_stop" when those stopped the run, and never record a
+      fixed success reason in finally. Verify by forcing one run to fail and
+      checking that its root span carries trustabl.exit_reason = error.

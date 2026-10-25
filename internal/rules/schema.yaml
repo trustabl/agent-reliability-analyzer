@@ -683,6 +683,28 @@ rules:
 #       repo needs only the run end. Proves the calls exist, not that the
 #       labels land: with no current span each call is a silent no-op.
 #       trustabl.* keys written by hand with set_attribute(s) count too.
+#   repo_otel_labels_run_shared: true | false
+#       Fires when a Run of agent-reliability-otel-labels is (or is not) shared
+#       between runs: built at module scope, in a class body, or as a Python
+#       default argument, or given a literal run id. A Python construct under
+#       `if __name__ == "__main__":` is a one-run script and does not count.
+#       Run is matched through each file's import. Test files never count.
+#   repo_otel_labels_tool_span_failure_unsafe: true | false
+#       Fires when tool spans are (or are not) labelled only on success:
+#       mark_tool_span / markToolSpan calls exist and none sits in a finally,
+#       except or catch block, a named error callback, or a function passed to
+#       .finally( / .catch(. Calls inside an OpenAI Agents RunHooks / AgentHooks
+#       on_tool_end method are left out (unknown). One failure-safe call
+#       credits the repo. Test files never count.
+#   repo_otel_labels_attempt_constant: true | false
+#       Fires when every tool-span label passes `attempt` as an integer
+#       literal. One counted attempt credits the repo. Test files never count.
+#   repo_otel_labels_run_end_success_only: true | false
+#       Fires when run-end labels exist and none can record a failure. A call
+#       credits the repo when it sits in an except / catch block, an error
+#       callback or a .catch( handler, passes the literal "error", or passes a
+#       variable reason. A fixed reason in finally does not credit it. Test
+#       files never count.
 #   repo_raw_anthropic_tool_output_in_system: true | false
 #       Fires when a function drives the bare `anthropic` client in a manual
 #       tool-use loop (.messages.create(..., tools=...)) and passes a runtime-

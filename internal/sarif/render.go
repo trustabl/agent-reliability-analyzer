@@ -156,9 +156,11 @@ func resultFromFinding(f models.Finding, ruleIndex *int, useBase bool) Result {
 		r.Locations = []Location{loc}
 	}
 
-	// Kind: "informational" for META results and repo-scoped rule findings
-	// (rule findings without a file location). Default (fail) for regular
-	// located rule findings — emit empty so SARIF's default applies.
+	// Kind: "informational" for META results and rule findings without a file
+	// location (most repo-scoped findings; the otel-labels correctness rules
+	// OBS-009..012 carry the offending call's file and line, so they render as
+	// ordinary located results). Default (fail) for regular located rule
+	// findings — emit empty so SARIF's default applies.
 	if isInformational(f) {
 		r.Kind = "informational"
 	}
@@ -185,8 +187,10 @@ func resultFromFinding(f models.Finding, ruleIndex *int, useBase bool) Result {
 
 // isInformational returns true for findings that should carry SARIF
 // kind="informational". Covers all META results that reach this builder
-// (META-001/004 don't reach it — they're notifications) plus repo-scoped rule
-// findings (which findingFromRule emits with empty FilePath/Line).
+// (META-001/004 don't reach it — they're notifications) plus any rule finding
+// with no file location. Repo-scoped findings carry a location only when the
+// rule's evidence lookup supplies one (the otel-labels correctness rules
+// OBS-009..012); otherwise findingFromRule emits an empty FilePath/Line.
 func isInformational(f models.Finding) bool {
 	if len(f.RuleID) >= 4 && f.RuleID[:4] == "META" {
 		return true
