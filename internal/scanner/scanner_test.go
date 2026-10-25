@@ -4,9 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -1442,5 +1444,254 @@ agent = Agent(name="travel-booker")
 				t.Errorf("agent-reliability-otel-labels findings: got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// The facts the OBS-006..012 rules read are published in the report, so a
+// finding can be checked against them. Not folded into ScanID.
+func TestScan_ReportsOtelLabels(t *testing.T) {
+	dir := t.TempDir()
+	src := `from agent_reliability_otel_labels import Run, mark_run_end
+
+
+def run_agent(root):
+    run = Run()
+    run.mark_start(root)
+    mark_run_end(root, exit_reason="final_answer")
+`
+	if err := os.WriteFile(filepath.Join(dir, "agent.py"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scanner.Run: %v", err)
+	}
+	kinds := map[models.OtelLabelsSignalKind]bool{}
+	for _, s := range res.OtelLabels {
+		kinds[s.Kind] = true
+	}
+	for _, k := range []models.OtelLabelsSignalKind{
+		models.OtelLabelsImport, models.OtelLabelsRunConstruct,
+		models.OtelLabelsRunStart, models.OtelLabelsRunEnd,
+	} {
+		if !kinds[k] {
+			t.Errorf("report has no %q signal: %+v", k, res.OtelLabels)
+		}
+	}
+}
+
+// otelCorrectnessSrc builds an instrumented, fully labelled agent and lets a
+// case swap one part for a broken version.
+func otelCorrectnessSrc(moduleRun, runDecl, attempt, tool, runEnd string) string {
+	return `from agents import Agent, function_tool
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from agent_reliability_otel_labels import Run, canonical_fp, mark_run_end, mark_tool_span
+
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+` + moduleRun + `
+
+@function_tool
+def search_flights(origin: str) -> str:
+    """Search flights from an airport."""
+    return origin
+
+
+agent = Agent(name="travel-booker", tools=[search_flights])
+
+
+def run_agent(args):
+` + runDecl + `
+    attempts = {}
+    with tracer.start_as_current_span("invoke_agent") as root:
+        run.mark_start(root)
+        try:
+            with tracer.start_as_current_span("execute_tool") as span:
+                key = canonical_fp(args)
+                attempts[key] = attempts.get(key, 0) + 1
+` + strings.ReplaceAll(tool, "ATTEMPT", attempt) + `
+` + runEnd
+}
+
+const (
+	otelGoodRun     = "    run = Run()"
+	otelGoodAttempt = "attempts[key]"
+	otelGoodTool    = `                result = None
+                try:
+                    result = search_flights(args)
+                finally:
+                    mark_tool_span(span, args=args, result=result, attempt=ATTEMPT,
+                                   step_index=run.next_step(), run_id=run.run_id)`
+	otelUnsafeTool = `                result = search_flights(args)
+                mark_tool_span(span, args=args, result=result, attempt=ATTEMPT,
+                               step_index=run.next_step(), run_id=run.run_id)`
+	otelGoodRunEnd = `            mark_run_end(root, exit_reason="final_answer")
+        except Exception:
+            mark_run_end(root, exit_reason="error")
+            raise
+`
+	otelSuccessOnlyRunEnd = `            mark_run_end(root, exit_reason="final_answer")
+        finally:
+            pass
+`
+)
+
+func TestScan_OtelLabelsCorrectness(t *testing.T) {
+	cases := []struct {
+		name     string
+		src      string
+		testFile string
+		want     []string
+		wantLine string // a line of src the single finding must point at
+	}{
+		{"correct labelling", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelGoodRunEnd), "", nil, ""},
+		{"shared module-scope Run", otelCorrectnessSrc("RUN = Run()\n", "    run = RUN", otelGoodAttempt, otelGoodTool, otelGoodRunEnd), "", []string{"OBS-009"}, "RUN = Run()"},
+		{"label skipped on failure", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelUnsafeTool, otelGoodRunEnd), "", []string{"OBS-010"}, "mark_tool_span(span"},
+		{"constant attempt", otelCorrectnessSrc("", otelGoodRun, "1", otelGoodTool, otelGoodRunEnd), "", []string{"OBS-011"}, "mark_tool_span(span"},
+		{"run end on success only", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelSuccessOnlyRunEnd), "", []string{"OBS-012"}, `mark_run_end(root, exit_reason="final_answer")`},
+		{"misuse only in a test file", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelGoodRunEnd),
+			`from agent_reliability_otel_labels import Run, mark_tool_span
+
+RUN = Run()
+
+
+def test_label(span):
+    mark_tool_span(span, args={}, result=None, attempt=1)
+`, nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			manifest := "[project]\nname = \"f\"\ndependencies = [\"openai-agents\", \"opentelemetry-sdk\", \"agent-reliability-otel-labels\"]\n"
+			files := map[string]string{"pyproject.toml": manifest, "agent.py": tc.src}
+			if tc.testFile != "" {
+				files["tests/test_agent.py"] = tc.testFile
+			}
+			for name, body := range files {
+				p := filepath.Join(dir, name)
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scanner.Run: %v", err)
+			}
+			var got []string
+			var hit models.Finding
+			for _, f := range res.Findings {
+				switch f.RuleID {
+				case "OBS-006", "OBS-007", "OBS-008", "OBS-009", "OBS-010", "OBS-011", "OBS-012":
+					got = append(got, f.RuleID)
+					hit = f
+				}
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("otel-labels findings: got %v, want %v", got, tc.want)
+			}
+			if tc.wantLine == "" {
+				return
+			}
+			wantLine := 0
+			for i, line := range strings.Split(tc.src, "\n") {
+				if strings.Contains(line, tc.wantLine) {
+					wantLine = i + 1
+					break
+				}
+			}
+			if hit.FilePath != "agent.py" || hit.StartLine != wantLine {
+				t.Errorf("finding at %s:%d, want agent.py:%d", hit.FilePath, hit.StartLine, wantLine)
+			}
+		})
+	}
+}
+
+// Forge tells a coding model how to write the labels and scan judges the
+// result. The code in forge's label blocks must not trip the rules that judge
+// it. Go blocks are out of scope (the Go binding is not inspected).
+func TestScan_ForgeLabelBlocksPassOtelLabelsRules(t *testing.T) {
+	fence := regexp.MustCompile("(?s)```(python|typescript)\n(.*?)```")
+	paths, _ := filepath.Glob("../forge/tracingtext/*_labels.md")
+	recipes, _ := filepath.Glob("../forge/tracingtext/recipes/*_labels.md")
+	blocks := map[string][]string{}
+	for _, p := range append(paths, recipes...) {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range fence.FindAllStringSubmatch(string(raw), -1) {
+			blocks[m[1]] = append(blocks[m[1]], m[2])
+		}
+	}
+	setups := []struct {
+		lang, ext, manifestName, manifest, setup string
+	}{
+		{"python", ".py", "pyproject.toml",
+			"[project]\nname = \"f\"\ndependencies = [\"openai-agents\", \"opentelemetry-sdk\", \"agent-reliability-otel-labels\"]\n",
+			`from agents import Agent
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+agent = Agent(name="travel-booker")
+`},
+		{"typescript", ".ts", "package.json",
+			`{"name": "f", "dependencies": {"@openai/agents": "*", "@opentelemetry/sdk-node": "*", "@trustabl/agent-reliability-otel-labels": "*"}}`,
+			`import { NodeSDK } from "@opentelemetry/sdk-node";
+import { Agent } from "@openai/agents";
+
+const sdk = new NodeSDK({});
+sdk.start();
+export const agent = new Agent({ name: "travel-booker" });
+`},
+	}
+	for _, s := range setups {
+		if len(blocks[s.lang]) == 0 {
+			t.Fatalf("no %s label blocks found under internal/forge/tracingtext", s.lang)
+		}
+		// One repo per block: scanning them together would let one correct
+		// block mask a bad one (a run_end here crediting a missing one there).
+		for i, b := range blocks[s.lang] {
+			t.Run(fmt.Sprintf("%s/%d", s.lang, i), func(t *testing.T) {
+				dir := t.TempDir()
+				write := func(name, body string) {
+					if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				write(s.manifestName, s.manifest)
+				write("tracing_setup"+s.ext, s.setup)
+				write("labels"+s.ext, b)
+				res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+				if err != nil {
+					t.Fatalf("scanner.Run: %v", err)
+				}
+				// Anchors, so the check cannot pass vacuously: tracing is
+				// initialized and the block was read as labelling code.
+				var initialized bool
+				for _, o := range res.Observability {
+					if o.Kind == models.ObsSignalInit {
+						initialized = true
+					}
+				}
+				kinds := map[models.OtelLabelsSignalKind]bool{}
+				for _, l := range res.OtelLabels {
+					kinds[l.Kind] = true
+				}
+				if !initialized || !kinds[models.OtelLabelsToolSpan] || !kinds[models.OtelLabelsRunEnd] {
+					t.Fatalf("anchors missing: initialized=%v kinds=%v\n%s", initialized, kinds, b)
+				}
+				for _, f := range res.Findings {
+					if strings.HasPrefix(f.RuleID, "OBS-0") && f.RuleID >= "OBS-006" && f.RuleID <= "OBS-012" {
+						t.Errorf("forge's own %s label block %d trips %s at %s:%d\n%s", s.lang, i, f.RuleID, f.FilePath, f.StartLine, b)
+					}
+				}
+			})
+		}
 	}
 }
