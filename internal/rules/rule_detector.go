@@ -124,7 +124,7 @@ func (d repoRuleDetector) Applies(p models.RepoProfile, inv models.RepoInventory
 			continue
 		}
 		// "raw_llm_sdk" is likewise not an SDK; the rule's own predicate gates.
-		if k == "raw_llm_sdk" {
+		if k == "raw_llm_sdk" || k == "agent_config" {
 			return true
 		}
 		// The repo-scope applies_to tokens are category labels, which equal
@@ -153,7 +153,38 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 	if s := otelLabelsEvidence(d.rule.Match, inv); s != nil {
 		return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, s.File, s.StartLine, s.EndLine, "")}
 	}
-	return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, "", 0, 0, "")}
+	file, line := configHitLocation(d.rule.Match, inv.ProjectConfig)
+	return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, file, line, line, "")}
+}
+
+// configHitLocation attributes an agent_config repo finding to the first
+// (path-sorted) config file behind the predicate that matched, so the finding
+// carries a file/line and pathclass can tag a vendored fixture as test-origin.
+// Every other repo rule returns "", 0 — their facts have no single site.
+func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) {
+	var hits []models.ConfigHit
+	switch {
+	case m.RepoProjectMCPAutoenable != nil:
+		hits = pc.MCPAutoEnable
+	case m.RepoProjectHookRunsUntrustedCmd != nil:
+		hits = pc.RiskyHooks
+	case m.RepoWorkspaceEnvOverridesTrust != nil:
+		hits = pc.TrustOverrideEnv
+	case m.RepoEditorAgentAutoApprove != nil:
+		hits = pc.EditorAutoApprove
+	case m.RepoMCPConfigLaunchesLocalCommand != nil:
+		hits = pc.LocalMCPLaunch
+	case m.RepoCodexHookRunsRepoCommand != nil:
+		hits = pc.CodexRiskyHooks
+	case m.RepoAgentsMdHasHiddenText != nil:
+		hits = pc.HiddenAgentText
+	case m.RepoHarnessGuidanceHasHiddenText != nil:
+		hits = pc.HiddenHarnessText
+	}
+	if len(hits) == 0 {
+		return "", 0
+	}
+	return hits[0].FilePath, hits[0].Line
 }
 
 // otelLabelsEvidence returns the offending call for a rule that asserts one of
@@ -352,6 +383,9 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 		// raw_llm_sdk has no SDK enum entry (bare anthropic/openai client usage is
 		// not an agent framework); its rules gate on their own predicates.
 		"raw_llm_sdk": true,
+		// agent_config (pre-trust harness config) is not an SDK either: the files
+		// it reads exist with no SDK code in the repo. Predicates do the gating.
+		"agent_config": true,
 	}
 	for _, sdk := range sdks {
 		switch sdk {

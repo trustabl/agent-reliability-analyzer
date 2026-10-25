@@ -6,6 +6,153 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- The `Harness files:` line in the scan summary no longer says that no rule judges
+  those files. It now says what is checked: Codex hooks for risky commands and
+  harness guidance files for hidden text, with OpenCode plugins and agents not
+  judged.
+
+## [0.1.15] - 2026-10-20
+
+Rule schema 23 -> 26 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 340 to 343 rules (AGCFG-008, AGCFG-009 and AGCFG-010; none removed). The
+exit code and CLI flags are unchanged. `ScanID` changes, as with every schema
+bump, because it folds the engine's supported schema version. **Overall scores
+can fall on repositories that keep skills under `.agents/`** (see Changed).
+The rules pack already carries AGCFG-008, AGCFG-009 and AGCFG-010. Engines older
+than 0.1.15 skip them and report a degraded scan ("rules skipped") until they are
+upgraded.
+
+### Added
+
+- **Codex and OpenCode harness files are now inventoried.** The file
+  walk enters `.agents/` and `.opencode/`, so a skill at
+  `.agents/skills/<name>/SKILL.md` is found like one under `skills/` or
+  `.claude/skills/`. `.codex/hooks.json` is tagged `codex_hooks`,
+  `.opencode/plugin(s)/*.{ts,js,mjs}` is tagged `opencode_plugin` and
+  `.opencode/agent(s)/*.md` is tagged `opencode_agent`. The scan summary gains a
+  `Harness files:` line. **No rule judges these files yet**, so an empty
+  findings list over them is not a pass. A bare `plugin/` or `sub_agents/`
+  directory outside `.opencode/` is deliberately not labelled. No schema change.
+
+- **Codex project hooks (rule schema 23 -> 24).** New repo-scope predicate
+  `repo_codex_hook_runs_repo_command` and rule **AGCFG-008** (medium) flag a
+  committed `.codex/hooks.json` hook whose `command` or `commandWindows` runs a
+  repo script (including the documented `$(git rev-parse --show-toplevel)/...`
+  form), a network or inline-execution primitive, or a credential path. It is a
+  separate rule from AGCFG-005 because Codex skips a project hook until the user
+  reviews and trusts it, so the "runs before trust" claim does not apply. Codex
+  hooks never feed AGCFG-005. `mcp_tool`, `prompt` and `agent` handlers carry no
+  shell command and are skipped. Plugin `hooks/hooks.json` and inline `[hooks]`
+  tables in `config.toml` are not read yet. **Release order:** this engine first,
+  then the rules pack; a rule that needs a new predicate is skipped on an older
+  engine.
+
+- **Hidden text in `AGENTS.md` (rule schema 24 -> 25).** New repo-scope predicate
+  `repo_agents_md_has_hidden_text` and rule **AGCFG-009** (medium) flag an
+  `AGENTS.md` that contains zero-width characters, Unicode Tags-block characters
+  or bidirectional overrides, which can hide an instruction from a reviewer while
+  the model still reads it. It reuses the same character checks as the skill
+  injection markers and judges no wording. A leading byte order mark, emoji or
+  non-ASCII letters joined by a zero-width joiner or non-joiner, and
+  subdivision-flag emoji are not flagged; right-to-left prose that uses
+  bidirectional controls is, and is a known false positive. The hidden text is
+  never echoed. `CLAUDE.md` is not read yet. **Release order:** this engine
+  first, then the rules pack.
+
+- **The staged OpenCode harness layout is inventoried.** A directory holding a
+  `systemprompt.md` and a `guardrails.md` side by side is recognised as a staged
+  harness tree, the layout the Harness² adaptation framework writes for its
+  OpenCode executor. Its `systemprompt.md`, `guardrails.md`, `LongTermMEMORY.md`
+  and `tool_descriptions/*.md` are tagged `harness_guidance`, `plugin/*.{ts,js,mjs}`
+  is tagged `opencode_plugin` and `sub_agents/<name>/AGENT.md` is tagged
+  `opencode_agent`, and the `Harness files:` line counts them. The pair is the
+  signature: a lone `guardrails.md` or a bare `plugin/` directory is not labelled.
+  **No rule judges these files yet**, so a clean result over them is not a pass.
+  No schema change.
+
+- **Hidden text in staged harness guidance files (rule schema 25 -> 26).** New
+  repo-scope predicate `repo_harness_guidance_has_hidden_text` and rule
+  **AGCFG-010** (medium) apply the AGCFG-009 character test (zero-width
+  characters, Unicode Tags-block characters, bidirectional overrides, with the same
+  exemptions) to the `harness_guidance` files of a staged OpenCode harness tree.
+  It is a separate predicate and rule, so AGCFG-009 keeps its AGENTS.md-only
+  meaning. The hidden text is never echoed. **Release order:** this engine first,
+  then the rules pack.
+
+### Changed
+
+- **Scores can fall on repositories that keep skills under `.agents/`.** Those
+  skills were never read before, so they now add findings and are scored. On
+  one large open-source repository with 18 such skills, 54 findings were added
+  (none removed) and the overall score fell by about six points, from 95.9% to
+  89.7%. Tool and agent counts did not change. `ScanID` changes, as with any
+  engine change. Repositories without `.agents/` or `.opencode/` are unaffected.
+
+## [0.1.14] - 2026-10-16
+
+Rule schema 18 → 23 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 298 to 339 rules. Nothing in this release changes scoring, the exit code,
+or an existing CLI flag. `ScanID` changes, as with every schema bump, because
+it folds the engine's supported schema version.
+
+### Added
+
+- **Pre-trust agent config (schema 23).** A new unconditionally loaded
+  `agent_config` category (AGCFG-004..007, MCPCFG-002) with five repo-scope
+  predicates backed by `RepoInventory.ProjectConfig`. The walk now enters
+  `.gemini/`, `.vscode/`, `.cursor/` and `.codex/`. Env files are read for key
+  names only; no value is stored, logged or printed.
+- **In-memory LangGraph checkpointer on a server path (schema 22).** LC-116
+  flags a graph compiled with `MemorySaver` / `InMemorySaver` and run from a
+  FastAPI, Flask, Celery or Dramatiq entrypoint. New predicates
+  `agent_checkpointer_in_memory` and `agent_server_reachable`; run-call
+  discovery gains a LangGraph anchor.
+- **Server entrypoint discovery.** `RepoInventory.Entrypoints` (also
+  `ScanResult.entrypoints`) records Python FastAPI / Flask routes and Celery /
+  Dramatiq tasks, and stamps run calls reachable from one.
+- **agent-reliability-otel-labels checks (schema 21).** OBS-006..008, a ladder
+  over whether an instrumented agent uses the labels library, gated on
+  `repo_observability_initialized`. Import aliases are followed and
+  hand-written `trustabl.*` label keys are credited.
+- **HTTPS-only fetch checks (schema 20).** 14 rules (CSDK-024/025, OAI-032/033,
+  MCP-031/032, ADK-022/023, LC-026/027, CREW-015, PYD-015, AG2-022, VAI-021)
+  over the new `has_unpinned_scheme_url_call` predicate, one per SSRF rule.
+- **Reliability gaps (schema 19).** LC-114 (StateGraph with no checkpointer),
+  LC-115 (side-effecting `add_node` function with no `interrupt(`), OAI-120 /
+  PYD-108 (no wall-clock timeout on the run call), and the new `raw_llm_sdk`
+  category, RAW-001 / RAW-002 (tool output fed into a dynamic system prompt in a
+  raw `anthropic` / `openai` tool loop). ADK-113 / AG2-021 extend the
+  wall-clock-timeout check to Google ADK and AutoGen.
+- **More agent and side-effect rules.** CSDK-114, CREW-111, LC-113, VAI-020,
+  and side-effect bounds Batch 2 (CREW-014, ADK-020/021, AG2-020, VAI-019,
+  CSDK-023). The SSRF rules now credit a visible allow-list.
+- **`trustabl forge` Runtime Tracing section.** The generated SKILL.md tells the
+  coding model how to emit OpenTelemetry spans and add agent-reliability-otel-labels
+  labels, with recipes for ten frameworks across Python, TypeScript and Go. New
+  `--lang` flag. `TemplateVersion` is 3, so `forge check` reports older
+  generated skills as outdated.
+- **Distribution.** A scoped skill payload for the wshobson/agents marketplace
+  (skill, manifest, disclosure README, licence; no hooks, MCP manifest or
+  scripts), and catalogue metadata, a skill card and evals for `trustabl-scan`.
+
+### Fixed
+
+- Process-wide instrumentation calls (`logfire.instrument_pydantic_ai()`,
+  `Agent.instrument_all()`, `LangChainInstrumentor().instrument()`) now count as
+  observability initialization, so PYD-107 / LC-112 stop firing on a repo that
+  followed their own fix text. Opik is recognized as a vendor.
+- VAI-020 credits the Vercel AI native `timeout` option, and the wall-clock
+  timeout check credits `abort_signal` / `cancellation_token`.
+- `forge` filters rule sections by the languages each SDK is used in, and the
+  ADK Go tracing recipe no longer shares one run across runs.
+
+## [0.1.13] - 2026-09-30
+
+The entries below shipped across 0.1.3 through 0.1.13; this section was not
+split per release at the time.
+
 ### Changed
 
 - **Test-path findings are excluded from scoring and the exit-code gate by

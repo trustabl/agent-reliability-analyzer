@@ -122,3 +122,30 @@ func TestLoadFor_LoadsRawLLMSDKPackUnconditionally(t *testing.T) {
 		t.Fatalf("want RAW-001 only with no SDK detected, got %v", fired)
 	}
 }
+
+// agent_config (pre-trust harness config) reads files that exist with no SDK
+// code in the repo, so it loads unconditionally and the finding is attributed
+// to the first offending config file rather than left file-less.
+func TestLoadFor_LoadsAgentConfigPackUnconditionally(t *testing.T) {
+	reg, _, err := rules.LoadFor(fixtureFS(t), nil)
+	if err != nil {
+		t.Fatalf("LoadFor: %v", err)
+	}
+	inv := models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{
+		EditorAutoApprove: []models.ConfigHit{
+			{Location: models.Location{FilePath: ".vscode/settings.json", Line: 4, EndLine: 4}, Reason: "x"},
+		},
+	}}
+	var got []models.Finding
+	for _, f := range reg.Run(models.RepoProfile{}, inv, nil, nil) {
+		if f.RuleID == "AGCFG-007" {
+			got = append(got, f)
+		}
+	}
+	if len(got) != 1 {
+		t.Fatalf("want AGCFG-007 once with no SDK detected, got %d", len(got))
+	}
+	if got[0].FilePath != ".vscode/settings.json" || got[0].StartLine != 4 {
+		t.Fatalf("finding location = %s:%d, want .vscode/settings.json:4", got[0].FilePath, got[0].StartLine)
+	}
+}

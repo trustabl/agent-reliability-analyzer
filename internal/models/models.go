@@ -86,6 +86,10 @@ const (
 	// is NOT an agent-framework SDK and has no SDK enum entry. Like observability
 	// it loads unconditionally; each rule's own predicate does the real gating.
 	CategoryRawLLMSDK DetectorCategory = "raw_llm_sdk"
+	// CategoryAgentConfig covers harness config committed to a repo that runs
+	// code or grants authority before the user trusts the folder (AGCFG-*,
+	// MCPCFG-*). Not an SDK; loads unconditionally, the rule predicate gates.
+	CategoryAgentConfig DetectorCategory = "agent_config"
 )
 
 // display order. It is the single source of truth for category membership:
@@ -97,7 +101,7 @@ var AllCategories = []DetectorCategory{
 	CategoryClaudeSDK, CategoryOpenAISDK, CategoryOpenShell, CategoryGoogleADK,
 	CategoryMCP, CategoryLangChain, CategoryCrewAI, CategoryPydanticAI,
 	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill, CategoryObservability,
-	CategoryRawLLMSDK,
+	CategoryRawLLMSDK, CategoryAgentConfig,
 }
 
 // ValidCategory reports whether c is a category this build recognizes. The rule
@@ -228,6 +232,22 @@ const (
 	ComponentClaudeAgentDefinition ComponentKind = "claude_agent_definition" // Python file using AgentDefinition
 	ComponentSkill                 ComponentKind = "skill"
 	ComponentPluginManifest        ComponentKind = "plugin_manifest"
+	// Harness config files that can run code or grant authority before the user
+	// trusts the folder (category agent_config). Surfaced as components so the
+	// pre-auth surface is visible; the facts are parsed by DiscoverProjectConfig.
+	ComponentGeminiSettings ComponentKind = "gemini_settings" // .gemini/settings.json
+	ComponentEditorSettings ComponentKind = "editor_settings" // .vscode/settings.json, .cursor/*.json (not mcp.json)
+	ComponentAgentEnvFile   ComponentKind = "agent_env_file"  // .gemini/.env, root .env (key names only are ever read)
+	ComponentCodexConfig    ComponentKind = "codex_config"    // .codex/config.toml
+	// Codex and OpenCode harness files: inventoried so a scan reports them, but no
+	// rule judges their content yet (an empty findings list on them is not a pass).
+	ComponentCodexHooks     ComponentKind = "codex_hooks"     // .codex/hooks.json
+	ComponentOpencodePlugin ComponentKind = "opencode_plugin" // .opencode/plugin(s)/*.{ts,js,mjs}
+	ComponentOpencodeAgent  ComponentKind = "opencode_agent"  // .opencode/agent(s)/*.md, sub_agents/<name>/AGENT.md in a staged tree
+	// Guidance files of a staged OpenCode harness tree (systemprompt.md,
+	// guardrails.md, LongTermMEMORY.md, tool_descriptions/*.md), recognised only
+	// when systemprompt.md and guardrails.md sit side by side.
+	ComponentHarnessGuidance ComponentKind = "harness_guidance"
 )
 
 // AgentComponent is a non-tool agent-related artifact discovered during
@@ -313,19 +333,22 @@ type ProjectedScores struct {
 
 // ScanManifest is what the Normalizer produces.
 type ScanManifest struct {
-	RepoRoot               string           `json:"repo_root"`
-	IsRemote               bool             `json:"is_remote"`
-	RemoteURL              string           `json:"remote_url,omitempty"`
-	PythonFiles            []string         `json:"python_files"`
-	TypeScriptFiles        []string         `json:"typescript_files,omitempty"`
-	JavaScriptFiles        []string         `json:"javascript_files,omitempty"`
-	GoFiles                []string         `json:"go_files,omitempty"`
-	CSharpFiles            []string         `json:"csharp_files,omitempty"`
-	PHPFiles               []string         `json:"php_files,omitempty"`
-	RustFiles              []string         `json:"rust_files,omitempty"`
-	YAMLFiles              []string         `json:"yaml_files"`
-	JSONFiles              []string         `json:"json_files,omitempty"`
-	MarkdownFiles          []string         `json:"markdown_files,omitempty"`
+	RepoRoot        string   `json:"repo_root"`
+	IsRemote        bool     `json:"is_remote"`
+	RemoteURL       string   `json:"remote_url,omitempty"`
+	PythonFiles     []string `json:"python_files"`
+	TypeScriptFiles []string `json:"typescript_files,omitempty"`
+	JavaScriptFiles []string `json:"javascript_files,omitempty"`
+	GoFiles         []string `json:"go_files,omitempty"`
+	CSharpFiles     []string `json:"csharp_files,omitempty"`
+	PHPFiles        []string `json:"php_files,omitempty"`
+	RustFiles       []string `json:"rust_files,omitempty"`
+	YAMLFiles       []string `json:"yaml_files"`
+	JSONFiles       []string `json:"json_files,omitempty"`
+	MarkdownFiles   []string `json:"markdown_files,omitempty"`
+	// ConfigFiles holds the non-source harness config files the walk keeps:
+	// any file named .env and .codex/config.toml. Sorted.
+	ConfigFiles            []string         `json:"config_files,omitempty"`
 	HasClaudeSDKDependency bool             `json:"has_claude_sdk_dependency"`
 	HasOpenShellArtifact   bool             `json:"has_openshell_artifact"`
 	Components             []AgentComponent `json:"components,omitempty"`
@@ -566,6 +589,7 @@ type RepoInventory struct {
 	PluginManifests    []PluginManifest        `json:"plugin_manifests"`
 	ClaudeSettings     []ClaudeSettings        `json:"claude_settings"`
 	ClaudeAgentOptions []ClaudeAgentOptionsDef `json:"claude_agent_options,omitempty"`
+	ProjectConfig      ProjectConfigFacts      `json:"project_config,omitempty"`
 	AgentRunCalls      []AgentRunCallDef       `json:"agent_run_calls,omitempty"`
 	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	SDKsDetected       []SDK                   `json:"sdks_detected"`

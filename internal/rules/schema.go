@@ -141,6 +141,17 @@ type MatchExpr struct {
 	RepoClaudeOptionsDisallowedToolsMissing *bool                       `yaml:"repo_claude_options_disallowed_tools_missing,omitempty"`
 	RepoClaudeOptionsModeWithoutKwarg       *ClaudeOptionsModeKwargExpr `yaml:"repo_claude_options_mode_without_kwarg,omitempty"`
 
+	// Pre-trust project-config predicates (category agent_config). Each is true
+	// when the corresponding ProjectConfigFacts slice is non-empty.
+	RepoProjectMCPAutoenable          *bool `yaml:"repo_project_mcp_autoenable,omitempty"`
+	RepoProjectHookRunsUntrustedCmd   *bool `yaml:"repo_project_hook_runs_untrusted_command,omitempty"`
+	RepoWorkspaceEnvOverridesTrust    *bool `yaml:"repo_workspace_env_overrides_trust,omitempty"`
+	RepoEditorAgentAutoApprove        *bool `yaml:"repo_editor_agent_auto_approve,omitempty"`
+	RepoMCPConfigLaunchesLocalCommand *bool `yaml:"repo_mcp_config_launches_local_command,omitempty"`
+	RepoCodexHookRunsRepoCommand      *bool `yaml:"repo_codex_hook_runs_repo_command,omitempty"`
+	RepoAgentsMdHasHiddenText         *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
+	RepoHarnessGuidanceHasHiddenText  *bool `yaml:"repo_harness_guidance_has_hidden_text,omitempty"`
+
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
 	RepoHasObservability             *bool    `yaml:"repo_has_observability,omitempty"`

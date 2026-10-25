@@ -1,0 +1,106 @@
+policy:
+  id: agent_config_preauth_execution
+  name: Pre-trust agent configuration
+  category: agent_config
+  description: >
+    Repo-scoped rules for harness configuration committed to a repository that
+    runs code or grants authority the moment the folder is opened, before the
+    user has trusted it. Cloning or opening the repo is enough; no prompt
+    injection is needed. The pack loads for every scan (the files it reads have
+    no SDK import), so each rule's own predicate does the gating. Fire once per
+    scan, attributed to the first offending config file.
+
+rules:
+  - id: AGCFG-004
+    title: Project settings auto-enable the repo's own MCP servers
+    severity: critical
+    confidence: 0.9
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_project_mcp_autoenable: true
+    explanation: >
+      A committed .claude/settings.json sets enableAllProjectMcpServers to true
+      or lists servers in enabledMcpjsonServers. Both skip the approval prompt
+      Claude Code shows before it starts a server declared in the repo's own
+      .mcp.json. Anyone who clones the repo and opens it therefore launches the
+      commands that file names with the developer's full privileges, before
+      reading or trusting anything. The repo author, or anyone who can land a
+      change to .mcp.json, controls what runs.
+    fix: >
+      Remove enableAllProjectMcpServers and enabledMcpjsonServers from the
+      committed settings so each project server needs an explicit per-user
+      approval. If a server is genuinely required, approve it in your own
+      user-level settings, not in a file other people clone.
+
+  - id: AGCFG-005
+    title: Project hooks execute repo-controlled commands
+    severity: critical
+    confidence: 0.7
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_project_hook_runs_untrusted_command: true
+    explanation: >
+      A committed project settings file (.claude/settings.json or
+      .gemini/settings.json) declares a hook whose command runs a script from
+      the repo, uses a network or inline-execution primitive such as curl,
+      wget, nc, bash -c, sh -c or python -c, or reads $HOME/.ssh, .aws or .env.
+      Hooks run automatically on agent events with the developer's privileges,
+      so whoever controls the repo controls what executes, and a hook that
+      reaches the network or credential files is an exfiltration path that
+      needs no model cooperation.
+    fix: >
+      Remove the hook from committed settings, or replace it with a call to a
+      vetted binary on the user's PATH that takes no repo-controlled script or
+      inline code. Keep personal hooks in user-level settings. If a project
+      hook is unavoidable, review it as you would a CI step and never let it
+      read credential files or call out to the network.
+
+  - id: AGCFG-006
+    title: Workspace env file overrides sandbox, proxy, endpoint or trust
+    severity: critical
+    confidence: 0.8
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_workspace_env_overrides_trust: true
+    explanation: >
+      A workspace config file sets a key that redirects how the agent harness
+      sandboxes or reaches the network: GEMINI_SANDBOX*, a *_PROXY_COMMAND, in
+      .gemini/.env or .codex/config.toml also *_BASE_URL (including
+      ANTHROPIC_BASE_URL and OPENAI_BASE_URL), NODE_OPTIONS or LD_PRELOAD, or
+      Codex is set to sandbox_mode = "danger-full-access" or approval_policy =
+      "never". Harnesses read these files on open, so a proxy command runs and
+      an endpoint override captures prompts and credentials before the user is
+      asked anything. Only key names are inspected; values are never read.
+    fix: >
+      Delete the override from the committed file. Set sandbox and proxy
+      options in user-level configuration or the process environment, never in
+      a workspace file that travels with the repo. Keep sandbox_mode at its
+      restrictive default and approval_policy on a mode that prompts.
+
+  - id: AGCFG-007
+    title: Editor settings enable agent auto-approve
+    severity: high
+    confidence: 0.85
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_editor_agent_auto_approve: true
+    explanation: >
+      A committed .vscode/settings.json or .cursor/ settings file sets an
+      auto-approve option to true, such as chat.tools.autoApprove or
+      chat.tools.global.autoApprove, or any *autoApprove* or *yolo* flag. With
+      that set, the editor's agent runs tool calls and terminal commands with
+      no confirmation, and the setting applies to everyone who opens the
+      workspace. A single injected instruction then becomes an unprompted
+      action on the developer's machine.
+    fix: >
+      Remove the auto-approve flag from workspace settings so tool calls
+      prompt. If you want it for yourself, set it in your user-level settings,
+      and scope any terminal auto-approval to a short, explicit allow-list.

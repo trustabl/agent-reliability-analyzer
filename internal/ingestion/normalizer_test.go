@@ -526,6 +526,66 @@ func TestDetectObsDeps_NoObservabilityDeclared(t *testing.T) {
 	}
 }
 
+func TestNormalize_PreTrustHarnessConfigClassified(t *testing.T) {
+	dir := t.TempDir()
+	for rel, body := range map[string]string{
+		".mcp.json":                `{"mcpServers":{}}`,
+		".cursor/mcp.json":         `{"mcpServers":{}}`,
+		".vscode/mcp.json":         `{"servers":{}}`,
+		".vscode/settings.json":    `{}`,
+		".cursor/settings.json":    `{}`,
+		".gemini/settings.json":    `{}`,
+		".gemini/.env":             "FAKE_KEY=fake-value\n",
+		".env":                     "FAKE_KEY=fake-value\n",
+		"sub/.env":                 "FAKE_KEY=fake-value\n",
+		".codex/config.toml":       "sandbox_mode = \"workspace-write\"\n",
+		"pyproject.toml":           "[project]\n",
+		".github/workflows/ci.yml": "name: ci\n",
+	} {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := Normalize(&Source{RootPath: dir}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]models.ComponentKind{}
+	for _, c := range m.Components {
+		got[c.Path] = c.Kind
+	}
+	want := map[string]models.ComponentKind{
+		".mcp.json":             models.ComponentMCPConfig,
+		".cursor/mcp.json":      models.ComponentMCPConfig,
+		".vscode/mcp.json":      models.ComponentMCPConfig,
+		".vscode/settings.json": models.ComponentEditorSettings,
+		".cursor/settings.json": models.ComponentEditorSettings,
+		".gemini/settings.json": models.ComponentGeminiSettings,
+		".gemini/.env":          models.ComponentAgentEnvFile,
+		".env":                  models.ComponentAgentEnvFile,
+		".codex/config.toml":    models.ComponentCodexConfig,
+	}
+	for p, k := range want {
+		if got[p] != k {
+			t.Errorf("%s: got kind %q, want %q", p, got[p], k)
+		}
+	}
+	// Only root and .gemini env files are components; a nested .env is kept in
+	// ConfigFiles but not classified, and pyproject.toml is not kept at all.
+	if _, ok := got["sub/.env"]; ok {
+		t.Error("sub/.env must not be classified as an agent env file")
+	}
+	for _, f := range m.ConfigFiles {
+		if f == "pyproject.toml" {
+			t.Error("pyproject.toml must not be in ConfigFiles")
+		}
+	}
+}
+
 // agent-reliability-otel-labels is declared under a different name per ecosystem; each manifest
 // that declares it is recorded once, sorted by manifest name.
 func TestDetectOtelLabelsDeps_FindsPythonAndNpmNames(t *testing.T) {

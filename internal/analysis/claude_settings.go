@@ -106,6 +106,9 @@ func DiscoverClaudeSettings(manifest models.ScanManifest) []models.ClaudeSetting
 			HasEnvBlock:     rawPresent(parsed.Env),
 			HasHooks:        rawPresent(parsed.Hooks),
 			HasSandboxBlock: rawPresent(parsed.Sandbox),
+
+			EnableAllProjectMcpServers: parsed.EnableAllProjectMcpServers,
+			EnabledMcpjsonServers:      parsed.EnabledMcpjsonServers,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].FilePath < out[j].FilePath })
@@ -117,6 +120,9 @@ type claudeSettingsFile struct {
 	Env         json.RawMessage `json:"env"`
 	Hooks       json.RawMessage `json:"hooks"`
 	Sandbox     json.RawMessage `json:"sandbox"`
+
+	EnableAllProjectMcpServers *bool    `json:"enableAllProjectMcpServers"`
+	EnabledMcpjsonServers      []string `json:"enabledMcpjsonServers"`
 }
 
 type permissionsRaw struct {

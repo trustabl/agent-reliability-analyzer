@@ -349,7 +349,7 @@ var appliesToByScope = map[models.Scope][]string{
 		"claude_sdk", "openai_agents", "openshell", "mcp", "google_adk",
 		"langchain",
 		"crewai", "pydantic_ai", "vercel_ai", "autogen",
-		"raw_llm_sdk",
+		"raw_llm_sdk", "agent_config",
 	},
 	models.ScopeSubagent: {"claude_subagent"},
 	models.ScopeSkill:    {"claude_skill"},

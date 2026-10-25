@@ -1,0 +1,34 @@
+policy:
+  id: agent_config_mcp_client_config
+  name: Project MCP client configuration
+  category: agent_config
+  description: >
+    Repo-scoped rules for MCP client configuration committed to a repository
+    (.mcp.json, .cursor/mcp.json, .vscode/mcp.json, .gemini/settings.json,
+    .codex/config.toml). This is the consuming side of MCP, distinct from the
+    mcp pack, which audits servers a repo implements. Loads for every scan.
+
+rules:
+  - id: MCPCFG-002
+    title: Project MCP config launches a local command
+    severity: high
+    confidence: 0.7
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_mcp_config_launches_local_command: true
+    explanation: >
+      A committed MCP client config starts a server by running an interpreter
+      (bash, sh, cmd, powershell, python or node) on a script from the repo or
+      with inline code (-c), or by running a command path inside the repo. The
+      client executes that command with the developer's privileges when the
+      server is enabled, so the repo's author controls what runs on every
+      machine that opens it. A server pinned to a published package or reached
+      over an authenticated remote URL is not flagged.
+    fix: >
+      Point the server at a published, version-pinned package (for example an
+      npx or uvx invocation with an exact version) or at an authenticated
+      remote URL instead of a script in the repo. If a local server is needed,
+      document how each developer installs and registers it in their own
+      user-level config rather than committing the launch command.

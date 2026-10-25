@@ -28,13 +28,14 @@ It runs entirely on your machine: no cloud scanner, no account, no code upload, 
 
 <h3 align="center">Trustabl Partners</h3>
 <p align="center">
-  <sub>One engine, nine front doors. Install it from the catalogue you already use.</sub>
+  <sub>One engine, ten front doors. Install it from the catalogue you already use.</sub>
 </p>
 
 <table align="center">
   <tr>
     <td align="center" width="200">
-      <a href="https://registry.modelcontextprotocol.io/?q=trustabl"><b>MCP Registry</b></a><br>
+      <a href="https://registry.modelcontextprotocol.io/?q=trustabl"><b>MCP Registry</b></a> &middot;
+      <a href="https://mcprush.com/trustabl"><b>mcprush</b></a><br>
       <sub>Scan from any<br>MCP-aware client</sub>
     </td>
     <td align="center" width="200">
@@ -1122,6 +1123,7 @@ trustabl forge --policy google_adk --lang go
 | `autogen` | AutoGen / AG2 (Python) |
 | `claude_skill` | Claude Code skills (`SKILL.md`) |
 | `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework) |
+| `agent_config` | Harness config committed to a repo that runs code or grants authority before the folder is trusted (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`) |
 | `openshell` | Shell-invocation tools (no rules in the current pack) |
 
 Multiple categories are comma-separated: `--policy openai_sdk,mcp`.

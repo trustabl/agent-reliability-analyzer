@@ -33,7 +33,7 @@ policy:
   category: claude_sdk                      # REQUIRED. Inherited by every rule in this file. Allowed:
                                             #   claude_sdk | openai_sdk | openshell | google_adk | mcp |
                                             #   langchain | crewai | pydantic_ai | vercel_ai | autogen | claude_skill |
-                                            #   observability | raw_llm_sdk.
+                                            #   observability | raw_llm_sdk | agent_config.
 
   description: >                            # REQUIRED. Multi-line ok. Describe the policy's intent.
     Rules that govern outbound network calls made from inside agent tools.
@@ -109,7 +109,8 @@ rules:
                                             #   repo  — fires once per scan. applies_to accepts:
                                             #           claude_sdk, openai_agents, google_adk, openshell, mcp,
                                             #           langchain, crewai, pydantic_ai, vercel_ai, autogen,
-                                            #           raw_llm_sdk (bare anthropic/openai client usage).
+                                            #           raw_llm_sdk (bare anthropic/openai client usage),
+                                            #           agent_config (pre-trust harness config; no SDK gate).
                                             # (Authoritative per-scope applies_to set: internal/rules/loader.go
                                             #  appliesToByScope — the lists here are a human summary of it.)
 
@@ -699,6 +700,52 @@ rules:
 #       Same for the bare `openai` client: .chat.completions.create(...,
 #       tools=...) plus a {"role": "system"|"developer", "content": <dynamic,
 #       tainted>} dict (RepoInventory.RawOpenAIToolOutputInSystemMessage).
+#   repo_project_mcp_autoenable: true | false
+#       Pre-trust project config (category agent_config). True when a committed
+#       .claude/settings.json sets enableAllProjectMcpServers: true or a
+#       non-empty enabledMcpjsonServers (ProjectConfigFacts.MCPAutoEnable).
+#       Used by AGCFG-004.
+#   repo_project_hook_runs_untrusted_command: true | false
+#       True when a Claude/Gemini project settings hook command runs a
+#       repo-relative script, a curl/wget/nc/bash -c/python -c primitive, or
+#       references .ssh/.aws/.env (ProjectConfigFacts.RiskyHooks). AGCFG-005.
+#   repo_workspace_env_overrides_trust: true | false
+#       True when .gemini/.env or .codex/config.toml (or, narrowly, a root .env)
+#       carries a sandbox/proxy/endpoint/loader override key, or Codex sets
+#       sandbox_mode = "danger-full-access" / approval_policy = "never". Env
+#       files are read for KEY NAMES only; values are never stored.
+#       (ProjectConfigFacts.TrustOverrideEnv). AGCFG-006.
+#   repo_editor_agent_auto_approve: true | false
+#       True when .vscode/settings.json or .cursor/*.json sets any *autoApprove*
+#       or *yolo* key to boolean true (ProjectConfigFacts.EditorAutoApprove).
+#       AGCFG-007.
+#   repo_mcp_config_launches_local_command: true | false
+#       True when a project MCP config (.mcp.json, .cursor/mcp.json,
+#       .vscode/mcp.json, .gemini/settings.json, .codex/config.toml) starts a
+#       server with an interpreter plus inline code or a repo-relative script,
+#       or a command path inside the repo (ProjectConfigFacts.LocalMCPLaunch).
+#       Published packages and remote URL servers are not flagged. MCPCFG-002.
+#   repo_codex_hook_runs_repo_command: true | false
+#       True when a committed .codex/hooks.json command or commandWindows runs a
+#       repo-relative script (including the documented
+#       "$(git rev-parse --show-toplevel)/..." form), a curl/wget/nc/bash -c/
+#       python -c primitive, or references .ssh/.aws/.env
+#       (ProjectConfigFacts.CodexRiskyHooks). Kept apart from
+#       repo_project_hook_runs_untrusted_command because Codex skips a project
+#       hook until the user reviews and trusts it. AGCFG-008.
+#   repo_agents_md_has_hidden_text: true | false
+#       True when an AGENTS.md (any depth) contains invisible or
+#       direction-overriding characters: zero-width characters, Unicode
+#       Tags-block characters, or bidirectional overrides
+#       (ProjectConfigFacts.HiddenAgentText). Exempts a leading byte order mark,
+#       emoji and non-ASCII letter sequences joined by a zero-width (non-)joiner,
+#       and subdivision-flag emoji. Text is never echoed. AGCFG-009.
+#   repo_harness_guidance_has_hidden_text: true | false
+#       The AGCFG-009 character test over the guidance files of a staged OpenCode
+#       harness tree (systemprompt.md, guardrails.md, LongTermMEMORY.md,
+#       tool_descriptions/*.md; ProjectConfigFacts.HiddenHarnessText). Same
+#       exemptions, text never echoed. AGCFG-010. A separate predicate from
+#       repo_agents_md_has_hidden_text, which keeps its AGENTS.md-only meaning.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads

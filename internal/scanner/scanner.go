@@ -426,6 +426,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.SlashCommands = analysis.DiscoverSlashCommands(profile.Manifest)
 	inventory.PluginManifests = analysis.DiscoverPlugins(profile.Manifest)
 	inventory.ClaudeSettings = analysis.DiscoverClaudeSettings(profile.Manifest)
+	inventory.ProjectConfig = analysis.DiscoverProjectConfig(profile.Manifest, inventory.ClaudeSettings)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
 	// Server-entrypoint fact (Python): must follow DiscoverAgentRunCalls, which

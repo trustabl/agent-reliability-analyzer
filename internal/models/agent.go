@@ -345,6 +345,39 @@ type ClaudeSettings struct {
 	HasEnvBlock     bool              `json:"has_env_block"`
 	HasHooks        bool              `json:"has_hooks"`
 	HasSandboxBlock bool              `json:"has_sandbox_block"`
+	// EnableAllProjectMcpServers is the enableAllProjectMcpServers value (nil =
+	// key absent); EnabledMcpjsonServers is enabledMcpjsonServers. Either one
+	// auto-approves the repo's own .mcp.json servers without a trust prompt.
+	EnableAllProjectMcpServers *bool    `json:"enable_all_project_mcp_servers,omitempty"`
+	EnabledMcpjsonServers      []string `json:"enabled_mcpjson_servers,omitempty"`
+}
+
+// ConfigHit is one pre-trust config finding site. Reason is a short, fixed
+// description built from key NAMES and command text only — never an env value.
+type ConfigHit struct {
+	Location
+	Reason string `json:"reason"`
+}
+
+// ProjectConfigFacts are the typed facts behind the agent_config rules
+// (AGCFG-004..007, MCPCFG-002). Each slice is sorted by path, line, reason.
+type ProjectConfigFacts struct {
+	MCPAutoEnable     []ConfigHit `json:"mcp_auto_enable,omitempty"`     // AGCFG-004
+	RiskyHooks        []ConfigHit `json:"risky_hooks,omitempty"`         // AGCFG-005
+	TrustOverrideEnv  []ConfigHit `json:"trust_override_env,omitempty"`  // AGCFG-006
+	EditorAutoApprove []ConfigHit `json:"editor_auto_approve,omitempty"` // AGCFG-007
+	LocalMCPLaunch    []ConfigHit `json:"local_mcp_launch,omitempty"`    // MCPCFG-002
+	// CodexRiskyHooks is kept apart from RiskyHooks on purpose: Codex skips a
+	// project hook until the user reviews and trusts it, so AGCFG-005's "runs
+	// before trust" claim does not hold for it. AGCFG-008 reads this list.
+	CodexRiskyHooks []ConfigHit `json:"codex_risky_hooks,omitempty"`
+	// HiddenAgentText is invisible or direction-overriding text found in an
+	// agent guidance file (AGENTS.md). AGCFG-009 reads this list.
+	HiddenAgentText []ConfigHit `json:"hidden_agent_text,omitempty"`
+	// HiddenHarnessText is the same check over the guidance files of a staged
+	// OpenCode harness tree (systemprompt.md, guardrails.md, ...). AGCFG-010 reads
+	// this list; AGCFG-009 keeps reading HiddenAgentText only.
+	HiddenHarnessText []ConfigHit `json:"hidden_harness_text,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

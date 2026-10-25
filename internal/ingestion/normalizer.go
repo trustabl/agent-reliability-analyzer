@@ -429,6 +429,11 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 		// dropped from the manifest. Matching the OS-native `path` here was both
 		// case-sensitive and inconsistent with the rel that gets stored.
 		lower := strings.ToLower(rel)
+		// Harness config the pre-trust rules read: any ".env" file and the Codex
+		// project config. Kept narrow on purpose (pyproject.toml etc. are not).
+		if filepath.Base(lower) == ".env" || lower == ".codex/config.toml" || strings.HasSuffix(lower, "/.codex/config.toml") {
+			manifest.ConfigFiles = append(manifest.ConfigFiles, rel)
+		}
 		switch {
 		case strings.HasSuffix(lower, ".py"):
 			manifest.PythonFiles = append(manifest.PythonFiles, rel)
@@ -472,11 +477,74 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 	} {
 		sort.Strings(*fl)
 	}
+	sort.Strings(manifest.ConfigFiles)
 
 	manifest.HasClaudeSDKDependency = detectClaudeSDKDependency(src.RootPath)
 	manifest.HasOpenShellArtifact = detectOpenShellArtifact(manifest.YAMLFiles, src.RootPath)
 	manifest.Components = discoverComponents(src.RootPath, manifest, onFile)
 	return manifest, nil
+}
+
+// stagedHarnessRoots returns the directories ("" for the repo root, otherwise
+// "dir/") that hold a staged OpenCode harness tree: a systemprompt.md and a
+// guardrails.md side by side. Either name alone is too common to label, so the
+// pair is the signature. The result is sorted, longest root last.
+func stagedHarnessRoots(markdown []string) []string {
+	seen := map[string]map[string]bool{}
+	for _, p := range markdown {
+		p = filepath.ToSlash(p)
+		i := strings.LastIndex(p, "/")
+		dir, base := p[:i+1], strings.ToLower(p[i+1:])
+		if base != "systemprompt.md" && base != "guardrails.md" {
+			continue
+		}
+		if seen[dir] == nil {
+			seen[dir] = map[string]bool{}
+		}
+		seen[dir][base] = true
+	}
+	var roots []string
+	for dir, names := range seen {
+		if names["systemprompt.md"] && names["guardrails.md"] {
+			roots = append(roots, dir)
+		}
+	}
+	sort.Slice(roots, func(i, j int) bool {
+		if len(roots[i]) != len(roots[j]) {
+			return len(roots[i]) < len(roots[j])
+		}
+		return roots[i] < roots[j]
+	})
+	return roots
+}
+
+// relativeToHarnessRoot returns p relative to the deepest staged-harness root
+// that contains it.
+func relativeToHarnessRoot(p string, roots []string) (string, bool) {
+	p = filepath.ToSlash(p)
+	for i := len(roots) - 1; i >= 0; i-- {
+		if strings.HasPrefix(p, roots[i]) {
+			return p[len(roots[i]):], true
+		}
+	}
+	return "", false
+}
+
+// inOpencodeDir reports whether p sits directly under .opencode/<one of names>/
+// at any depth of the repo (monorepos nest projects).
+func inOpencodeDir(p string, names ...string) bool {
+	parts := strings.Split(strings.ToLower(filepath.ToSlash(p)), "/")
+	for i := 0; i+2 < len(parts); i++ {
+		if parts[i] != ".opencode" {
+			continue
+		}
+		for _, n := range names {
+			if parts[i+1] == n {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func shouldSkipDir(name string) bool {
@@ -488,6 +556,15 @@ func shouldSkipDir(name string) bool {
 		// Agent-config directories — deliberately descend into them
 		// (.claude/ holds agents/skills/commands/settings; .claude-plugin/
 		// holds plugin.json / marketplace.json).
+		return false
+	case ".gemini", ".vscode", ".cursor", ".codex":
+		// Other harnesses' project config (settings, hooks, MCP, env) that takes
+		// effect when the folder is opened — read by the agent_config rules.
+		return false
+	case ".agents", ".opencode":
+		// Codex keeps project skills under .agents/ and OpenCode keeps plugins and
+		// agents under .opencode/. Skipping them hid those files from the scan, so a
+		// harness scan read as empty.
 		return false
 	}
 	// Skip other dot-prefixed dirs (build caches, editor metadata, etc.).
@@ -574,12 +651,79 @@ func discoverComponents(root string, m models.ScanManifest, onFile func(string))
 		"mcp.json":                   true,
 		"mcp_servers.json":           true,
 		"claude_desktop_config.json": true,
+		".mcp.json":                  true, // Claude Code project-scoped MCP servers
 	}
 	for _, p := range m.JSONFiles {
 		// Case-insensitive: MCP config names are conventionally lowercase, but a
 		// repo on a case-sensitive FS could ship MCP.json / Claude_Desktop_Config.json.
 		if mcpNames[strings.ToLower(filepath.Base(p))] {
 			out = append(out, models.AgentComponent{Kind: models.ComponentMCPConfig, Path: p})
+		}
+	}
+
+	// Pre-trust harness config (agent_config rules): Gemini settings, editor
+	// settings, agent env files, Codex config. Matched by directory + name.
+	for _, p := range m.JSONFiles {
+		dir, base := filepath.ToSlash(filepath.Dir(p)), filepath.Base(p)
+		switch {
+		case base == "settings.json" && (dir == ".gemini" || strings.HasSuffix(dir, "/.gemini")):
+			out = append(out, models.AgentComponent{Kind: models.ComponentGeminiSettings, Path: p})
+		case base == "settings.json" && (dir == ".vscode" || strings.HasSuffix(dir, "/.vscode")),
+			base != "mcp.json" && (dir == ".cursor" || strings.HasSuffix(dir, "/.cursor")):
+			out = append(out, models.AgentComponent{Kind: models.ComponentEditorSettings, Path: p})
+		case base == "hooks.json" && (dir == ".codex" || strings.HasSuffix(dir, "/.codex")):
+			out = append(out, models.AgentComponent{Kind: models.ComponentCodexHooks, Path: p})
+		}
+	}
+
+	// OpenCode plugins and agents. Scoped to .opencode/ on purpose: a bare plugin/
+	// directory is too common to label as agent infrastructure without a real
+	// harness tree to check against.
+	for _, files := range [][]string{m.TypeScriptFiles, m.JavaScriptFiles} {
+		for _, p := range files {
+			if inOpencodeDir(p, "plugin", "plugins") {
+				out = append(out, models.AgentComponent{Kind: models.ComponentOpencodePlugin, Path: p})
+			}
+		}
+	}
+	for _, p := range m.MarkdownFiles {
+		if inOpencodeDir(p, "agent", "agents") {
+			out = append(out, models.AgentComponent{Kind: models.ComponentOpencodeAgent, Path: p})
+		}
+	}
+
+	// A staged OpenCode harness tree: root-level guidance files rather than a
+	// .opencode/ directory. Recognised by its signature, never by one bare name.
+	if roots := stagedHarnessRoots(m.MarkdownFiles); len(roots) > 0 {
+		for _, p := range m.MarkdownFiles {
+			rest, ok := relativeToHarnessRoot(p, roots)
+			if !ok {
+				continue
+			}
+			lower := strings.ToLower(rest)
+			switch {
+			case lower == "systemprompt.md", lower == "guardrails.md", lower == "longtermmemory.md",
+				strings.HasPrefix(lower, "tool_descriptions/"):
+				out = append(out, models.AgentComponent{Kind: models.ComponentHarnessGuidance, Path: p})
+			case strings.HasPrefix(lower, "sub_agents/") && strings.HasSuffix(lower, "/agent.md"):
+				out = append(out, models.AgentComponent{Kind: models.ComponentOpencodeAgent, Path: p})
+			}
+		}
+		for _, files := range [][]string{m.TypeScriptFiles, m.JavaScriptFiles} {
+			for _, p := range files {
+				if rest, ok := relativeToHarnessRoot(p, roots); ok && strings.HasPrefix(strings.ToLower(rest), "plugin/") {
+					out = append(out, models.AgentComponent{Kind: models.ComponentOpencodePlugin, Path: p})
+				}
+			}
+		}
+	}
+	for _, p := range m.ConfigFiles {
+		dir := filepath.ToSlash(filepath.Dir(p))
+		switch {
+		case filepath.Base(p) == ".env" && (p == ".env" || dir == ".gemini" || strings.HasSuffix(dir, "/.gemini")):
+			out = append(out, models.AgentComponent{Kind: models.ComponentAgentEnvFile, Path: p})
+		case filepath.Base(p) == "config.toml":
+			out = append(out, models.AgentComponent{Kind: models.ComponentCodexConfig, Path: p})
 		}
 	}
 

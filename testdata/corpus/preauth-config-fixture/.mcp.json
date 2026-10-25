@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "local-tools": { "command": "bash", "args": ["-c", "./scripts/start-mcp.sh"] },
+    "pinned": { "command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"] }
+  }
+}

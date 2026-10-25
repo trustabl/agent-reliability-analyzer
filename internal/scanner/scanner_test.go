@@ -1247,6 +1247,78 @@ func TestScan_RunCallWallClock_ADKAndAutoGen(t *testing.T) {
 	}
 }
 
+// End to end: the pre-trust fixture holds one offending file per agent_config
+// rule and no SDK code at all. Every rule fires at its own file, and because
+// the fixture lives under testdata/ the findings are tagged test-origin.
+func TestScan_PreTrustConfigFixtureFiresEveryRule(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "preauth-config-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := map[string]string{
+		"AGCFG-004":  ".claude/settings.json",
+		"AGCFG-005":  ".claude/settings.json",
+		"AGCFG-006":  ".codex/config.toml", // first path-sorted hit; .gemini/.env also matches
+		"AGCFG-007":  ".vscode/settings.json",
+		"MCPCFG-002": ".mcp.json",
+	}
+	got := map[string]models.Finding{}
+	for _, f := range res.Findings {
+		got[f.RuleID] = f
+	}
+	for id, file := range want {
+		f, ok := got[id]
+		if !ok {
+			t.Errorf("%s did not fire; fired: %v", id, got)
+			continue
+		}
+		if !strings.HasSuffix(f.FilePath, file) {
+			t.Errorf("%s attributed to %q, want a path ending %q", id, f.FilePath, file)
+		}
+		if f.StartLine < 1 {
+			t.Errorf("%s has no line", id)
+		}
+	}
+	for _, f := range res.Findings {
+		if strings.Contains(f.Explanation+f.Title, "fake-value-not-real") {
+			t.Errorf("%s leaked an env value", f.RuleID)
+		}
+	}
+}
+
+// The "pass" counterpart of the pre-trust fixture: the same five config files
+// rewritten to their safe forms. None of the agent_config rules may fire.
+func TestScan_PreTrustConfigSafeVariantsStaySilent(t *testing.T) {
+	dir := t.TempDir()
+	for rel, body := range map[string]string{
+		".claude/settings.json": `{"permissions": {"allow": ["Read"]}}`,
+		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "remote": {"url": "https://mcp.example.invalid/sse"}}}`,
+		".gemini/.env":          "PLAIN_SETTING=fake-value-not-real\n",
+		".env":                  "OPENAI_BASE_URL=https://api.example.invalid\nNODE_OPTIONS=--max-old-space-size=4096\n",
+		".vscode/settings.json": "{\n  // fixture only\n  \"chat.tools.autoApprove\": false,\n}\n",
+		".codex/config.toml":    "sandbox_mode = \"workspace-write\"\napproval_policy = \"on-request\"\n",
+	} {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "AGCFG-") || strings.HasPrefix(f.RuleID, "MCPCFG-") {
+			t.Errorf("%s fired on a safe variant (%s:%d)", f.RuleID, f.FilePath, f.StartLine)
+		}
+	}
+}
+
 // TestScan_OtelLabelsLadder runs real Python source through the full scanner
 // for the OBS-006..008 ladder. The per-rule cases in policies_test.go feed
 // hand-built inventories, so they cannot catch recon or discovery failing to

@@ -464,6 +464,30 @@ remote repos). `ingestion.Recon` then walks the source tree and returns a
 
 Recon must stay cheap. No tree-sitter parses here.
 
+**Pre-trust harness config (category `agent_config`, `schema_version` 23).**
+The walk descends into `.gemini/`, `.vscode/`, `.cursor/` and `.codex/` (it
+skips every other dot-directory), keeps any file named `.env` and
+`.codex/config.toml` in `ScanManifest.ConfigFiles`, and classifies the results as
+components: `mcp_config` (now also `.mcp.json`, `.cursor/mcp.json`,
+`.vscode/mcp.json`), `gemini_settings`, `editor_settings` (`.vscode/settings.json`,
+`.cursor/*.json` other than `mcp.json`), `agent_env_file` (root `.env`,
+`.gemini/.env`) and `codex_config`. `analysis.DiscoverProjectConfig`
+([project_config.go](internal/analysis/project_config.go)) turns them into
+`RepoInventory.ProjectConfig` (`ProjectConfigFacts`): sorted, deduped
+`ConfigHit{file, line, reason}` lists behind five repo-scope predicates
+(`repo_project_mcp_autoenable`, `repo_project_hook_runs_untrusted_command`,
+`repo_workspace_env_overrides_trust`, `repo_editor_agent_auto_approve`,
+`repo_mcp_config_launches_local_command`) read by AGCFG-004..007 and MCPCFG-002.
+Settings files are parsed as JSONC (comments and trailing commas stripped), Codex
+as TOML. **Env files are read for key names only**: a value is never stored,
+logged or placed in a finding. Root `.env` uses a narrow key set
+(`GEMINI_SANDBOX*`, `*_PROXY_COMMAND`); `.gemini/.env` and `.codex/config.toml`
+also check `*_BASE_URL`, `NODE_OPTIONS` and `LD_PRELOAD`. Unlike other repo-scope
+rules, an `agent_config` finding is attributed to the first path-sorted hit's
+file and line (`configHitLocation` in `rule_detector.go`), so `pathclass` can tag
+a vendored fixture as test-origin. The pack loads unconditionally and the
+`agent_config` `applies_to` token skips the SDK gate.
+
 ### Step 2 — Inventory ([internal/analysis/](internal/analysis/))
 
 For each language recon cleared, do the AST work and produce a `RepoInventory`:

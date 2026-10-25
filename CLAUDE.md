@@ -350,6 +350,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
+> (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
+> (`analysis.DiscoverProjectConfig`). The walk now enters `.gemini/`, `.vscode/`, `.cursor/`, `.codex/`. Env files are read for **key
+> names only** — never store, log or print a value. The IDs deliberately sit outside the SDK-prefix `NNN`/`1NN`/`2NN` convention (they
+> are cross-harness config rules; AGCFG-001..003 and MCPCFG-001 are unused). Rulebook docs live under `docs/Policy/agent_config/`. Built in parallel with LC-116, which took
+> 21 → 22, so this batch takes 23. The fixture holds **339** rules (334 + 5; re-derive, do not trust this figure).
+>
 > **In-memory LangGraph checkpointer on a server path (2026-10-08, `schema_version` 21 → 22):** one rule, **LC-116** (high, 0.6, agent
 > scope, Python; `applies_to: [langchain_state_graph, langchain_agent]`): a graph whose `checkpointer=` is `MemorySaver` / `InMemorySaver`
 > and that is run from a FastAPI / Flask / Celery / Dramatiq entrypoint, silent when the repo ships a `langgraph.json`. New predicates
@@ -380,8 +387,8 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > OTel GenAI semconv is still Development with renamed keys), and **rank 4** (run-level correlation id — session / `group_id` — needs a
 > run-call kwarg predicate, tracked with the HTTP-entrypoint design ticket). See `COVERAGE.md`.
 >
-> **agent-reliability-otel-labels correctness, Batch 1 (2026-10-08, `schema_version` 22 → 23):** the fixture now holds **338** rules
-> (334 + 4; re-derive, do not trust this figure). Built in parallel with LC-116, which took 21 → 22 first, so this batch takes 23. **OBS-009** (shared `Run`) / **OBS-010** (tool span labelled only on success) /
+> **agent-reliability-otel-labels correctness, Batch 1 (2026-10-08, `schema_version` 26 → 27):** the fixture now holds **347** rules
+> (343 + 4; re-derive, do not trust this figure). Built in parallel with LC-116 (21 → 22) and the `agent_config` pack (22 → 26), which merged first, so this batch takes 27. **OBS-009** (shared `Run`) / **OBS-010** (tool span labelled only on success) /
 > **OBS-011** (constant `attempt`) / **OBS-012** (run end only on success) read new facts on `OtelLabelsSignal`; test-file
 > signals never count and findings point at the offending call. Hand-written `trustabl.*` keys now credit OBS-006..008.
 > Spec: `.superpowers/specs/2026-10-04-otel-labels-correctness-rules-design.md`. Not built: the handoff rule (spec O7),
