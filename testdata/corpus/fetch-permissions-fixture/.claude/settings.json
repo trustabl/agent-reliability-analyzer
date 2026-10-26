@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "WebFetch(domain:huggingface.co)",
+      "WebFetch(domain:docs.example.invalid)"
+    ]
+  }
+}

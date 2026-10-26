@@ -8,6 +8,20 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Added
 
+- **AGCFG-011: a committed settings file pre-approves fetches from a host that
+  serves user-published content.** A WebFetch rule in `permissions.allow` of
+  `.claude/settings.json` or `settings.local.json` that covers github.com,
+  gist.github.com, raw.githubusercontent.com, an arbitrary `*.github.io` site,
+  huggingface.co, bitbucket.org, pastebin.com or an arbitrary `*.readthedocs.io`
+  site fires a high-severity, 0.7-confidence repo-scope finding, attributed to the
+  entry's line. A bare `WebFetch` and `WebFetch(domain:*)` count. Matching follows
+  the documented `domain:` rules (case-insensitive, `*.` for subdomains, `*` within
+  one label), and a deny or ask rule in the same `.claude/` folder cancels the
+  finding. User and managed settings are not read. New predicate
+  `repo_settings_preapprove_user_content_fetch`, backed by
+  `ProjectConfigFacts.UserContentFetchAllow`. Rule schema 30 -> 31
+  (provisional: whichever open branch merges later renumbers). The rule ships in a new pack file,
+  `agent_config/fetch_permissions.yaml`.
 - **Unpinned MCP package launches (rule schema 29 -> 30, provisional).** New
   repo-scope predicate `repo_mcp_config_launches_unpinned_package` and rule
   **MCPCFG-003** (high, 0.7) flag a committed MCP client config

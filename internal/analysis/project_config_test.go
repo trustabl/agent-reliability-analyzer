@@ -291,3 +291,93 @@ func TestProjectConfig_Deterministic(t *testing.T) {
 		}
 	}
 }
+
+func TestProjectConfig_UserContentFetchAllow(t *testing.T) {
+	settings := func(allow, deny, ask string) string {
+		return `{"permissions": {"allow": [` + allow + `], "deny": [` + deny + `], "ask": [` + ask + `]}}`
+	}
+	cases := []struct {
+		name, body string
+		want       int
+	}{
+		{"github.com", settings(`"WebFetch(domain:github.com)"`, "", ""), 1},
+		{"gist", settings(`"WebFetch(domain:gist.github.com)"`, "", ""), 1},
+		{"raw", settings(`"WebFetch(domain:raw.githubusercontent.com)"`, "", ""), 1},
+		{"github.io wildcard", settings(`"WebFetch(domain:*.github.io)"`, "", ""), 1},
+		{"huggingface", settings(`"WebFetch(domain:huggingface.co)"`, "", ""), 1},
+		{"bitbucket", settings(`"WebFetch(domain:bitbucket.org)"`, "", ""), 1},
+		{"pastebin", settings(`"WebFetch(domain:pastebin.com)"`, "", ""), 1},
+		{"readthedocs wildcard", settings(`"WebFetch(domain:*.readthedocs.io)"`, "", ""), 1},
+		{"case and trailing dot", settings(`"WebFetch(domain:GitHub.com.)"`, "", ""), 1},
+		{"subdomain wildcard over githubusercontent", settings(`"WebFetch(domain:*.githubusercontent.com)"`, "", ""), 1},
+		{"subdomain wildcard over github.com", settings(`"WebFetch(domain:*.github.com)"`, "", ""), 1},
+		{"trailing wildcard", settings(`"WebFetch(domain:github.*)"`, "", ""), 1},
+		{"domain star", settings(`"WebFetch(domain:*)"`, "", ""), 1},
+		{"bare WebFetch", settings(`"WebFetch"`, "", ""), 1},
+		{"domain star, deny covers one host", settings(`"WebFetch(domain:*)"`, `"WebFetch(domain:github.com)"`, ""), 1},
+		{"two entries", settings(`"WebFetch(domain:github.com)", "WebFetch(domain:pastebin.com)"`, "", ""), 2},
+
+		{"non-listed host", settings(`"WebFetch(domain:docs.example.invalid)"`, "", ""), 0},
+		{"single account site", settings(`"WebFetch(domain:alice.github.io)"`, "", ""), 0},
+		{"wildcard excludes apex", settings(`"WebFetch(domain:*.huggingface.co)"`, "", ""), 0},
+		{"wildcard stays inside a label", settings(`"WebFetch(domain:example.*)"`, "", ""), 0},
+		{"empty parens", settings(`"WebFetch()"`, "", ""), 0},
+		{"url specifier", settings(`"WebFetch(url:https://github.com/x)"`, "", ""), 0},
+		{"WebSearch", settings(`"WebSearch"`, "", ""), 0},
+		{"Bash curl", settings(`"Bash(curl https://pastebin.com/x)"`, "", ""), 0},
+		{"allow and deny same entry", settings(`"WebFetch(domain:github.com)"`, `"WebFetch(domain:github.com)"`, ""), 0},
+		{"ask covers by wildcard", settings(`"WebFetch(domain:gist.github.com)"`, "", `"WebFetch(domain:*.github.com)"`), 0},
+		{"bare deny cancels domain star", settings(`"WebFetch(domain:*)"`, `"WebFetch"`, ""), 0},
+		{"allow list under another key", `{"other": {"allow": ["WebFetch"]}}`, 0},
+		{"malformed json", `{"permissions": {"allow": ["WebFetch(domain:github.com)",]}}`, 0},
+	}
+	for _, c := range cases {
+		f := discoverWith(t, ".claude/settings.json", c.body, models.ComponentClaudeSettings)
+		if got := len(f.UserContentFetchAllow); got != c.want {
+			t.Errorf("%s: got %d hits, want %d (%+v)", c.name, got, c.want, f.UserContentFetchAllow)
+		}
+	}
+}
+
+func TestProjectConfig_UserContentFetchAllowCancelScope(t *testing.T) {
+	kinds := func(files map[string]string) map[string]models.ComponentKind {
+		k := map[string]models.ComponentKind{}
+		for rel := range files {
+			k[rel] = models.ComponentClaudeSettings
+		}
+		return k
+	}
+	run := func(files map[string]string) models.ProjectConfigFacts {
+		m := projectConfigFixture(t, files, kinds(files))
+		return DiscoverProjectConfig(m, DiscoverClaudeSettings(m))
+	}
+
+	// A deny in settings.local.json cancels an allow in settings.json: same folder.
+	same := run(map[string]string{
+		".claude/settings.json":       `{"permissions": {"allow": ["WebFetch(domain:github.com)"]}}`,
+		".claude/settings.local.json": `{"permissions": {"deny": ["WebFetch(domain:github.com)"]}}`,
+	})
+	if len(same.UserContentFetchAllow) != 0 {
+		t.Errorf("same-folder deny did not cancel the allow: %+v", same.UserContentFetchAllow)
+	}
+
+	// A deny in a nested .claude/ folder does not cancel the root allow.
+	nested := run(map[string]string{
+		".claude/settings.json":     `{"permissions": {"allow": ["WebFetch(domain:github.com)"]}}`,
+		"pkg/.claude/settings.json": `{"permissions": {"deny": ["WebFetch(domain:github.com)"]}}`,
+	})
+	if len(nested.UserContentFetchAllow) != 1 || nested.UserContentFetchAllow[0].FilePath != ".claude/settings.json" {
+		t.Errorf("nested deny must not cancel the root allow: %+v", nested.UserContentFetchAllow)
+	}
+}
+
+func TestProjectConfig_UserContentFetchAllowLine(t *testing.T) {
+	body := "{\n  \"permissions\": {\n    \"allow\": [\n      \"Read\",\n      \"WebFetch(domain:huggingface.co)\"\n    ]\n  }\n}\n"
+	f := discoverWith(t, ".claude/settings.json", body, models.ComponentClaudeSettings)
+	if len(f.UserContentFetchAllow) != 1 || f.UserContentFetchAllow[0].Line != 5 {
+		t.Fatalf("want one hit on line 5, got %+v", f.UserContentFetchAllow)
+	}
+	if !strings.Contains(f.UserContentFetchAllow[0].Reason, "huggingface.co") {
+		t.Errorf("reason should name the host: %q", f.UserContentFetchAllow[0].Reason)
+	}
+}

@@ -27,6 +27,7 @@ These were authored in this repository as test fixtures.
 | `ci-agent-workflow-fixture/` | Synthetic GitHub Actions workflows (`.github/workflows/issue-triage.yml`, `gated-comment.yml`) exercising the CI-001..CI-005 rules. Shapes follow the AGS-07 rule table; secret names are placeholders |
 | `subagent-tools-inherit/` | Synthetic `.claude/agents/*.md` subagents (no `tools`, a listed `tools`, an empty `tools: []`, a `disallowedTools` denylist), a non-canonical `agents/planner.md`, and an in-code `AgentDefinition` with no `tools`, exercising CSDK-115. All values are fake placeholders |
 | `mcp-unpinned-launch-fixture/` | Synthetic MCP client configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`) pairing unpinned and pinned package launches (npx, bunx, uvx, pipx, docker) for MCPCFG-003. All package and image names are fake placeholders |
+| `fetch-permissions-fixture/` | Synthetic `.claude/settings.json` and `settings.local.json` pairing WebFetch allow rules for user-content hosts with a non-listed host, a single-account site and a same-folder deny, for AGCFG-011. All values are placeholders |
 
 ## Vendored from `openai/openai-agents-python` (MIT)
 

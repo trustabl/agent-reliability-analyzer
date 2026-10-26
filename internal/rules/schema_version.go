@@ -35,4 +35,7 @@ package rules
 //
 // Schema 30 adds the repo_mcp_config_launches_unpinned_package predicate
 // (repo scope).
-const SupportedSchemaVersion = 30
+//
+// Schema 31 adds the repo_settings_preapprove_user_content_fetch predicate
+// (repo scope).
+const SupportedSchemaVersion = 31

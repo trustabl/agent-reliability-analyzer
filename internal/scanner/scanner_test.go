@@ -1348,12 +1348,43 @@ func TestScan_UnpinnedMCPLaunchFixture(t *testing.T) {
 	}
 }
 
+// End to end: the fetch-permissions fixture pairs user-content allow rules with a
+// non-listed host, a single-account site, a nested folder and a same-folder deny.
+// AGCFG-011 fires once, on the first path-sorted file, at the huggingface entry,
+// and no other agent_config rule fires.
+func TestScan_FetchPermissionsFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "fetch-permissions-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var fetch []models.Finding
+	for _, f := range res.Findings {
+		switch {
+		case f.RuleID == "AGCFG-011":
+			fetch = append(fetch, f)
+		case strings.HasPrefix(f.RuleID, "AGCFG-") || strings.HasPrefix(f.RuleID, "MCPCFG-"):
+			t.Errorf("%s fired on the fetch-permissions fixture (%s:%d)", f.RuleID, f.FilePath, f.StartLine)
+		}
+		if strings.Contains(f.Explanation+f.Title, "huggingface") && f.RuleID != "AGCFG-011" {
+			t.Errorf("%s echoed a fixture entry", f.RuleID)
+		}
+	}
+	if len(fetch) != 1 {
+		t.Fatalf("AGCFG-011 fired %d times, want once; findings: %v", len(fetch), res.Findings)
+	}
+	if !strings.HasSuffix(fetch[0].FilePath, ".claude/settings.json") || fetch[0].StartLine != 5 {
+		t.Errorf("AGCFG-011 attributed to %s:%d, want .claude/settings.json:5", fetch[0].FilePath, fetch[0].StartLine)
+	}
+}
+
 // The "pass" counterpart of the pre-trust fixture: the same five config files
 // rewritten to their safe forms. None of the agent_config rules may fire.
 func TestScan_PreTrustConfigSafeVariantsStaySilent(t *testing.T) {
 	dir := t.TempDir()
 	for rel, body := range map[string]string{
-		".claude/settings.json": `{"permissions": {"allow": ["Read"]}}`,
+		".claude/settings.json": `{"permissions": {"allow": ["Read", "WebFetch(domain:docs.example.invalid)"]}}`,
 		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "pinned-uv": {"command": "uvx", "args": ["example-mcp-git@0.6.2"]}, "pinned-img": {"command": "docker", "args": ["run", "-i", "--rm", "ghcr.io/example/mcp-server@sha256:` + strings.Repeat("0", 64) + `"]}, "remote": {"url": "https://mcp.example.invalid/sse"}}}`,
 		".gemini/.env":          "PLAIN_SETTING=fake-value-not-real\n",
 		".env":                  "OPENAI_BASE_URL=https://api.example.invalid\nNODE_OPTIONS=--max-old-space-size=4096\n",

@@ -162,6 +162,8 @@ type MatchExpr struct {
 	RepoCIAgentUnrestrictedShell           *bool `yaml:"repo_ci_agent_unrestricted_shell,omitempty"`
 	RepoCIAgentNoEgressRestriction         *bool `yaml:"repo_ci_agent_no_egress_restriction,omitempty"`
 
+	RepoSettingsPreapproveUserContentFetch *bool `yaml:"repo_settings_preapprove_user_content_fetch,omitempty"`
+
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
 	RepoHasObservability             *bool    `yaml:"repo_has_observability,omitempty"`

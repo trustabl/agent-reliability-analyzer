@@ -3892,6 +3892,24 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{UnrestrictedShell: []models.CIHit{{Reason: "x"}}}},
 		false},
 
+	// ─── AGCFG-011 pre-approved fetch from user-content hosts (repo-scoped, no SDK gate) ──
+	{"AGCFG-011 fires on a user-content fetch allow fact with no SDK detected", "AGCFG-011",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{UserContentFetchAllow: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGCFG-011 silent when no user-content fetch fact exists", "AGCFG-011",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGCFG-011 silent when only an MCP auto-enable fact is present", "AGCFG-011",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{MCPAutoEnable: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	{"AGCFG-004 silent when only a user-content fetch fact is present", "AGCFG-004",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{UserContentFetchAllow: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+
 	// ─── CSDK-202 session permission_mode bypass (repo-scoped) ───────────────
 	{"CSDK-202 fires when ClaudeAgentOptions permission_mode is bypassPermissions with no deny-list", "CSDK-202",
 		models.RepoProfile{},

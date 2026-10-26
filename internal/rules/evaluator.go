@@ -196,6 +196,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoHarnessGuidanceHasHiddenText != nil && (len(inv.ProjectConfig.HiddenHarnessText) > 0) != *e.RepoHarnessGuidanceHasHiddenText {
 		return false
 	}
+	if e.RepoSettingsPreapproveUserContentFetch != nil && (len(inv.ProjectConfig.UserContentFetchAllow) > 0) != *e.RepoSettingsPreapproveUserContentFetch {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -595,6 +598,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_ci_agent_checkout_persists_credentials":  true,
 		"repo_ci_agent_unrestricted_shell":             true,
 		"repo_ci_agent_no_egress_restriction":          true,
+		"repo_settings_preapprove_user_content_fetch":  true,
 	},
 }
 
@@ -698,6 +702,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoCIAgentCheckoutPersistsCredentials != nil, "repo_ci_agent_checkout_persists_credentials")
 	add(e.RepoCIAgentUnrestrictedShell != nil, "repo_ci_agent_unrestricted_shell")
 	add(e.RepoCIAgentNoEgressRestriction != nil, "repo_ci_agent_no_egress_restriction")
+	add(e.RepoSettingsPreapproveUserContentFetch != nil, "repo_settings_preapprove_user_content_fetch")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")

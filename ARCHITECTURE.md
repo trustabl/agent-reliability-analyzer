@@ -483,6 +483,11 @@ and MCPCFG-003. The two MCP predicates never judge the same server entry:
 `classifyMCPLaunch` (repo-controlled code) and `classifyMCPPin` (a runner on a
 registry package or image with no exact version or digest) accept disjoint
 commands.
+`repo_settings_preapprove_user_content_fetch` (AGCFG-011) reads the already-parsed
+`permissions.allow/deny/ask` rules (`DiscoverClaudeSettings`): `userContentFetchHits`
+matches each WebFetch allow entry against a fixed host list using the documented
+`domain:` rules (`webFetchCovers`), and a deny or ask rule in the same `.claude/`
+folder cancels it.
 Settings files are parsed as JSONC (comments and trailing commas stripped), Codex
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set
