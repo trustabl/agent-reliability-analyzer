@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/github_banner.jpg" alt="Trustabl — open source AI agent reliability" width="100%">
+  <img src="assets/github_banner.jpg" alt="Agent Reliability Analyzer by Trustabl — open-source AI agent reliability scanner" width="100%">
 </p>
 
 <p align="center">
@@ -17,18 +17,21 @@
   <a href="README.md#output-modes"><img src="https://img.shields.io/badge/output-human%20%7C%20JSON%20%7C%20SARIF-blue" alt="Output formats"></a>
 </p>
 
-# Trustabl — find and fix AI agent reliability gaps
+# Agent Reliability Analyzer — find and fix AI agent reliability gaps
 
-**Find what will make your AI agent fail — then fix it with one command.**
+**Agent Reliability Analyzer** is Trustabl's open-source, deterministic scanner that finds and fixes agent reliability failures in AI agent code before it reaches production. Find what will make your AI agent fail — then fix it with one command.
 
 Deterministic static analysis for agent code, across nine SDKs and seven languages.
 It runs entirely on your machine: no cloud scanner, no account, no code upload, no LLM.
 
+If Agent Reliability Analyzer saves you a production incident, please ⭐ the repo — it helps other teams find it.
+
 ---
 
-<h3 align="center">Trustabl Partners</h3>
+<a id="trustabl-partners"></a>
+<h2 align="center">Trustabl partners — install from the catalogue you already use</h2>
 <p align="center">
-  <sub>One engine, ten front doors. Install it from the catalogue you already use.</sub>
+  <sub>One agent reliability engine, ten front doors.</sub>
 </p>
 
 <table align="center">
@@ -123,10 +126,11 @@ matrix.
 Scanning needs no key and no network. Applying fixes uses your own Anthropic,
 OpenAI, or Google key.
 
-## What a scan looks like
+<a id="what-a-scan-looks-like"></a>
+## What an agent reliability scan looks like
 
-Real output, scanning an agent repo that ships a Claude Agent SDK client, an MCP
-server, a subagent, and two skills:
+Real output from an agent reliability scan of a repo that ships a Claude Agent SDK
+client, an MCP server, a subagent, and two skills:
 
 ```console
 $ trustabl scan .
@@ -170,7 +174,7 @@ Three things worth noticing:
 
 ## AI agents pass their demo and fail in production
 
-The failures are rarely exotic. They are the same handful of gaps, over and over:
+Most agent reliability failures are not exotic. They are the same handful of gaps, over and over:
 
 - An agent holding shell tools with **no input guardrails**
 - A tool making an HTTP call with **no timeout**, hanging the whole run
@@ -195,11 +199,12 @@ the scan works*, then covers building and running it. For the full
 implementation reference see [ARCHITECTURE.md](ARCHITECTURE.md); for the
 at-a-glance SDK coverage matrix see [COVERAGE.md](COVERAGE.md).
 
-## What it analyzes — the five-scope model
+<a id="what-it-analyzes--the-five-scope-model"></a>
+## What it analyzes — agent reliability across five scopes
 
-Trustabl does not treat a repository as one undifferentiated blob. Every
-rule is classified into exactly one of five scopes, and each scope receives
-a different typed input:
+Agent Reliability Analyzer does not treat a repository as one undifferentiated
+blob. Every agent reliability rule is classified into exactly one of five scopes,
+and each scope receives a different typed input:
 
 - **`tool`** — fires once per tool definition. Input: a `ToolDef` (a
   `@function_tool` / `@tool` / `@claude_tool` function, a Claude TS
@@ -270,7 +275,7 @@ TypeScript agent.
 
 ## How it reasons — the scanning pipeline
 
-trustabl scans in four steps. Each step's output is the typed input to the
+Agent Reliability Analyzer (the `trustabl` CLI) scans in four steps. Each step's output is the typed input to the
 next, with no shared state between runs — and the inventory the early
 steps build is what makes policy selection *data-driven* rather than
 statically configured.
@@ -446,8 +451,9 @@ The rule schema's `language:` field gates per-language rule sets.
 
 ## What it produces
 
-Trustabl is a detect-and-report tool: it does **not** write or modify any
-files in the scanned repo. Each run produces a `ScanResult` containing:
+`trustabl scan` is detect-and-report: it does **not** write or modify any
+files in the scanned repo. Fixes are applied only when you opt in with
+`trustabl enrich --apply`. Each run produces a `ScanResult` containing:
 
 - **Findings** — one per rule hit, each with `severity`, `confidence`,
   an `explanation`, a `suggested_fix`, and the location it fired at
@@ -490,7 +496,7 @@ files in the scanned repo. Each run produces a `ScanResult` containing:
 The human format honestly separates the three things people commonly
 conflate:
 
-```
+```text
 Tool definitions:   2  (custom tools with function bodies — scored below)
 Agent tool grants: 14  (tool names the agent may call — audited by agent-scope rules)
 Hosted tools:       1  (...)
@@ -651,6 +657,8 @@ unknown SDK would be.
 
 ## Install
 
+Install Agent Reliability Analyzer (the `trustabl` CLI) with Homebrew, Scoop, Docker or a direct download.
+
 ### Homebrew (macOS, Linux)
 
 ```sh
@@ -684,6 +692,77 @@ gh attestation verify <archive> --repo trustabl/agent-reliability-analyzer
 > old slug (`--repo trustabl/trustabl`): the Sigstore certificate binds the
 > repository path as it was at signing time, so the recorded identity cannot
 > follow a rename.
+
+### Claude Code plugin
+
+The plugin installs two skills (`trustabl-scan` and `trustabl-enrich`), a
+`SessionStart` hook, and a bundled MCP server — and auto-downloads the pinned
+CLI binary on first session (no `sudo`, nothing outside Claude Code's plugin
+data directory touched).
+
+Install from within a Claude Code session using the `/plugin` slash command:
+
+```text
+/plugin install trustabl@claude-plugins-official
+```
+
+Then reload to activate:
+
+```text
+/reload-plugins
+```
+
+After installation, the `mcp__trustabl__scan` tool is available for direct
+calls, the `trustabl-scan` and `trustabl-enrich` skills appear in the skill
+picker, and the hook confirms the binary is ready at session start. Uninstall
+with `/plugin uninstall trustabl`.
+
+### Claude Code agent
+
+A standalone subagent (`trustabl`) runs the full scan → enrich → review →
+apply pipeline interactively. It does not require the plugin — just the
+`trustabl` binary already on your PATH. Copy the agent file into your project
+or home config:
+
+```sh
+# Project-level (scoped to this repo)
+curl -fsSL https://raw.githubusercontent.com/trustabl/agent-reliability-analyzer/main/agents/trustabl.md \
+  -o .claude/agents/trustabl.md
+
+# Global (available in every project)
+curl -fsSL https://raw.githubusercontent.com/trustabl/agent-reliability-analyzer/main/agents/trustabl.md \
+  -o ~/.claude/agents/trustabl.md
+```
+
+Once installed, invoke it via `@trustabl` in Claude Code or select it from
+the subagent picker. It will ask which directory to scan, run `trustabl scan`
+and `trustabl enrich`, then walk you through each proposed fix as a diff.
+
+The enrich step requires an Anthropic API key. Set it before invoking the agent:
+
+```sh
+export ANTHROPIC_API_KEY=sk-ant-api03-...   # or: trustabl llm key set
+```
+
+### From source
+
+Requires `CGO_ENABLED=1` because the AST parsers use tree-sitter
+(Python + TypeScript + TSX bindings), which is a C library:
+
+```bash
+# macOS / Linux
+CGO_ENABLED=1 go build -o trustabl ./cmd/trustabl
+
+# Cross-compile: pick a C toolchain for the target. zig is the easiest.
+CGO_ENABLED=1 CC="zig cc -target x86_64-linux-gnu" \
+  GOOS=linux GOARCH=amd64 go build -o trustabl-linux ./cmd/trustabl
+```
+
+This is the cost of using tree-sitter for accurate AST parsing. If a
+single-binary, no-CGO distribution becomes a hard requirement later, the
+swap target is `github.com/go-python/gpython` for Python (with lower
+fidelity on modern Python); TypeScript would need a separate replacement.
+
 ## Attestation
 ### Test Usage Example
 #### **Prerequisite and setup:**
@@ -798,77 +877,8 @@ Keyless signing (no private key to manage) is the default in CI, where an ambien
 OIDC identity exists; it also records the signature in the public Rekor
 transparency log. See [Use](#use) for the full command surface.
 
-### Claude Code plugin
-
-The plugin installs two skills (`trustabl-scan` and `trustabl-enrich`), a
-`SessionStart` hook, and a bundled MCP server — and auto-downloads the pinned
-CLI binary on first session (no `sudo`, nothing outside Claude Code's plugin
-data directory touched).
-
-Install from within a Claude Code session using the `/plugin` slash command:
-
-```
-/plugin install trustabl@claude-plugins-official
-```
-
-Then reload to activate:
-
-```
-/reload-plugins
-```
-
-After installation, the `mcp__trustabl__scan` tool is available for direct
-calls, the `trustabl-scan` and `trustabl-enrich` skills appear in the skill
-picker, and the hook confirms the binary is ready at session start. Uninstall
-with `/plugin uninstall trustabl`.
-
-### Claude Code agent
-
-A standalone subagent (`trustabl`) runs the full scan → enrich → review →
-apply pipeline interactively. It does not require the plugin — just the
-`trustabl` binary already on your PATH. Copy the agent file into your project
-or home config:
-
-```sh
-# Project-level (scoped to this repo)
-curl -fsSL https://raw.githubusercontent.com/trustabl/agent-reliability-analyzer/main/agents/trustabl.md \
-  -o .claude/agents/trustabl.md
-
-# Global (available in every project)
-curl -fsSL https://raw.githubusercontent.com/trustabl/agent-reliability-analyzer/main/agents/trustabl.md \
-  -o ~/.claude/agents/trustabl.md
-```
-
-Once installed, invoke it via `@trustabl` in Claude Code or select it from
-the subagent picker. It will ask which directory to scan, run `trustabl scan`
-and `trustabl enrich`, then walk you through each proposed fix as a diff.
-
-The enrich step requires an Anthropic API key. Set it before invoking the agent:
-
-```sh
-export ANTHROPIC_API_KEY=sk-ant-api03-...   # or: trustabl llm key set
-```
-
-### From source
-
-Requires `CGO_ENABLED=1` because the AST parsers use tree-sitter
-(Python + TypeScript + TSX bindings), which is a C library:
-
-```bash
-# macOS / Linux
-CGO_ENABLED=1 go build -o trustabl ./cmd/trustabl
-
-# Cross-compile: pick a C toolchain for the target. zig is the easiest.
-CGO_ENABLED=1 CC="zig cc -target x86_64-linux-gnu" \
-  GOOS=linux GOARCH=amd64 go build -o trustabl-linux ./cmd/trustabl
-```
-
-This is the cost of using tree-sitter for accurate AST parsing. If a
-single-binary, no-CGO distribution becomes a hard requirement later, the
-swap target is `github.com/go-python/gpython` for Python (with lower
-fidelity on modern Python); TypeScript would need a separate replacement.
-
-## Use
+<a id="use"></a>
+## Use — run your first agent reliability scan
 
 ```bash
 # Local repo
@@ -1396,7 +1406,7 @@ newer rule-schema version than your binary understands, the scan still runs: it
 evaluates every rule your build *can* understand and **skips** the rest, warning
 on stderr (and recording the skipped rule IDs on `ScanResult.RulesSkipped`):
 
-```
+```text
 warning: the rules target schema version 13 but this Trustabl build supports up to 12; 2 rule(s) newer than this build were skipped. Upgrade Trustabl to evaluate them.
 ```
 
