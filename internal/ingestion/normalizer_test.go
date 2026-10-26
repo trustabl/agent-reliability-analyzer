@@ -666,3 +666,51 @@ func TestManifestLanguage(t *testing.T) {
 		}
 	}
 }
+
+// Only workflow files directly under the repo-root .github/workflows are kept,
+// and they stay out of YAMLFiles; nothing else under .github enters the manifest.
+func TestNormalize_GitHubWorkflowsRootOnly(t *testing.T) {
+	dir := t.TempDir()
+	for rel, body := range map[string]string{
+		".github/workflows/a.yml":          "name: a\n",
+		".github/workflows/B.YAML":         "name: b\n",
+		".github/workflows/notes.md":       "# not a workflow\n",
+		".github/workflows/sub/deep.yml":   "name: deep\n",
+		".github/dependabot.yml":           "version: 2\n",
+		".github/copilot-instructions.md":  "# instructions\n",
+		".github/ISSUE_TEMPLATE/bug.yml":   "name: bug\n",
+		"pkg/.github/workflows/nested.yml": "name: nested\n",
+		"config/real.yml":                  "a: 1\n",
+	} {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := Normalize(&Source{RootPath: dir}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{".github/workflows/B.YAML", ".github/workflows/a.yml"}
+	if len(m.WorkflowFiles) != 2 || m.WorkflowFiles[0] != want[0] || m.WorkflowFiles[1] != want[1] {
+		t.Fatalf("WorkflowFiles = %v, want %v", m.WorkflowFiles, want)
+	}
+	if len(m.YAMLFiles) != 1 || m.YAMLFiles[0] != "config/real.yml" {
+		t.Fatalf("YAMLFiles = %v, want only config/real.yml", m.YAMLFiles)
+	}
+	if len(m.MarkdownFiles) != 0 {
+		t.Fatalf("MarkdownFiles = %v, want none", m.MarkdownFiles)
+	}
+	var kinds int
+	for _, c := range m.Components {
+		if c.Kind == models.ComponentGitHubWorkflow {
+			kinds++
+		}
+	}
+	if kinds != 2 {
+		t.Fatalf("github_workflow components = %d, want 2: %+v", kinds, m.Components)
+	}
+}

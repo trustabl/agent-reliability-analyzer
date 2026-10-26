@@ -350,6 +350,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **CI workflows (2026-10-19, `schema_version` 27 → 28, provisional; +5 rules):** new unconditionally-loaded category `ci` (**CI-001..005**, repo
+> scope, `applies_to: [github_actions]`) over five `repo_ci_agent_*` predicates backed by `RepoInventory.CIWorkflows`
+> (`analysis.DiscoverCIWorkflows`). The walk reads only the repo-root `.github/workflows/*.yml|yaml` (into `ScanManifest.WorkflowFiles`, not
+> `YAMLFiles`). The IDs sit outside the SDK-prefix `NNN`/`1NN`/`2NN` convention, like AGCFG. A CI rule emits one finding per step that runs an
+> offending agent, and for CI-003 one per `actions/checkout` step in that job (not one per scan). Hits carry event, action and secret names only, never a `with` / `env` / `run` value. Rulebook docs (`docs/Policy/ci/`) are a
+> separate follow-up. Built in parallel with the otel-labels correctness batch, which merged first and took 26 → 27, so this batch takes 28. The fixture holds **352** rules (347 + 5; re-derive, do not trust this figure).
+>
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
 > (`analysis.DiscoverProjectConfig`). The walk now enters `.gemini/`, `.vscode/`, `.cursor/`, `.codex/`. Env files are read for **key

@@ -90,6 +90,10 @@ const (
 	// code or grants authority before the user trusts the folder (AGCFG-*,
 	// MCPCFG-*). Not an SDK; loads unconditionally, the rule predicate gates.
 	CategoryAgentConfig DetectorCategory = "agent_config"
+	// CategoryCI covers coding agents run from GitHub Actions workflows on
+	// events any GitHub user can cause (CI-*). Not an SDK; loads
+	// unconditionally, the rule predicate gates.
+	CategoryCI DetectorCategory = "ci"
 )
 
 // display order. It is the single source of truth for category membership:
@@ -101,7 +105,7 @@ var AllCategories = []DetectorCategory{
 	CategoryClaudeSDK, CategoryOpenAISDK, CategoryOpenShell, CategoryGoogleADK,
 	CategoryMCP, CategoryLangChain, CategoryCrewAI, CategoryPydanticAI,
 	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill, CategoryObservability,
-	CategoryRawLLMSDK, CategoryAgentConfig,
+	CategoryRawLLMSDK, CategoryAgentConfig, CategoryCI,
 }
 
 // ValidCategory reports whether c is a category this build recognizes. The rule
@@ -248,6 +252,9 @@ const (
 	// guardrails.md, LongTermMEMORY.md, tool_descriptions/*.md), recognised only
 	// when systemprompt.md and guardrails.md sit side by side.
 	ComponentHarnessGuidance ComponentKind = "harness_guidance"
+	// ComponentGitHubWorkflow is a workflow file directly under the repo-root
+	// .github/workflows/ (category ci); parsed by DiscoverCIWorkflows.
+	ComponentGitHubWorkflow ComponentKind = "github_workflow"
 )
 
 // AgentComponent is a non-tool agent-related artifact discovered during
@@ -348,7 +355,11 @@ type ScanManifest struct {
 	MarkdownFiles   []string `json:"markdown_files,omitempty"`
 	// ConfigFiles holds the non-source harness config files the walk keeps:
 	// any file named .env and .codex/config.toml. Sorted.
-	ConfigFiles            []string         `json:"config_files,omitempty"`
+	ConfigFiles []string `json:"config_files,omitempty"`
+	// WorkflowFiles holds the GitHub Actions workflow files directly under the
+	// repo-root .github/workflows/ (*.yml, *.yaml). Sorted. Kept apart from
+	// YAMLFiles so no existing YAMLFiles consumer sees them.
+	WorkflowFiles          []string         `json:"workflow_files,omitempty"`
 	HasClaudeSDKDependency bool             `json:"has_claude_sdk_dependency"`
 	HasOpenShellArtifact   bool             `json:"has_openshell_artifact"`
 	Components             []AgentComponent `json:"components,omitempty"`
@@ -590,6 +601,7 @@ type RepoInventory struct {
 	ClaudeSettings     []ClaudeSettings        `json:"claude_settings"`
 	ClaudeAgentOptions []ClaudeAgentOptionsDef `json:"claude_agent_options,omitempty"`
 	ProjectConfig      ProjectConfigFacts      `json:"project_config,omitempty"`
+	CIWorkflows        CIWorkflowFacts         `json:"ci_workflows,omitempty"`
 	AgentRunCalls      []AgentRunCallDef       `json:"agent_run_calls,omitempty"`
 	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	SDKsDetected       []SDK                   `json:"sdks_detected"`

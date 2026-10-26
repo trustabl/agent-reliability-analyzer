@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -1444,6 +1445,243 @@ agent = Agent(name="travel-booker")
 				t.Errorf("agent-reliability-otel-labels findings: got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// End to end: the CI fixture has one ungated issues-triggered claude-code-action
+// job (bypass input set) that fires CI-001..CI-005, and one gated gemini job
+// where only CI-003..CI-005 fire. Every finding carries its own file, line and
+// job.
+func TestScan_CIAgentWorkflowFixtureFiresEveryRule(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "ci-agent-workflow-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	const triage, gated = ".github/workflows/issue-triage.yml", ".github/workflows/gated-comment.yml"
+	want := map[string][]string{
+		"CI-001": {triage},
+		"CI-002": {triage},
+		"CI-003": {triage, gated},
+		"CI-004": {triage, gated},
+		"CI-005": {triage, gated},
+	}
+	got := map[string][]string{}
+	for _, f := range res.Findings {
+		if !strings.HasPrefix(f.RuleID, "CI-") {
+			continue
+		}
+		t.Logf("%s %s %s:%d job=%s", f.RuleID, f.Severity, f.FilePath, f.StartLine, f.ToolName)
+		if f.StartLine < 1 || f.ToolName == "" {
+			t.Errorf("%s has no line or job: %+v", f.RuleID, f)
+		}
+		got[f.RuleID] = append(got[f.RuleID], f.FilePath)
+	}
+	for id, files := range want {
+		if len(got[id]) != len(files) {
+			t.Errorf("%s fired in %v, want %v", id, got[id], files)
+			continue
+		}
+		gotFiles := append([]string{}, got[id]...)
+		sort.Strings(gotFiles)
+		wantFiles := append([]string{}, files...)
+		sort.Strings(wantFiles)
+		for i := range wantFiles {
+			if !strings.HasSuffix(gotFiles[i], wantFiles[i]) {
+				t.Errorf("%s hit %d attributed to %q, want a path ending %q", id, i, gotFiles[i], wantFiles[i])
+			}
+		}
+	}
+	if len(res.Manifest.WorkflowFiles) != 2 {
+		t.Errorf("manifest.workflow_files = %v, want 2 files", res.Manifest.WorkflowFiles)
+	}
+	for _, f := range res.Findings {
+		if strings.Contains(f.Explanation+f.Title, "NPM_TOKEN") {
+			t.Errorf("%s leaked a secret name into rule text", f.RuleID)
+		}
+	}
+}
+
+// The "pass" counterpart: hardened workflows shaped like the vendor guidance
+// (gated trigger, read token, persist-credentials false, exact-command tools,
+// harden-runner block). None of the CI rules may fire.
+func TestScan_CIAgentWorkflowSafeVariantsStaySilent(t *testing.T) {
+	dir := t.TempDir()
+	const gate = `contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)`
+	for rel, body := range map[string]string{
+		".github/workflows/claude.yml": `name: claude
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+jobs:
+  claude:
+    if: ` + gate + `
+    runs-on: ubuntu-latest
+    steps:
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: block
+          allowed-endpoints: api.anthropic.com:443
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --allowedTools "Bash(npm test),Read"
+`,
+		".github/workflows/dispatch.yml": `name: dispatch
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  invoke:
+    if: ` + gate + `
+    uses: ./.github/workflows/invoke.yml
+    permissions:
+      contents: read
+`,
+		".github/workflows/invoke.yml": `name: invoke
+on:
+  workflow_call:
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: 'false'
+      - uses: google-github-actions/run-gemini-cli@v0
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: '{"tools": {"core": []}}'
+`,
+		".github/workflows/codex.yml": `name: codex
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+`,
+	} {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "CI-") {
+			t.Errorf("%s fired on a hardened workflow (%s:%d job=%s)", f.RuleID, f.FilePath, f.StartLine, f.ToolName)
+		}
+	}
+}
+
+// Ties the finding-granularity text in the CI rule YAML and docs to behaviour:
+// one finding per step that runs an offending agent, one per actions/checkout
+// step for CI-003, and two agent CLIs in one run: step share a line and give
+// one finding.
+func TestScan_CIFindingGranularity(t *testing.T) {
+	dir := t.TempDir()
+	const wf = `name: granularity
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  two:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          path: other
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_non_write_users: "*"
+          claude_args: --allowedTools "Bash"
+      - uses: google-github-actions/run-gemini-cli@v0
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: '{"tools": {"core": ["run_shell_command"]}}'
+  cli:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: |
+          claude --dangerously-skip-permissions -p hi && codex --dangerously-bypass-approvals-and-sandbox exec hi
+`
+	full := filepath.Join(dir, ".github/workflows/granularity.yml")
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(wf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	type site struct {
+		job  string
+		line int
+	}
+	got := map[string][]site{}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "CI-") {
+			got[f.RuleID] = append(got[f.RuleID], site{f.ToolName, f.StartLine})
+		}
+	}
+	// job "two": 2 agent steps, 2 checkout steps. job "cli": 1 run step with
+	// 2 agent CLIs, bypass flags on both, no gate (CI-001) and no egress
+	// block (CI-005), no write token or extra secret (no CI-002).
+	want := map[string]int{"CI-001": 3, "CI-002": 2, "CI-003": 2, "CI-004": 3, "CI-005": 3}
+	for id, n := range want {
+		sites := got[id]
+		if len(sites) != n {
+			t.Errorf("%s: %d findings %v, want %d", id, len(sites), sites, n)
+		}
+		seen := map[site]bool{}
+		for _, s := range sites {
+			if seen[s] {
+				t.Errorf("%s: duplicate site %+v", id, s)
+			}
+			seen[s] = true
+		}
+	}
+	for id, sites := range got {
+		if _, ok := want[id]; !ok {
+			t.Errorf("unexpected rule %s fired: %v", id, sites)
+		}
+	}
+	// CI-003 is attributed to the checkout steps of job "two", not to "cli".
+	for _, s := range got["CI-003"] {
+		if s.job != "two" {
+			t.Errorf("CI-003 attributed to job %q, want %q", s.job, "two")
+		}
 	}
 }
 

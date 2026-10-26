@@ -141,7 +141,7 @@ func loadPolicies(fsys fs.FS, lenient bool) ([]PolicyFile, []string, error) {
 				}
 				continue
 			}
-			errs = append(errs, fmt.Errorf("%s: unknown category %q (allowed: claude_sdk, openai_sdk, openshell, google_adk, mcp, langchain, crewai, pydantic_ai, vercel_ai, autogen, claude_skill, observability)", name, pf.Policy.Category))
+			errs = append(errs, fmt.Errorf("%s: unknown category %q (allowed: claude_sdk, openai_sdk, openshell, google_adk, mcp, langchain, crewai, pydantic_ai, vercel_ai, autogen, claude_skill, observability, raw_llm_sdk, agent_config, ci)", name, pf.Policy.Category))
 			continue
 		}
 
@@ -349,7 +349,7 @@ var appliesToByScope = map[models.Scope][]string{
 		"claude_sdk", "openai_agents", "openshell", "mcp", "google_adk",
 		"langchain",
 		"crewai", "pydantic_ai", "vercel_ai", "autogen",
-		"raw_llm_sdk", "agent_config",
+		"raw_llm_sdk", "agent_config", "github_actions",
 	},
 	models.ScopeSubagent: {"claude_subagent"},
 	models.ScopeSkill:    {"claude_skill"},

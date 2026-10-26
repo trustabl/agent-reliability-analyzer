@@ -1,0 +1,22 @@
+# Synthetic fixture: fires CI-001..CI-005. Modelled on the report table and the
+# step excerpt in Adnan Khan's Clinejection post; not a copy of any real workflow.
+name: issue-triage
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_non_write_users: "*"
+          claude_args: --allowedTools "Bash,Read,WebFetch"
+          prompt: "Triage this issue."
