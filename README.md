@@ -24,6 +24,8 @@
 Deterministic static analysis for agent code, across nine SDKs and seven languages.
 It runs entirely on your machine: no cloud scanner, no account, no code upload, no LLM.
 
+Agent reliability coverage as of Oct 2026: 340+ rules · 9 SDKs · 7 languages · 5 scopes
+
 If Agent Reliability Analyzer saves you a production incident, please ⭐ the repo — it helps other teams find it.
 
 ---
@@ -1501,7 +1503,35 @@ export TRUSTABL_TELEMETRY=0     # or disable for the current shell session
 trustabl telemetry status       # show current level and its source
 ```
 
-The full event schema — every event name and every property, verbatim — is at [TELEMETRY.md](TELEMETRY.md) (and at [trustabl.ai/telemetry](https://trustabl.ai/telemetry) once the site is live). That page is kept in sync with the code; stale docs are treated as a defect.
+The full event schema — every event name and every property, verbatim — is at [TELEMETRY.md](TELEMETRY.md) (and at [trustabl.ai/docs/telemetry](https://www.trustabl.ai/docs/telemetry/)). That page is kept in sync with the code; stale docs are treated as a defect.
+
+## FAQ
+
+**What is Agent Reliability Analyzer?**
+An open-source, deterministic scanner from Trustabl that finds and fixes agent reliability failures in AI agent code before production, across nine agent SDKs and seven languages.
+
+**How do I test AI agent reliability before production?**
+Run `trustabl scan ./your-agent-repo` locally or in CI. It checks tools, agents, subagents, skills and MCP servers against agent reliability rules, and exits non-zero on medium-or-higher findings so the CI job fails when it should.
+
+**Does it replace LangSmith, Langfuse, Braintrust or Arize?**
+No. Those tools observe and evaluate agents at runtime; Agent Reliability Analyzer catches defects in the code before it runs. Use them together.
+
+**Does it send my code anywhere?**
+No. Scanning is local and deterministic — no LLM, no code upload. By default it downloads the latest rules and vulnerability data; `--no-rules-update` runs fully offline from the local cache. `trustabl enrich` is opt-in and uses your own LLM key. Telemetry is off by default.
+
+**Which agent frameworks does it support?**
+Nine SDKs, including Claude Agent SDK, OpenAI Agents SDK, Google ADK, LangChain / LangGraph, CrewAI, AutoGen / AG2 and Pydantic AI. Full list: [COVERAGE.md](COVERAGE.md).
+
+## Part of Trustabl's open-source agent reliability tooling
+
+Agent Reliability Analyzer is one piece of a set of open-source agent reliability tools from [Trustabl](https://www.trustabl.ai/):
+
+- [agent-reliability-rules](https://github.com/trustabl/agent-reliability-rules) — the deterministic agent reliability detection rules the analyzer loads
+- [trustabl-action](https://github.com/trustabl/trustabl-action) — run the analyzer as a GitHub Action
+- [agent-opentelemetry-rules](https://github.com/trustabl/agent-opentelemetry-rules) — agent-specific OpenTelemetry rules for observability platforms
+- [trustabl-aws](https://github.com/trustabl/trustabl-aws) — the analyzer for AWS CodePipeline and CodeCatalyst
+
+The checks implement concepts from [Agent Reliability Engineering (ARE)](https://agentreliabilityengineering.org/), an open discipline for building reliable, governable AI agents. Trustabl is affiliated with the author of ARE.
 
 ## Community
 
