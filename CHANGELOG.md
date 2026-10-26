@@ -8,6 +8,12 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Added
 
+- **A one-time star line after the first interactive scan.** `trustabl scan`
+  prints "⭐ Found this useful? Star Agent Reliability Analyzer" with the
+  repository link to stderr once, after the first successful scan with human
+  output in a terminal. It never appears in CI, with `--format json` or `sarif`,
+  or when stdout or stderr is not a terminal. A `star-prompt-shown` marker next
+  to `~/.config/trustabl/telemetry.json` keeps it from showing again.
 - **AGCFG-011: a committed settings file pre-approves fetches from a host that
   serves user-published content.** A WebFetch rule in `permissions.allow` of
   `.claude/settings.json` or `settings.local.json` that covers github.com,
