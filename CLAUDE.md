@@ -350,6 +350,14 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Unpinned MCP package launch (2026-10-21, `schema_version` 29 → 30, provisional; +1 rule):** **MCPCFG-003** (high, 0.7, repo scope,
+> category `agent_config`) over the new predicate `repo_mcp_config_launches_unpinned_package`, backed by
+> `ProjectConfigFacts.UnpinnedMCPLaunch`. It flags an MCP client config entry started by `npx` / `bunx` / `pnpm dlx` / `uvx` /
+> `uv tool run` / `pipx run` / `docker run` on a package or image with no exact version (docker: an `@sha256:` digest). Git, URL,
+> local-path and `$VAR` specs are not judged; a command inside the repo stays with MCPCFG-002, so the two never judge one entry.
+> Schema 29 is held by CSDK-115 on main, so this number is provisional and a later merge may renumber. The fixture holds
+> **354** rules (353 + 1; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`, a separate follow-up round.
+> Not judged and not built: git refs, `deno` / `podman` / `yarn dlx` / `npm exec` launchers, lockfile pins.
 > **CI workflows (2026-10-19, `schema_version` 27 → 28, provisional; +5 rules):** new unconditionally-loaded category `ci` (**CI-001..005**, repo
 > scope, `applies_to: [github_actions]`) over five `repo_ci_agent_*` predicates backed by `RepoInventory.CIWorkflows`
 > (`analysis.DiscoverCIWorkflows`). The walk reads only the repo-root `.github/workflows/*.yml|yaml` (into `ScanManifest.WorkflowFiles`, not

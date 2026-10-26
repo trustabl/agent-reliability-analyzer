@@ -1317,13 +1317,44 @@ func TestScan_PreTrustConfigFixtureFiresEveryRule(t *testing.T) {
 	}
 }
 
+// End to end: the unpinned-launch fixture pairs unpinned and pinned package
+// launches across four client config files. MCPCFG-003 fires once, attributed to
+// the first path-sorted file, MCPCFG-002 stays silent (no entry launches
+// repo-controlled code), and the finding text never echoes a package name.
+func TestScan_UnpinnedMCPLaunchFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "mcp-unpinned-launch-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var unpinned []models.Finding
+	for _, f := range res.Findings {
+		switch f.RuleID {
+		case "MCPCFG-003":
+			unpinned = append(unpinned, f)
+		case "MCPCFG-002":
+			t.Errorf("MCPCFG-002 fired on a package launch (%s:%d)", f.FilePath, f.StartLine)
+		}
+		if strings.Contains(f.Explanation+f.Title, "example-mcp") {
+			t.Errorf("%s echoed a fixture package name", f.RuleID)
+		}
+	}
+	if len(unpinned) != 1 {
+		t.Fatalf("MCPCFG-003 fired %d times, want once; findings: %v", len(unpinned), res.Findings)
+	}
+	if !strings.HasSuffix(unpinned[0].FilePath, ".codex/config.toml") || unpinned[0].StartLine < 1 {
+		t.Errorf("MCPCFG-003 attributed to %s:%d, want .codex/config.toml with a line", unpinned[0].FilePath, unpinned[0].StartLine)
+	}
+}
+
 // The "pass" counterpart of the pre-trust fixture: the same five config files
 // rewritten to their safe forms. None of the agent_config rules may fire.
 func TestScan_PreTrustConfigSafeVariantsStaySilent(t *testing.T) {
 	dir := t.TempDir()
 	for rel, body := range map[string]string{
 		".claude/settings.json": `{"permissions": {"allow": ["Read"]}}`,
-		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "remote": {"url": "https://mcp.example.invalid/sse"}}}`,
+		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "pinned-uv": {"command": "uvx", "args": ["example-mcp-git@0.6.2"]}, "pinned-img": {"command": "docker", "args": ["run", "-i", "--rm", "ghcr.io/example/mcp-server@sha256:` + strings.Repeat("0", 64) + `"]}, "remote": {"url": "https://mcp.example.invalid/sse"}}}`,
 		".gemini/.env":          "PLAIN_SETTING=fake-value-not-real\n",
 		".env":                  "OPENAI_BASE_URL=https://api.example.invalid\nNODE_OPTIONS=--max-old-space-size=4096\n",
 		".vscode/settings.json": "{\n  // fixture only\n  \"chat.tools.autoApprove\": false,\n}\n",

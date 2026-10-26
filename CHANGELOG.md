@@ -8,6 +8,22 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Added
 
+- **Unpinned MCP package launches (rule schema 29 -> 30, provisional).** New
+  repo-scope predicate `repo_mcp_config_launches_unpinned_package` and rule
+  **MCPCFG-003** (high, 0.7) flag a committed MCP client config
+  (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`,
+  `claude_desktop_config.json`, `.gemini/settings.json`, `.codex/config.toml`)
+  that starts a server with `npx`, `bunx`, `pnpm dlx`, `uvx`, `uv tool run`,
+  `pipx run` or `docker run` on a package or image with no exact version: an
+  exact semver for npm, `==` (or uv's `name@version`) for uv and pipx, an
+  `@sha256:` digest for docker. Git, URL, local-path and `$VAR` specs are not
+  judged, and a command inside the repo stays with MCPCFG-002, so the two rules
+  never judge the same server entry. Lockfile pins are not seen. The package or
+  image name is never echoed. MCPCFG-002's explanation no longer implies that an
+  unpinned package might be flagged by it. **Release order:** this engine first,
+  then the rules pack; a rule that needs a new predicate is skipped on an older
+  engine. The schema number is provisional; it follows CSDK-115 (29), and
+  whichever open branch merges later renumbers.
 - **Coding agents in GitHub Actions workflows (rule schema 27 -> 28, provisional).** A new
   unconditionally loaded `ci` category (CI-001..005) with five repo-scope
   predicates backed by `RepoInventory.CIWorkflows`. The walk now reads the

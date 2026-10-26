@@ -474,10 +474,15 @@ components: `mcp_config` (now also `.mcp.json`, `.cursor/mcp.json`,
 `.gemini/.env`) and `codex_config`. `analysis.DiscoverProjectConfig`
 ([project_config.go](internal/analysis/project_config.go)) turns them into
 `RepoInventory.ProjectConfig` (`ProjectConfigFacts`): sorted, deduped
-`ConfigHit{file, line, reason}` lists behind five repo-scope predicates
+`ConfigHit{file, line, reason}` lists behind repo-scope predicates
 (`repo_project_mcp_autoenable`, `repo_project_hook_runs_untrusted_command`,
 `repo_workspace_env_overrides_trust`, `repo_editor_agent_auto_approve`,
-`repo_mcp_config_launches_local_command`) read by AGCFG-004..007 and MCPCFG-002.
+`repo_mcp_config_launches_local_command`,
+`repo_mcp_config_launches_unpinned_package`) read by AGCFG-004..007, MCPCFG-002
+and MCPCFG-003. The two MCP predicates never judge the same server entry:
+`classifyMCPLaunch` (repo-controlled code) and `classifyMCPPin` (a runner on a
+registry package or image with no exact version or digest) accept disjoint
+commands.
 Settings files are parsed as JSONC (comments and trailing commas stripped), Codex
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set

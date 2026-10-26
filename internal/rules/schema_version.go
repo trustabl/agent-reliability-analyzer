@@ -32,4 +32,7 @@ package rules
 // category and the `github_actions` repo applies_to token.
 //
 // Schema 29 adds the subagent_inherits_all_tools predicate (subagent scope).
-const SupportedSchemaVersion = 29
+//
+// Schema 30 adds the repo_mcp_config_launches_unpinned_package predicate
+// (repo scope).
+const SupportedSchemaVersion = 30

@@ -369,13 +369,17 @@ type ConfigHit struct {
 }
 
 // ProjectConfigFacts are the typed facts behind the agent_config rules
-// (AGCFG-004..007, MCPCFG-002). Each slice is sorted by path, line, reason.
+// (AGCFG-004..007, MCPCFG-002/003). Each slice is sorted by path, line, reason.
 type ProjectConfigFacts struct {
 	MCPAutoEnable     []ConfigHit `json:"mcp_auto_enable,omitempty"`     // AGCFG-004
 	RiskyHooks        []ConfigHit `json:"risky_hooks,omitempty"`         // AGCFG-005
 	TrustOverrideEnv  []ConfigHit `json:"trust_override_env,omitempty"`  // AGCFG-006
 	EditorAutoApprove []ConfigHit `json:"editor_auto_approve,omitempty"` // AGCFG-007
 	LocalMCPLaunch    []ConfigHit `json:"local_mcp_launch,omitempty"`    // MCPCFG-002
+	// UnpinnedMCPLaunch is a server started by a package runner (npx, bunx,
+	// pnpm dlx, uvx, uv tool run, pipx run, docker run) on a package or image
+	// with no exact version or digest. Disjoint from LocalMCPLaunch. MCPCFG-003.
+	UnpinnedMCPLaunch []ConfigHit `json:"unpinned_mcp_launch,omitempty"`
 	// CodexRiskyHooks is kept apart from RiskyHooks on purpose: Codex skips a
 	// project hook until the user reviews and trusts it, so AGCFG-005's "runs
 	// before trust" claim does not hold for it. AGCFG-008 reads this list.
