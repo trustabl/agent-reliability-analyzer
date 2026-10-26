@@ -677,6 +677,8 @@ func finishScan(result models.ScanResult, jobErr error, f scanFlags, log *logx.L
 		}
 	}
 
+	maybeStarPrompt(os.Stderr, f.format, starPromptInteractive(), starPromptMarkerPath())
+
 	code := scanExitCode
 	log.Verbosef("result: scan_id %s · overall %.0f%% · %d findings (%s) · exit %d",
 		result.ScanID, result.OverallScore*100, len(result.Findings), severitySummary(result.Findings), code)
