@@ -41,6 +41,7 @@ func DiscoverSubagents(manifest models.ScanManifest) []models.SubagentDef {
 		}
 		seen[c.Path] = true
 		if def, ok := parseSubagentFile(manifest.RepoRoot, c.Path); ok {
+			def.Canonical = true
 			out = append(out, def)
 		}
 	}
@@ -81,6 +82,11 @@ func parseSubagentFile(repoRoot, relPath string) (models.SubagentDef, bool) {
 	if parsed.Name == "" {
 		return models.SubagentDef{}, false
 	}
+	// Key presence, not value: an omitted `tools` inherits the subagent tool
+	// pool, while `tools: []` / `tools:` decode to the same nil Tools.
+	var keys map[string]yaml.Node
+	_ = yaml.Unmarshal(fm, &keys)
+	_, hasTools := keys["tools"]
 	tokens := splitToolsTokens([]string(parsed.Tools))
 	return models.SubagentDef{
 		Name:            parsed.Name,
@@ -94,6 +100,7 @@ func parseSubagentFile(repoRoot, relPath string) (models.SubagentDef, bool) {
 		Skills:          splitToolsTokens([]string(parsed.Skills)),
 		HasHooks:        parsed.Hooks.Kind == yaml.MappingNode && len(parsed.Hooks.Content) > 0,
 		Isolation:       parsed.Isolation,
+		ToolsOmitted:    !hasTools,
 		Location: models.Location{
 			FilePath: relPath,
 			Line:     startLine,

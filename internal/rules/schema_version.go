@@ -27,4 +27,18 @@ package rules
 // that rule (safe) instead of mis-evaluating a predicate whose meaning changed.
 // That rename discipline is what keeps lenient loading safe without a hard
 // version gate.
-const SupportedSchemaVersion = 28
+//
+// Schema 28 adds the CI workflow predicates (repo_ci_agent_*), the `ci`
+// category and the `github_actions` repo applies_to token.
+//
+// Schema 29 adds the subagent_inherits_all_tools predicate (subagent scope).
+//
+// Schema 30 adds the repo_mcp_config_launches_unpinned_package predicate
+// (repo scope).
+//
+// Schema 31 adds the repo_settings_preapprove_user_content_fetch predicate
+// (repo scope).
+//
+// Schema 32 adds the tool_claim_use predicate (tool scope) and the claim_use
+// discovery fact.
+const SupportedSchemaVersion = 32

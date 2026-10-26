@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fs-unpinned": { "command": "npx", "args": ["-y", "@example/mcp-server-fs"] },
+    "fs-pinned": { "command": "npx", "args": ["-y", "@example/mcp-server-fs@1.2.3"] },
+    "git-latest": { "command": "uvx", "args": ["example-mcp-git@latest"] },
+    "git-pinned": { "command": "uvx", "args": ["example-mcp-git@0.6.2"] }
+  }
+}

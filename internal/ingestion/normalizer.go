@@ -391,6 +391,18 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 			return nil
 		}
 		if d.IsDir() {
+			// GitHub runs only workflows directly under the repo-root
+			// .github/workflows, so that is the only part of .github the walk
+			// enters; a nested .github (or any other .github subdirectory) is
+			// skipped like every other dot-directory.
+			if drel, derr := filepath.Rel(src.RootPath, path); derr == nil {
+				if skip, handled := githubDirDecision(filepath.ToSlash(drel)); handled {
+					if skip {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+			}
 			if shouldSkipDir(d.Name()) {
 				return filepath.SkipDir
 			}
@@ -429,6 +441,15 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 		// dropped from the manifest. Matching the OS-native `path` here was both
 		// case-sensitive and inconsistent with the rel that gets stored.
 		lower := strings.ToLower(rel)
+		// Only repo-root workflow files are kept from .github/. Everything else
+		// directly under it (dependabot.yml, CODEOWNERS, copilot-instructions.md)
+		// stays out of the manifest, and workflows stay out of YAMLFiles.
+		if strings.HasPrefix(lower, ".github/") {
+			if isWorkflowFile(lower) {
+				manifest.WorkflowFiles = append(manifest.WorkflowFiles, rel)
+			}
+			return nil
+		}
 		// Harness config the pre-trust rules read: any ".env" file and the Codex
 		// project config. Kept narrow on purpose (pyproject.toml etc. are not).
 		if filepath.Base(lower) == ".env" || lower == ".codex/config.toml" || strings.HasSuffix(lower, "/.codex/config.toml") {
@@ -478,6 +499,7 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 		sort.Strings(*fl)
 	}
 	sort.Strings(manifest.ConfigFiles)
+	sort.Strings(manifest.WorkflowFiles)
 
 	manifest.HasClaudeSDKDependency = detectClaudeSDKDependency(src.RootPath)
 	manifest.HasOpenShellArtifact = detectOpenShellArtifact(manifest.YAMLFiles, src.RootPath)
@@ -545,6 +567,29 @@ func inOpencodeDir(p string, names ...string) bool {
 		}
 	}
 	return false
+}
+
+// githubDirDecision decides the walk for a directory whose slash-separated path
+// relative to the scan root is rel. handled is false when rel is not under the
+// root .github, so the normal dot-directory rules apply.
+func githubDirDecision(rel string) (skip, handled bool) {
+	switch {
+	case rel == ".github" || rel == ".github/workflows":
+		return false, true
+	case strings.HasPrefix(rel, ".github/"):
+		return true, true
+	}
+	return false, false
+}
+
+// isWorkflowFile reports whether lower (a lowercased, slash-separated relative
+// path) is a *.yml / *.yaml file directly inside .github/workflows.
+func isWorkflowFile(lower string) bool {
+	rest, ok := strings.CutPrefix(lower, ".github/workflows/")
+	if !ok || rest == "" || strings.Contains(rest, "/") {
+		return false
+	}
+	return strings.HasSuffix(rest, ".yml") || strings.HasSuffix(rest, ".yaml")
 }
 
 func shouldSkipDir(name string) bool {
@@ -725,6 +770,12 @@ func discoverComponents(root string, m models.ScanManifest, onFile func(string))
 		case filepath.Base(p) == "config.toml":
 			out = append(out, models.AgentComponent{Kind: models.ComponentCodexConfig, Path: p})
 		}
+	}
+
+	// GitHub Actions workflows (category ci). The walk already restricted these
+	// to the repo-root .github/workflows directory.
+	for _, p := range m.WorkflowFiles {
+		out = append(out, models.AgentComponent{Kind: models.ComponentGitHubWorkflow, Path: p})
 	}
 
 	// Agent-guidance docs at the repo root. CLAUDE.md is the Claude Code

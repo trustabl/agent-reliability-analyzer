@@ -350,13 +350,36 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **Tool-call claims, EBTE (2026-10-19, `schema_version` 27 → 28; +9 rules; main took 27 for OBS-009..012):** new tool-scope predicate `tool_claim_use` over the
+> **Tool-call claims, EBTE (2026-10-19, `schema_version` 31 → 32; +9 rules; main took 27 for OBS-009..012, 28 for CI-001..005, 29 for CSDK-115, 30 for MCPCFG-003, 31 for AGCFG-011):** new tool-scope predicate `tool_claim_use` over the
 > `claim_use` fact that Python decorated-tool discovery stamps on a tool declaring a `claim` parameter (`internal/analysis/claim_use.go`;
 > `absent` is decided from `ParamNames`). A three-rung ladder per SDK: **OAI-034 / MCP-033 / LC-028** (info, 0.5; the pack's first info rules) side-effecting tool with
 > no claim, **OAI-035 / MCP-034 / LC-029** (medium, 0.6) claim never read, **OAI-036 / MCP-035 / LC-030** (medium, 0.55) claim only
 > printed / logged / serialized / returned. A second decorator, or an OpenAI tool input guardrail, makes the fact `wrapped` (silent). Rules
 > live in `<sdk>/tool_call_claims.yaml`; rulebook docs in `docs/Policy/<sdk>/tool_call_claims.md`. Python only; TypeScript, Claude SDK,
-> ADK, CrewAI, Pydantic AI, AutoGen and Vercel AI are follow-ups. The fixture holds **356** rules (347 + 9; re-derive).
+> ADK, CrewAI, Pydantic AI, AutoGen and Vercel AI are follow-ups. The fixture holds **364** rules (355 + 9; re-derive).
+>
+> **Pre-approved fetch from a user-content host (2026-10-21, `schema_version` 30 -> 31, provisional; +1 rule):** **AGCFG-011** (high, 0.7, repo
+> scope, category `agent_config`, new pack file `agent_config/fetch_permissions.yaml`) over the new predicate
+> `repo_settings_preapprove_user_content_fetch`, backed by `ProjectConfigFacts.UserContentFetchAllow`. It flags a WebFetch rule in
+> `permissions.allow` of `.claude/settings.json` / `settings.local.json` that covers a fixed list of hosts where any account can publish
+> (github.com, gist.github.com, raw.githubusercontent.com, an arbitrary `*.github.io`, huggingface.co, bitbucket.org, pastebin.com, an
+> arbitrary `*.readthedocs.io`), using Claude Code's documented `domain:` matching; a bare `WebFetch` and `domain:*` count; a deny or ask
+> rule in the same `.claude/` folder cancels. The Reason names the entry; the finding text is static. Schema 30 is held by MCPCFG-003 on main, so 31 is provisional and a later merge may renumber. The fixture holds
+> **355** rules (354 + 1; re-derive). Rulebook doc: `docs/Policy/agent_config/fetch_permissions.md`. Not judged: user and managed settings, `WebFetch()`, WebSearch, Bash `curl`, MCP fetch tools.
+> **Unpinned MCP package launch (2026-10-21, `schema_version` 29 → 30, provisional; +1 rule):** **MCPCFG-003** (high, 0.7, repo scope,
+> category `agent_config`) over the new predicate `repo_mcp_config_launches_unpinned_package`, backed by
+> `ProjectConfigFacts.UnpinnedMCPLaunch`. It flags an MCP client config entry started by `npx` / `bunx` / `pnpm dlx` / `uvx` /
+> `uv tool run` / `pipx run` / `docker run` on a package or image with no exact version (docker: an `@sha256:` digest). Git, URL,
+> local-path and `$VAR` specs are not judged; a command inside the repo stays with MCPCFG-002, so the two never judge one entry.
+> Schema 29 is held by CSDK-115 on main, so this number is provisional and a later merge may renumber. The fixture holds
+> **354** rules (353 + 1; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`, a separate follow-up round.
+> Not judged and not built: git refs, `deno` / `podman` / `yarn dlx` / `npm exec` launchers, lockfile pins.
+> **CI workflows (2026-10-19, `schema_version` 27 → 28, provisional; +5 rules):** new unconditionally-loaded category `ci` (**CI-001..005**, repo
+> scope, `applies_to: [github_actions]`) over five `repo_ci_agent_*` predicates backed by `RepoInventory.CIWorkflows`
+> (`analysis.DiscoverCIWorkflows`). The walk reads only the repo-root `.github/workflows/*.yml|yaml` (into `ScanManifest.WorkflowFiles`, not
+> `YAMLFiles`). The IDs sit outside the SDK-prefix `NNN`/`1NN`/`2NN` convention, like AGCFG. A CI rule emits one finding per step that runs an
+> offending agent, and for CI-003 one per `actions/checkout` step in that job (not one per scan). Hits carry event, action and secret names only, never a `with` / `env` / `run` value. Rulebook docs (`docs/Policy/ci/`) are a
+> separate follow-up. Built in parallel with the otel-labels correctness batch, which merged first and took 26 → 27, so this batch takes 28. The fixture holds **352** rules (347 + 5; re-derive, do not trust this figure).
 >
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`

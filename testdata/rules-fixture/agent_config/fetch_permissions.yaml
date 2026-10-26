@@ -1,0 +1,55 @@
+policy:
+  id: agent_config_fetch_permissions
+  name: Pre-approved web fetch
+  category: agent_config
+  description: >
+    Repo-scoped rule for Claude Code permission rules committed to a
+    repository that let the agent fetch web content without asking. Claude
+    Code applies a project's allow rules after the user accepts the workspace
+    trust dialog, which lists them, so this is not a pre-trust rule like
+    AGCFG-004 and AGCFG-005. The pack loads for each scan (the files it reads
+    have no SDK import), so the rule's own predicate does the gating. Fires
+    once per scan, attributed to the first offending allow entry.
+
+rules:
+  - id: AGCFG-011
+    title: Project settings pre-approve fetches from hosts that serve user-published content
+    severity: high
+    confidence: 0.7
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_settings_preapprove_user_content_fetch: true
+    explanation: >
+      A committed .claude/settings.json or .claude/settings.local.json lists a
+      WebFetch rule in permissions.allow that covers a host where any account
+      holder can publish content: github.com, gist.github.com,
+      raw.githubusercontent.com, an arbitrary *.github.io site, huggingface.co,
+      bitbucket.org, pastebin.com or an arbitrary *.readthedocs.io site. A bare
+      WebFetch rule and WebFetch(domain:*) cover these hosts too. Claude Code
+      fetches a URL on a host an allow rule matches without asking, runs an
+      extraction prompt over the page in a separate model call and returns the
+      result to the agent, so if a page on that host contains text a stranger
+      published, that text can shape what the agent reads, with no prompt that
+      lets the developer stop the fetch. Claude Code applies these allow rules
+      once the user accepts the workspace trust dialog, which lists them, and
+      does not apply them in a claude -p or SDK run in a folder that has not
+      been trusted. Limits of this check: it reads the permissions block of the
+      .claude/ settings files in the repo and follows the documented domain:
+      matching (an exact host, a leading *. for subdomains, * within one
+      label). A deny or ask rule in a settings file in the same .claude/ folder
+      that covers the host cancels the finding; deny and ask rules in user or
+      managed settings are not seen. A rule for one account's site, such as
+      WebFetch(domain:alice.github.io), is not flagged. WebFetch() and other
+      specifiers without domain:, WebSearch rules, Bash rules for curl or wget
+      and MCP fetch tools are not judged. The host list is fixed; other sites
+      that host user content are not judged.
+    fix: >
+      Remove the WebFetch allow rule for these hosts from committed settings so
+      each fetch prompts, or narrow it to a host the project controls, such as
+      its own docs site. If you trust a host for your own work, add the rule to
+      ~/.claude/settings.json instead. To make a host prompt or be refused for
+      the whole team, add a WebFetch(domain:...) rule to permissions.ask or
+      permissions.deny in the committed settings; deny rules win over allow
+      rules from any scope, and ask rules are evaluated before allow rules.

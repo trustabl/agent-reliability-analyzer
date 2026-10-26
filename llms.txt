@@ -1,6 +1,6 @@
-# Trustabl
+# Agent Reliability Analyzer (Trustabl)
 
-> Trustabl is an open-source tool for AI agent reliability: it finds the
+> Agent Reliability Analyzer, by Trustabl, is an open-source tool for AI agent reliability: it finds the
 > reliability, safety, and security defects in an agent codebase and
 > automatically fixes them. It discovers a repo's agent/tool inventory via
 > tree-sitter, runs YAML-defined detection rules against it, reports weaknesses

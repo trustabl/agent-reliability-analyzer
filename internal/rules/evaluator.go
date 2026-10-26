@@ -184,6 +184,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoMCPConfigLaunchesLocalCommand != nil && (len(inv.ProjectConfig.LocalMCPLaunch) > 0) != *e.RepoMCPConfigLaunchesLocalCommand {
 		return false
 	}
+	if e.RepoMCPConfigLaunchesUnpinnedPackage != nil && (len(inv.ProjectConfig.UnpinnedMCPLaunch) > 0) != *e.RepoMCPConfigLaunchesUnpinnedPackage {
+		return false
+	}
 	if e.RepoCodexHookRunsRepoCommand != nil && (len(inv.ProjectConfig.CodexRiskyHooks) > 0) != *e.RepoCodexHookRunsRepoCommand {
 		return false
 	}
@@ -193,6 +196,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoHarnessGuidanceHasHiddenText != nil && (len(inv.ProjectConfig.HiddenHarnessText) > 0) != *e.RepoHarnessGuidanceHasHiddenText {
 		return false
 	}
+	if e.RepoSettingsPreapproveUserContentFetch != nil && (len(inv.ProjectConfig.UserContentFetchAllow) > 0) != *e.RepoSettingsPreapproveUserContentFetch {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -200,6 +206,21 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 		return false
 	}
 	if e.RepoOtelLabelsImplemented != nil && !PredRepoOtelLabelsImplemented(*e.RepoOtelLabelsImplemented, inv) {
+		return false
+	}
+	if e.RepoCIAgentUntrustedTriggerUngated != nil && (len(inv.CIWorkflows.UntrustedUngated) > 0) != *e.RepoCIAgentUntrustedTriggerUngated {
+		return false
+	}
+	if e.RepoCIAgentUntrustedTriggerPrivileged != nil && (len(inv.CIWorkflows.UntrustedPrivileged) > 0) != *e.RepoCIAgentUntrustedTriggerPrivileged {
+		return false
+	}
+	if e.RepoCIAgentCheckoutPersistsCredentials != nil && (len(inv.CIWorkflows.CheckoutPersists) > 0) != *e.RepoCIAgentCheckoutPersistsCredentials {
+		return false
+	}
+	if e.RepoCIAgentUnrestrictedShell != nil && (len(inv.CIWorkflows.UnrestrictedShell) > 0) != *e.RepoCIAgentUnrestrictedShell {
+		return false
+	}
+	if e.RepoCIAgentNoEgressRestriction != nil && (len(inv.CIWorkflows.NoEgressRestriction) > 0) != *e.RepoCIAgentNoEgressRestriction {
 		return false
 	}
 	if e.RepoOtelLabelsRunShared != nil && !PredRepoOtelLabelsRunShared(*e.RepoOtelLabelsRunShared, inv) {
@@ -262,6 +283,9 @@ func (e MatchExpr) EvaluateSubagent(s models.SubagentDef, inv models.RepoInvento
 		return false
 	}
 	if len(e.SubagentGrantsTool) > 0 && !PredSubagentGrantsTool(s, e.SubagentGrantsTool) {
+		return false
+	}
+	if e.SubagentInheritsAllTools != nil && PredSubagentInheritsAllTools(s) != *e.SubagentInheritsAllTools {
 		return false
 	}
 	return true
@@ -515,7 +539,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_langgraph_platform_config_present": true,
 	},
 	models.ScopeSubagent: {
-		"subagent_grants_tool": true,
+		"subagent_grants_tool":        true,
+		"subagent_inherits_all_tools": true,
 	},
 	models.ScopeSkill: {
 		"skill_allows_unrestricted_shell":               true,
@@ -568,9 +593,16 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_workspace_env_overrides_trust":           true,
 		"repo_editor_agent_auto_approve":               true,
 		"repo_mcp_config_launches_local_command":       true,
+		"repo_mcp_config_launches_unpinned_package":    true,
 		"repo_codex_hook_runs_repo_command":            true,
 		"repo_agents_md_has_hidden_text":               true,
 		"repo_harness_guidance_has_hidden_text":        true,
+		"repo_ci_agent_untrusted_trigger_ungated":      true,
+		"repo_ci_agent_untrusted_trigger_privileged":   true,
+		"repo_ci_agent_checkout_persists_credentials":  true,
+		"repo_ci_agent_unrestricted_shell":             true,
+		"repo_ci_agent_no_egress_restriction":          true,
+		"repo_settings_preapprove_user_content_fetch":  true,
 	},
 }
 
@@ -631,6 +663,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentServerReachable != nil, "agent_server_reachable")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
+	add(e.SubagentInheritsAllTools != nil, "subagent_inherits_all_tools")
 	// Skill scope
 	add(e.SkillAllowsUnrestrictedShell != nil, "skill_allows_unrestricted_shell")
 	add(len(e.SkillAllowsTool) > 0, "skill_allows_tool")
@@ -665,9 +698,16 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoWorkspaceEnvOverridesTrust != nil, "repo_workspace_env_overrides_trust")
 	add(e.RepoEditorAgentAutoApprove != nil, "repo_editor_agent_auto_approve")
 	add(e.RepoMCPConfigLaunchesLocalCommand != nil, "repo_mcp_config_launches_local_command")
+	add(e.RepoMCPConfigLaunchesUnpinnedPackage != nil, "repo_mcp_config_launches_unpinned_package")
 	add(e.RepoCodexHookRunsRepoCommand != nil, "repo_codex_hook_runs_repo_command")
 	add(e.RepoAgentsMdHasHiddenText != nil, "repo_agents_md_has_hidden_text")
 	add(e.RepoHarnessGuidanceHasHiddenText != nil, "repo_harness_guidance_has_hidden_text")
+	add(e.RepoCIAgentUntrustedTriggerUngated != nil, "repo_ci_agent_untrusted_trigger_ungated")
+	add(e.RepoCIAgentUntrustedTriggerPrivileged != nil, "repo_ci_agent_untrusted_trigger_privileged")
+	add(e.RepoCIAgentCheckoutPersistsCredentials != nil, "repo_ci_agent_checkout_persists_credentials")
+	add(e.RepoCIAgentUnrestrictedShell != nil, "repo_ci_agent_unrestricted_shell")
+	add(e.RepoCIAgentNoEgressRestriction != nil, "repo_ci_agent_no_egress_restriction")
+	add(e.RepoSettingsPreapproveUserContentFetch != nil, "repo_settings_preapprove_user_content_fetch")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")

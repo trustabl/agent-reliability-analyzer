@@ -206,6 +206,15 @@ type SubagentDef struct {
 	HasHooks        bool        `json:"has_hooks,omitempty"`
 	Isolation       string      `json:"isolation,omitempty"`
 	Location                    // file_path / start_line / end_line (flat in JSON via anonymous embed)
+
+	// ToolsOmitted is true when the frontmatter has no `tools` key. A `tools:`
+	// key with an empty or null value is not omitted. In-memory only; read by
+	// subagent_inherits_all_tools (CSDK-115).
+	ToolsOmitted bool `json:"-"`
+	// Canonical is true when the file was found in a .claude/agents/ directory
+	// (DiscoverSubagents pass 1), false for the frontmatter-shape fallback.
+	// In-memory only.
+	Canonical bool `json:"-"`
 }
 
 // SkillDef is one parsed Claude Code skill (a SKILL.md file). allowed-tools and
@@ -360,13 +369,17 @@ type ConfigHit struct {
 }
 
 // ProjectConfigFacts are the typed facts behind the agent_config rules
-// (AGCFG-004..007, MCPCFG-002). Each slice is sorted by path, line, reason.
+// (AGCFG-004..007, MCPCFG-002/003). Each slice is sorted by path, line, reason.
 type ProjectConfigFacts struct {
 	MCPAutoEnable     []ConfigHit `json:"mcp_auto_enable,omitempty"`     // AGCFG-004
 	RiskyHooks        []ConfigHit `json:"risky_hooks,omitempty"`         // AGCFG-005
 	TrustOverrideEnv  []ConfigHit `json:"trust_override_env,omitempty"`  // AGCFG-006
 	EditorAutoApprove []ConfigHit `json:"editor_auto_approve,omitempty"` // AGCFG-007
 	LocalMCPLaunch    []ConfigHit `json:"local_mcp_launch,omitempty"`    // MCPCFG-002
+	// UnpinnedMCPLaunch is a server started by a package runner (npx, bunx,
+	// pnpm dlx, uvx, uv tool run, pipx run, docker run) on a package or image
+	// with no exact version or digest. Disjoint from LocalMCPLaunch. MCPCFG-003.
+	UnpinnedMCPLaunch []ConfigHit `json:"unpinned_mcp_launch,omitempty"`
 	// CodexRiskyHooks is kept apart from RiskyHooks on purpose: Codex skips a
 	// project hook until the user reviews and trusts it, so AGCFG-005's "runs
 	// before trust" claim does not hold for it. AGCFG-008 reads this list.
@@ -378,6 +391,10 @@ type ProjectConfigFacts struct {
 	// OpenCode harness tree (systemprompt.md, guardrails.md, ...). AGCFG-010 reads
 	// this list; AGCFG-009 keeps reading HiddenAgentText only.
 	HiddenHarnessText []ConfigHit `json:"hidden_harness_text,omitempty"`
+	// UserContentFetchAllow is a WebFetch allow rule in .claude/settings*.json
+	// that covers a host serving user-published content, not cancelled by a
+	// deny or ask rule in the same .claude/ folder. AGCFG-011 reads this list.
+	UserContentFetchAllow []ConfigHit `json:"user_content_fetch_allow,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

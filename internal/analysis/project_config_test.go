@@ -183,6 +183,104 @@ func TestProjectConfig_LocalMCPLaunch(t *testing.T) {
 	}
 }
 
+func TestProjectConfig_UnpinnedMCPLaunch(t *testing.T) {
+	srv := func(body string) string { return `{"mcpServers":{"s":` + body + `}}` }
+	digest := "sha256:" + strings.Repeat("0", 64)
+	fire := []string{
+		`{"command":"npx","args":["-y","@example/mcp-fs","/tmp"]}`,
+		`{"command":"npx","args":["-y","pkg@latest"]}`,
+		`{"command":"npx","args":["pkg@next"]}`,
+		`{"command":"npx","args":["pkg@^1.2.0"]}`,
+		`{"command":"npx","args":["pkg@~1.2"]}`,
+		`{"command":"npx","args":["pkg@1"]}`,
+		`{"command":"npx","args":["--package=@example/pkg","-c","srv"]}`,
+		`{"command":"npx","args":["--package","@example/pkg","-c","srv"]}`,
+		`{"command":"npx","args":["--registry","https://r.example.invalid","-y","pkg"]}`,
+		`{"command":"C:\\tools\\npx.exe","args":["-y","pkg"]}`,
+		`{"command":"bunx","args":["pkg"]}`,
+		`{"command":"pnpm","args":["dlx","pkg@latest"]}`,
+		`{"command":"uvx","args":["example-git"]}`,
+		`{"command":"uvx","args":["example-git@latest"]}`,
+		`{"command":"uvx","args":["--from","example-git>=0.6","example-git"]}`,
+		`{"command":"uvx","args":["--python","3.12","example-git"]}`,
+		`{"command":"uvx","args":["--from","example-git==0.*","example-git"]}`,
+		`{"command":"uv","args":["tool","run","example-fetch"]}`,
+		`{"command":"pipx","args":["run","example-time"]}`,
+		`{"command":"pipx","args":["run","--spec","pkg>=1","pkg"]}`,
+		`{"command":"docker","args":["run","-i","--rm","ghcr.io/example/srv"]}`,
+		`{"command":"docker","args":["run","-i","--rm","img:latest"]}`,
+		`{"command":"docker","args":["run","-i","--rm","-e","TOKEN","img:1.2.3"]}`,
+	}
+	for _, body := range fire {
+		f := discoverWith(t, ".mcp.json", srv(body), models.ComponentMCPConfig)
+		if len(f.UnpinnedMCPLaunch) != 1 {
+			t.Errorf("%s: want one unpinned hit, got %+v", body, f.UnpinnedMCPLaunch)
+		}
+		if len(f.LocalMCPLaunch) != 0 {
+			t.Errorf("%s: MCPCFG-002 must not also fire, got %+v", body, f.LocalMCPLaunch)
+		}
+	}
+	silent := []string{
+		`{"command":"npx","args":["-y","@example/pkg@1.2.3"]}`,
+		`{"command":"npx","args":["-y","pkg@1.2.3-beta.1"]}`,
+		`{"command":"npx","args":["--package=@example/pkg@1.2.3","-c","srv"]}`,
+		`{"command":"bunx","args":["pkg@1.2.3"]}`,
+		`{"command":"pnpm","args":["dlx","pkg@1.2.3"]}`,
+		`{"command":"uvx","args":["example-git@0.6.2"]}`,
+		`{"command":"uvx","args":["--from","example-git==0.6.2","example-git"]}`,
+		`{"command":"uvx","args":["example-git==0.6.2"]}`,
+		`{"command":"pipx","args":["run","--spec","pkg==1.0.0","pkg"]}`,
+		`{"command":"docker","args":["run","-i","--rm","img@` + digest + `"]}`,
+		`{"command":"docker","args":["run","-i","img:1.2@` + digest + `"]}`,
+		`{"url":"https://mcp.example.invalid/sse"}`,
+		`{"command":"npx","args":["-y","./local-srv"]}`,
+		`{"command":"npx","args":["github:user/repo"]}`,
+		`{"command":"npx","args":["user/repo"]}`,
+		`{"command":"npx","args":["pkg@github:user/repo"]}`,
+		`{"command":"npx","args":["-y","${PKG}"]}`,
+		`{"command":"uvx","args":["--from","git+https://example.invalid/r.git","srv"]}`,
+		`{"command":"uvx","args":["./local-tool"]}`,
+		`{"command":"docker","args":["run","-i","--rm","${IMAGE}"]}`,
+		`{"command":"npx"}`,
+		`{"command":"npx","args":["-c","echo hi"]}`,
+		`{"command":"node","args":["/opt/srv.js"]}`,
+		`{"command":"python","args":["-m","pkg.server"]}`,
+		`{"command":"docker","args":["compose","up"]}`,
+		`{"command":"pnpm","args":["--silent","dlx","pkg"]}`, // documented limit: a flag before the subcommand
+	}
+	for _, body := range silent {
+		if f := discoverWith(t, ".mcp.json", srv(body), models.ComponentMCPConfig); len(f.UnpinnedMCPLaunch) != 0 {
+			t.Errorf("%s: want silent, got %+v", body, f.UnpinnedMCPLaunch)
+		}
+	}
+
+	// A command inside the repo is MCPCFG-002's, never MCPCFG-003's.
+	f := discoverWith(t, ".mcp.json", srv(`{"command":"./node_modules/.bin/npx","args":["-y","pkg"]}`), models.ComponentMCPConfig)
+	if len(f.LocalMCPLaunch) == 0 || len(f.UnpinnedMCPLaunch) != 0 {
+		t.Errorf("repo-relative npx: want MCPCFG-002 only, got local=%+v unpinned=%+v", f.LocalMCPLaunch, f.UnpinnedMCPLaunch)
+	}
+
+	// The same classifier runs over every parsed config shape.
+	vs := `{"servers":{"s":{"command":"bunx","args":["pkg"]}}}`
+	if f := discoverWith(t, ".vscode/mcp.json", vs, models.ComponentMCPConfig); len(f.UnpinnedMCPLaunch) == 0 {
+		t.Error(".vscode/mcp.json servers: want a hit")
+	}
+	gem := `{"mcpServers":{"s":{"command":"npx","args":["pkg"]}}}`
+	if f := discoverWith(t, ".gemini/settings.json", gem, models.ComponentGeminiSettings); len(f.UnpinnedMCPLaunch) == 0 {
+		t.Error(".gemini/settings.json mcpServers: want a hit")
+	}
+	toml := "[mcp_servers.s]\ncommand = \"uvx\"\nargs = [\"pkg\"]\n"
+	if f := discoverWith(t, ".codex/config.toml", toml, models.ComponentCodexConfig); len(f.UnpinnedMCPLaunch) == 0 {
+		t.Error("codex mcp_servers: want a hit")
+	}
+
+	// The reason names the server and a fixed phrase, never the package spec.
+	f = discoverWith(t, ".mcp.json", srv(`{"command":"npx","args":["-y","@example/secret-name"]}`), models.ComponentMCPConfig)
+	if len(f.UnpinnedMCPLaunch) != 1 || strings.Contains(f.UnpinnedMCPLaunch[0].Reason, "secret-name") {
+		t.Errorf("reason must not echo the spec: %+v", f.UnpinnedMCPLaunch)
+	}
+}
+
 func TestProjectConfig_Deterministic(t *testing.T) {
 	body := `{"hooks":{"A":[{"command":"./a.sh"}],"B":[{"command":"./b.sh"}],"C":[{"command":"curl x"}]}}`
 	first, _ := json.Marshal(discoverWith(t, ".claude/settings.json", body, models.ComponentClaudeSettings))
@@ -191,5 +289,95 @@ func TestProjectConfig_Deterministic(t *testing.T) {
 		if string(got) != string(first) {
 			t.Fatalf("run %d differs:\n%s\n%s", i, got, first)
 		}
+	}
+}
+
+func TestProjectConfig_UserContentFetchAllow(t *testing.T) {
+	settings := func(allow, deny, ask string) string {
+		return `{"permissions": {"allow": [` + allow + `], "deny": [` + deny + `], "ask": [` + ask + `]}}`
+	}
+	cases := []struct {
+		name, body string
+		want       int
+	}{
+		{"github.com", settings(`"WebFetch(domain:github.com)"`, "", ""), 1},
+		{"gist", settings(`"WebFetch(domain:gist.github.com)"`, "", ""), 1},
+		{"raw", settings(`"WebFetch(domain:raw.githubusercontent.com)"`, "", ""), 1},
+		{"github.io wildcard", settings(`"WebFetch(domain:*.github.io)"`, "", ""), 1},
+		{"huggingface", settings(`"WebFetch(domain:huggingface.co)"`, "", ""), 1},
+		{"bitbucket", settings(`"WebFetch(domain:bitbucket.org)"`, "", ""), 1},
+		{"pastebin", settings(`"WebFetch(domain:pastebin.com)"`, "", ""), 1},
+		{"readthedocs wildcard", settings(`"WebFetch(domain:*.readthedocs.io)"`, "", ""), 1},
+		{"case and trailing dot", settings(`"WebFetch(domain:GitHub.com.)"`, "", ""), 1},
+		{"subdomain wildcard over githubusercontent", settings(`"WebFetch(domain:*.githubusercontent.com)"`, "", ""), 1},
+		{"subdomain wildcard over github.com", settings(`"WebFetch(domain:*.github.com)"`, "", ""), 1},
+		{"trailing wildcard", settings(`"WebFetch(domain:github.*)"`, "", ""), 1},
+		{"domain star", settings(`"WebFetch(domain:*)"`, "", ""), 1},
+		{"bare WebFetch", settings(`"WebFetch"`, "", ""), 1},
+		{"domain star, deny covers one host", settings(`"WebFetch(domain:*)"`, `"WebFetch(domain:github.com)"`, ""), 1},
+		{"two entries", settings(`"WebFetch(domain:github.com)", "WebFetch(domain:pastebin.com)"`, "", ""), 2},
+
+		{"non-listed host", settings(`"WebFetch(domain:docs.example.invalid)"`, "", ""), 0},
+		{"single account site", settings(`"WebFetch(domain:alice.github.io)"`, "", ""), 0},
+		{"wildcard excludes apex", settings(`"WebFetch(domain:*.huggingface.co)"`, "", ""), 0},
+		{"wildcard stays inside a label", settings(`"WebFetch(domain:example.*)"`, "", ""), 0},
+		{"empty parens", settings(`"WebFetch()"`, "", ""), 0},
+		{"url specifier", settings(`"WebFetch(url:https://github.com/x)"`, "", ""), 0},
+		{"WebSearch", settings(`"WebSearch"`, "", ""), 0},
+		{"Bash curl", settings(`"Bash(curl https://pastebin.com/x)"`, "", ""), 0},
+		{"allow and deny same entry", settings(`"WebFetch(domain:github.com)"`, `"WebFetch(domain:github.com)"`, ""), 0},
+		{"ask covers by wildcard", settings(`"WebFetch(domain:gist.github.com)"`, "", `"WebFetch(domain:*.github.com)"`), 0},
+		{"bare deny cancels domain star", settings(`"WebFetch(domain:*)"`, `"WebFetch"`, ""), 0},
+		{"allow list under another key", `{"other": {"allow": ["WebFetch"]}}`, 0},
+		{"malformed json", `{"permissions": {"allow": ["WebFetch(domain:github.com)",]}}`, 0},
+	}
+	for _, c := range cases {
+		f := discoverWith(t, ".claude/settings.json", c.body, models.ComponentClaudeSettings)
+		if got := len(f.UserContentFetchAllow); got != c.want {
+			t.Errorf("%s: got %d hits, want %d (%+v)", c.name, got, c.want, f.UserContentFetchAllow)
+		}
+	}
+}
+
+func TestProjectConfig_UserContentFetchAllowCancelScope(t *testing.T) {
+	kinds := func(files map[string]string) map[string]models.ComponentKind {
+		k := map[string]models.ComponentKind{}
+		for rel := range files {
+			k[rel] = models.ComponentClaudeSettings
+		}
+		return k
+	}
+	run := func(files map[string]string) models.ProjectConfigFacts {
+		m := projectConfigFixture(t, files, kinds(files))
+		return DiscoverProjectConfig(m, DiscoverClaudeSettings(m))
+	}
+
+	// A deny in settings.local.json cancels an allow in settings.json: same folder.
+	same := run(map[string]string{
+		".claude/settings.json":       `{"permissions": {"allow": ["WebFetch(domain:github.com)"]}}`,
+		".claude/settings.local.json": `{"permissions": {"deny": ["WebFetch(domain:github.com)"]}}`,
+	})
+	if len(same.UserContentFetchAllow) != 0 {
+		t.Errorf("same-folder deny did not cancel the allow: %+v", same.UserContentFetchAllow)
+	}
+
+	// A deny in a nested .claude/ folder does not cancel the root allow.
+	nested := run(map[string]string{
+		".claude/settings.json":     `{"permissions": {"allow": ["WebFetch(domain:github.com)"]}}`,
+		"pkg/.claude/settings.json": `{"permissions": {"deny": ["WebFetch(domain:github.com)"]}}`,
+	})
+	if len(nested.UserContentFetchAllow) != 1 || nested.UserContentFetchAllow[0].FilePath != ".claude/settings.json" {
+		t.Errorf("nested deny must not cancel the root allow: %+v", nested.UserContentFetchAllow)
+	}
+}
+
+func TestProjectConfig_UserContentFetchAllowLine(t *testing.T) {
+	body := "{\n  \"permissions\": {\n    \"allow\": [\n      \"Read\",\n      \"WebFetch(domain:huggingface.co)\"\n    ]\n  }\n}\n"
+	f := discoverWith(t, ".claude/settings.json", body, models.ComponentClaudeSettings)
+	if len(f.UserContentFetchAllow) != 1 || f.UserContentFetchAllow[0].Line != 5 {
+		t.Fatalf("want one hit on line 5, got %+v", f.UserContentFetchAllow)
+	}
+	if !strings.Contains(f.UserContentFetchAllow[0].Reason, "huggingface.co") {
+		t.Errorf("reason should name the host: %q", f.UserContentFetchAllow[0].Reason)
 	}
 }

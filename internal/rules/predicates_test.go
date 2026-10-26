@@ -1609,6 +1609,26 @@ func TestPredSubagentGrantsTool(t *testing.T) {
 	}
 }
 
+func TestPredSubagentInheritsAllTools(t *testing.T) {
+	cases := []struct {
+		name string
+		s    models.SubagentDef
+		want bool
+	}{
+		{"canonical, tools omitted", models.SubagentDef{Canonical: true, ToolsOmitted: true}, true},
+		{"omitted but not canonical", models.SubagentDef{ToolsOmitted: true}, false},
+		{"canonical, omitted, disallowedTools set", models.SubagentDef{Canonical: true, ToolsOmitted: true, DisallowedTools: []string{"Bash"}}, false},
+		{"tools key present but empty", models.SubagentDef{Canonical: true}, false},
+		{"hand-built Tools with ToolsOmitted set", models.SubagentDef{Canonical: true, ToolsOmitted: true, Tools: []string{"Read"}}, false},
+		{"zero value", models.SubagentDef{}, false},
+	}
+	for _, c := range cases {
+		if got := rules.PredSubagentInheritsAllTools(c.s); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // TestPredSkillAllowsUnrestrictedTool exercises the per-tool "unrestricted"
 // table: Bash/PowerShell and WebFetch/Edit have real pattern-argument
 // restrictions Claude Code enforces, while Write and NotebookEdit accept a
