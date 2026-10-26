@@ -427,6 +427,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.PluginManifests = analysis.DiscoverPlugins(profile.Manifest)
 	inventory.ClaudeSettings = analysis.DiscoverClaudeSettings(profile.Manifest)
 	inventory.ProjectConfig = analysis.DiscoverProjectConfig(profile.Manifest, inventory.ClaudeSettings)
+	inventory.CIWorkflows = analysis.DiscoverCIWorkflows(profile.Manifest)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
 	// Server-entrypoint fact (Python): must follow DiscoverAgentRunCalls, which
@@ -655,6 +656,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 		Dependencies:        inventory.Dependencies,
 		Observability:       inventory.ObservabilitySignals,
 		Entrypoints:         inventory.Entrypoints,
+		OtelLabels:          inventory.OtelLabelsSignals,
 		Vulnerabilities:     vulns,
 		Secrets:             secrets,
 		SlashCommands:       inventory.SlashCommands,
