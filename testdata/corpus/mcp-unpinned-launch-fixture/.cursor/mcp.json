@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "img-tag": { "command": "docker", "args": ["run", "-i", "--rm", "ghcr.io/example/mcp-server:1.0.0"] },
+    "img-digest": { "command": "docker", "args": ["run", "-i", "--rm", "ghcr.io/example/mcp-server@sha256:0000000000000000000000000000000000000000000000000000000000000000"] }
+  }
+}

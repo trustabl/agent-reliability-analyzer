@@ -33,7 +33,7 @@ policy:
   category: claude_sdk                      # REQUIRED. Inherited by every rule in this file. Allowed:
                                             #   claude_sdk | openai_sdk | openshell | google_adk | mcp |
                                             #   langchain | crewai | pydantic_ai | vercel_ai | autogen | claude_skill |
-                                            #   observability | raw_llm_sdk | agent_config.
+                                            #   observability | raw_llm_sdk | agent_config | ci.
 
   description: >                            # REQUIRED. Multi-line ok. Describe the policy's intent.
     Rules that govern outbound network calls made from inside agent tools.
@@ -110,7 +110,8 @@ rules:
                                             #           claude_sdk, openai_agents, google_adk, openshell, mcp,
                                             #           langchain, crewai, pydantic_ai, vercel_ai, autogen,
                                             #           raw_llm_sdk (bare anthropic/openai client usage),
-                                            #           agent_config (pre-trust harness config; no SDK gate).
+                                            #           agent_config (pre-trust harness config; no SDK gate),
+#           github_actions (coding agents in GitHub Actions workflows; no SDK gate).
                                             # (Authoritative per-scope applies_to set: internal/rules/loader.go
                                             #  appliesToByScope — the lists here are a human summary of it.)
 
@@ -447,6 +448,14 @@ rules:
 #       in the list — e.g. tools: [Bash, Write, WebSearch]). Use for subagents
 #       that call system tools or manipulate files.
 #
+#   subagent_inherits_all_tools: true | false
+#       True when a subagent found in a .claude/agents/ directory has no
+#       `tools:` key in its frontmatter and no disallowedTools entries.
+#       Claude Code gives such a subagent all tools available to subagents.
+#       A `tools:` key with an empty or null value counts as declared (false).
+#       Files found by the frontmatter-shape fallback are excluded. Used by
+#       CSDK-115.
+#
 #
 # ━━━ SKILL-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # (used only in scope: skill rules — Claude Code Agent Skills, SKILL.md)
@@ -668,6 +677,28 @@ rules:
 #       repo needs only the run end. Proves the calls exist, not that the
 #       labels land: with no current span each call is a silent no-op.
 #       trustabl.* keys written by hand with set_attribute(s) count too.
+#   repo_otel_labels_run_shared: true | false
+#       Fires when a Run of agent-reliability-otel-labels is (or is not) shared
+#       between runs: built at module scope, in a class body, or as a Python
+#       default argument, or given a literal run id. A Python construct under
+#       `if __name__ == "__main__":` is a one-run script and does not count.
+#       Run is matched through each file's import. Test files never count.
+#   repo_otel_labels_tool_span_failure_unsafe: true | false
+#       Fires when tool spans are (or are not) labelled only on success:
+#       mark_tool_span / markToolSpan calls exist and none sits in a finally,
+#       except or catch block, a named error callback, or a function passed to
+#       .finally( / .catch(. Calls inside an OpenAI Agents RunHooks / AgentHooks
+#       on_tool_end method are left out (unknown). One failure-safe call
+#       credits the repo. Test files never count.
+#   repo_otel_labels_attempt_constant: true | false
+#       Fires when every tool-span label passes `attempt` as an integer
+#       literal. One counted attempt credits the repo. Test files never count.
+#   repo_otel_labels_run_end_success_only: true | false
+#       Fires when run-end labels exist and none can record a failure. A call
+#       credits the repo when it sits in an except / catch block, an error
+#       callback or a .catch( handler, passes the literal "error", or passes a
+#       variable reason. A fixed reason in finally does not credit it. Test
+#       files never count.
 #   repo_raw_anthropic_tool_output_in_system: true | false
 #       Fires when a function drives the bare `anthropic` client in a manual
 #       tool-use loop (.messages.create(..., tools=...)) and passes a runtime-
@@ -703,6 +734,16 @@ rules:
 #       server with an interpreter plus inline code or a repo-relative script,
 #       or a command path inside the repo (ProjectConfigFacts.LocalMCPLaunch).
 #       Published packages and remote URL servers are not flagged. MCPCFG-002.
+#   repo_mcp_config_launches_unpinned_package: true | false
+#       True when a project MCP config (.mcp.json, .cursor/mcp.json,
+#       .vscode/mcp.json, claude_desktop_config.json, .gemini/settings.json,
+#       .codex/config.toml) starts a server with npx, bunx, pnpm dlx, uvx,
+#       uv tool run, pipx run or docker run on a package or image with no exact
+#       version (npm: exact semver; uv and pipx: ==, or uv's name@version;
+#       docker: an @sha256: digest) (ProjectConfigFacts.UnpinnedMCPLaunch).
+#       Git, URL, local-path and $VAR specs are not judged; a command inside the
+#       repo is left to repo_mcp_config_launches_local_command, so the two never
+#       judge one entry. MCPCFG-003.
 #   repo_codex_hook_runs_repo_command: true | false
 #       True when a committed .codex/hooks.json command or commandWindows runs a
 #       repo-relative script (including the documented
@@ -724,6 +765,35 @@ rules:
 #       tool_descriptions/*.md; ProjectConfigFacts.HiddenHarnessText). Same
 #       exemptions, text never echoed. AGCFG-010. A separate predicate from
 #       repo_agents_md_has_hidden_text, which keeps its AGENTS.md-only meaning.
+#   repo_ci_agent_untrusted_trigger_ungated: true | false
+#       CI workflows (category ci; applies_to github_actions). True when a coding
+#       agent step runs on pull_request_target, issue_comment, issues, discussion,
+#       discussion_comment or pull_request_review_comment with no actor gate
+#       (CIWorkflowFacts.UntrustedUngated). A gate is an author_association
+#       allow-list of OWNER/MEMBER/COLLABORATOR, a literal actor check, or (for
+#       pull_request_target) a same-repo check, on the job, the step or a needs
+#       ancestor; claude-code-action and codex-action count as gated through
+#       their own write-access check unless a '*' bypass input is set. `if:`
+#       text is matched, never evaluated. One hit per agent step. CI-001.
+#   repo_ci_agent_untrusted_trigger_privileged: true | false
+#       The CI-001 condition plus a write token (write-all, or contents,
+#       pull-requests, actions or packages: write), a secret outside the agent's
+#       model-key input, or `secrets: inherit`
+#       (CIWorkflowFacts.UntrustedPrivileged). CI-002.
+#   repo_ci_agent_checkout_persists_credentials: true | false
+#       An agent job on an untrusted trigger has an actions/checkout step whose
+#       persist-credentials is not the literal false
+#       (CIWorkflowFacts.CheckoutPersists). Fires with or without an actor gate.
+#       CI-003.
+#   repo_ci_agent_unrestricted_shell: true | false
+#       An agent step on an untrusted trigger grants Bash with no pattern or a
+#       shell/interpreter/download-tool prefix, a bare run_shell_command, or
+#       skips approvals or the sandbox (CIWorkflowFacts.UnrestrictedShell).
+#       CI-004.
+#   repo_ci_agent_no_egress_restriction: true | false
+#       An agent step on an untrusted trigger has shell or fetch access and no
+#       earlier step-security/harden-runner step with egress-policy: block in the
+#       same job (CIWorkflowFacts.NoEgressRestriction). CI-005.
 #   repo_settings_preapprove_user_content_fetch: true | false
 #       A WebFetch rule in permissions.allow of .claude/settings.json or
 #       settings.local.json covers a host serving user-published content

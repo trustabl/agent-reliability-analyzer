@@ -1609,6 +1609,26 @@ func TestPredSubagentGrantsTool(t *testing.T) {
 	}
 }
 
+func TestPredSubagentInheritsAllTools(t *testing.T) {
+	cases := []struct {
+		name string
+		s    models.SubagentDef
+		want bool
+	}{
+		{"canonical, tools omitted", models.SubagentDef{Canonical: true, ToolsOmitted: true}, true},
+		{"omitted but not canonical", models.SubagentDef{ToolsOmitted: true}, false},
+		{"canonical, omitted, disallowedTools set", models.SubagentDef{Canonical: true, ToolsOmitted: true, DisallowedTools: []string{"Bash"}}, false},
+		{"tools key present but empty", models.SubagentDef{Canonical: true}, false},
+		{"hand-built Tools with ToolsOmitted set", models.SubagentDef{Canonical: true, ToolsOmitted: true, Tools: []string{"Read"}}, false},
+		{"zero value", models.SubagentDef{}, false},
+	}
+	for _, c := range cases {
+		if got := rules.PredSubagentInheritsAllTools(c.s); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // TestPredSkillAllowsUnrestrictedTool exercises the per-tool "unrestricted"
 // table: Bash/PowerShell and WebFetch/Edit have real pattern-argument
 // restrictions Claude Code enforces, while Write and NotebookEdit accept a
@@ -2041,5 +2061,103 @@ func TestPredRepoOtelLabels_HandWrittenKeysCredit(t *testing.T) {
 	}
 	if !rules.PredRepoOtelLabelsImplemented(true, attr("trustabl.exit_reason", "trustabl.tool.attempt")) {
 		t.Error("trustabl.tool.attempt counts as a tool-span key")
+	}
+}
+
+func otelInv(sigs ...models.OtelLabelsSignal) models.RepoInventory {
+	return models.RepoInventory{OtelLabelsSignals: sigs}
+}
+
+func TestPredRepoOtelLabelsRunShared(t *testing.T) {
+	run := func(s models.OtelLabelsSignal) models.OtelLabelsSignal {
+		s.Kind = models.OtelLabelsRunConstruct
+		return s
+	}
+	cases := []struct {
+		name string
+		inv  models.RepoInventory
+		want bool
+	}{
+		{"no Run at all", otelInv(), false},
+		{"per-run Run", otelInv(run(models.OtelLabelsSignal{})), false},
+		{"module-scope Run", otelInv(run(models.OtelLabelsSignal{ModuleScope: true})), true},
+		{"literal run id", otelInv(run(models.OtelLabelsSignal{RunIDConst: true})), true},
+		{"module-scope Run only in a test file", otelInv(run(models.OtelLabelsSignal{ModuleScope: true, TestOrigin: true})), false},
+	}
+	for _, tc := range cases {
+		if got := rules.PredRepoOtelLabelsRunShared(true, tc.inv); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestPredRepoOtelLabelsToolSpanFailureUnsafe(t *testing.T) {
+	span := func(s models.OtelLabelsSignal) models.OtelLabelsSignal {
+		s.Kind = models.OtelLabelsToolSpan
+		return s
+	}
+	cases := []struct {
+		name string
+		inv  models.RepoInventory
+		want bool
+	}{
+		{"no tool spans", otelInv(), false},
+		{"every span unsafe", otelInv(span(models.OtelLabelsSignal{}), span(models.OtelLabelsSignal{})), true},
+		{"one safe span credits the repo", otelInv(span(models.OtelLabelsSignal{}), span(models.OtelLabelsSignal{FailureSafe: true})), false},
+		{"only success-hook spans: unknown, not unsafe", otelInv(span(models.OtelLabelsSignal{HookUnknown: true})), false},
+		{"unsafe span only in a test file", otelInv(span(models.OtelLabelsSignal{TestOrigin: true})), false},
+		{"a safe test span does not credit unsafe production spans", otelInv(span(models.OtelLabelsSignal{}), span(models.OtelLabelsSignal{FailureSafe: true, TestOrigin: true})), true},
+	}
+	for _, tc := range cases {
+		if got := rules.PredRepoOtelLabelsToolSpanFailureUnsafe(true, tc.inv); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestPredRepoOtelLabelsAttemptConstant(t *testing.T) {
+	span := func(s models.OtelLabelsSignal) models.OtelLabelsSignal {
+		s.Kind = models.OtelLabelsToolSpan
+		return s
+	}
+	cases := []struct {
+		name string
+		inv  models.RepoInventory
+		want bool
+	}{
+		{"no tool spans", otelInv(), false},
+		{"every attempt constant", otelInv(span(models.OtelLabelsSignal{AttemptConst: true})), true},
+		{"one counted attempt credits the repo", otelInv(span(models.OtelLabelsSignal{AttemptConst: true}), span(models.OtelLabelsSignal{})), false},
+		{"constant attempt only in a test file", otelInv(span(models.OtelLabelsSignal{AttemptConst: true, TestOrigin: true})), false},
+	}
+	for _, tc := range cases {
+		if got := rules.PredRepoOtelLabelsAttemptConstant(true, tc.inv); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestPredRepoOtelLabelsRunEndSuccessOnly(t *testing.T) {
+	end := func(s models.OtelLabelsSignal) models.OtelLabelsSignal {
+		s.Kind = models.OtelLabelsRunEnd
+		return s
+	}
+	cases := []struct {
+		name string
+		inv  models.RepoInventory
+		want bool
+	}{
+		{"no run ends", otelInv(), false},
+		{"final_answer only", otelInv(end(models.OtelLabelsSignal{ExitReason: "final_answer"})), true},
+		{"final_answer and max_steps, still no error", otelInv(end(models.OtelLabelsSignal{ExitReason: "final_answer"}), end(models.OtelLabelsSignal{ExitReason: "max_steps"})), true},
+		{"on the error path", otelInv(end(models.OtelLabelsSignal{ExitReason: "final_answer"}), end(models.OtelLabelsSignal{ExitReason: "error", ErrorPath: true})), false},
+		{"literal error anywhere", otelInv(end(models.OtelLabelsSignal{ExitReason: "error"})), false},
+		{"variable reason", otelInv(end(models.OtelLabelsSignal{})), false},
+		{"error path only in a test file", otelInv(end(models.OtelLabelsSignal{ExitReason: "final_answer"}), end(models.OtelLabelsSignal{ExitReason: "error", ErrorPath: true, TestOrigin: true})), true},
+	}
+	for _, tc := range cases {
+		if got := rules.PredRepoOtelLabelsRunEndSuccessOnly(true, tc.inv); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }

@@ -4,10 +4,13 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -514,6 +517,34 @@ func TestScan_SkillNameMatch(t *testing.T) {
 		if strings.HasPrefix(f.RuleID, "CSKILL-") && f.RuleID != "CSKILL-080" {
 			t.Errorf("unexpected skill finding %s fired on skill-name-match", f.RuleID)
 		}
+	}
+}
+
+func TestScan_SubagentToolsInherit(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "subagent-tools-inherit")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+
+	if len(res.Subagents) != 5 {
+		t.Errorf("subagents = %d, want 5", len(res.Subagents))
+	}
+	var hits []models.Finding
+	for _, f := range res.Findings {
+		switch f.RuleID {
+		case "CSDK-115":
+			hits = append(hits, f)
+		case "CSDK-110", "CSDK-111", "CSDK-112":
+			t.Errorf("unexpected %s fired on subagent-tools-inherit", f.RuleID)
+		}
+	}
+	if len(hits) != 1 {
+		t.Fatalf("CSDK-115 findings = %d, want 1: %+v", len(hits), hits)
+	}
+	if hits[0].FilePath != ".claude/agents/inheritor.md" || hits[0].StartLine != 1 {
+		t.Errorf("CSDK-115 at %s:%d, want .claude/agents/inheritor.md:1", hits[0].FilePath, hits[0].StartLine)
 	}
 }
 
@@ -1286,6 +1317,37 @@ func TestScan_PreTrustConfigFixtureFiresEveryRule(t *testing.T) {
 	}
 }
 
+// End to end: the unpinned-launch fixture pairs unpinned and pinned package
+// launches across four client config files. MCPCFG-003 fires once, attributed to
+// the first path-sorted file, MCPCFG-002 stays silent (no entry launches
+// repo-controlled code), and the finding text never echoes a package name.
+func TestScan_UnpinnedMCPLaunchFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "mcp-unpinned-launch-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var unpinned []models.Finding
+	for _, f := range res.Findings {
+		switch f.RuleID {
+		case "MCPCFG-003":
+			unpinned = append(unpinned, f)
+		case "MCPCFG-002":
+			t.Errorf("MCPCFG-002 fired on a package launch (%s:%d)", f.FilePath, f.StartLine)
+		}
+		if strings.Contains(f.Explanation+f.Title, "example-mcp") {
+			t.Errorf("%s echoed a fixture package name", f.RuleID)
+		}
+	}
+	if len(unpinned) != 1 {
+		t.Fatalf("MCPCFG-003 fired %d times, want once; findings: %v", len(unpinned), res.Findings)
+	}
+	if !strings.HasSuffix(unpinned[0].FilePath, ".codex/config.toml") || unpinned[0].StartLine < 1 {
+		t.Errorf("MCPCFG-003 attributed to %s:%d, want .codex/config.toml with a line", unpinned[0].FilePath, unpinned[0].StartLine)
+	}
+}
+
 // End to end: the fetch-permissions fixture pairs user-content allow rules with a
 // non-listed host, a single-account site, a nested folder and a same-folder deny.
 // AGCFG-011 fires once, on the first path-sorted file, at the huggingface entry,
@@ -1323,7 +1385,7 @@ func TestScan_PreTrustConfigSafeVariantsStaySilent(t *testing.T) {
 	dir := t.TempDir()
 	for rel, body := range map[string]string{
 		".claude/settings.json": `{"permissions": {"allow": ["Read", "WebFetch(domain:docs.example.invalid)"]}}`,
-		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "remote": {"url": "https://mcp.example.invalid/sse"}}}`,
+		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "pinned-uv": {"command": "uvx", "args": ["example-mcp-git@0.6.2"]}, "pinned-img": {"command": "docker", "args": ["run", "-i", "--rm", "ghcr.io/example/mcp-server@sha256:` + strings.Repeat("0", 64) + `"]}, "remote": {"url": "https://mcp.example.invalid/sse"}}}`,
 		".gemini/.env":          "PLAIN_SETTING=fake-value-not-real\n",
 		".env":                  "OPENAI_BASE_URL=https://api.example.invalid\nNODE_OPTIONS=--max-old-space-size=4096\n",
 		".vscode/settings.json": "{\n  // fixture only\n  \"chat.tools.autoApprove\": false,\n}\n",
@@ -1473,5 +1535,491 @@ agent = Agent(name="travel-booker")
 				t.Errorf("agent-reliability-otel-labels findings: got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// End to end: the CI fixture has one ungated issues-triggered claude-code-action
+// job (bypass input set) that fires CI-001..CI-005, and one gated gemini job
+// where only CI-003..CI-005 fire. Every finding carries its own file, line and
+// job.
+func TestScan_CIAgentWorkflowFixtureFiresEveryRule(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "ci-agent-workflow-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	const triage, gated = ".github/workflows/issue-triage.yml", ".github/workflows/gated-comment.yml"
+	want := map[string][]string{
+		"CI-001": {triage},
+		"CI-002": {triage},
+		"CI-003": {triage, gated},
+		"CI-004": {triage, gated},
+		"CI-005": {triage, gated},
+	}
+	got := map[string][]string{}
+	for _, f := range res.Findings {
+		if !strings.HasPrefix(f.RuleID, "CI-") {
+			continue
+		}
+		t.Logf("%s %s %s:%d job=%s", f.RuleID, f.Severity, f.FilePath, f.StartLine, f.ToolName)
+		if f.StartLine < 1 || f.ToolName == "" {
+			t.Errorf("%s has no line or job: %+v", f.RuleID, f)
+		}
+		got[f.RuleID] = append(got[f.RuleID], f.FilePath)
+	}
+	for id, files := range want {
+		if len(got[id]) != len(files) {
+			t.Errorf("%s fired in %v, want %v", id, got[id], files)
+			continue
+		}
+		gotFiles := append([]string{}, got[id]...)
+		sort.Strings(gotFiles)
+		wantFiles := append([]string{}, files...)
+		sort.Strings(wantFiles)
+		for i := range wantFiles {
+			if !strings.HasSuffix(gotFiles[i], wantFiles[i]) {
+				t.Errorf("%s hit %d attributed to %q, want a path ending %q", id, i, gotFiles[i], wantFiles[i])
+			}
+		}
+	}
+	if len(res.Manifest.WorkflowFiles) != 2 {
+		t.Errorf("manifest.workflow_files = %v, want 2 files", res.Manifest.WorkflowFiles)
+	}
+	for _, f := range res.Findings {
+		if strings.Contains(f.Explanation+f.Title, "NPM_TOKEN") {
+			t.Errorf("%s leaked a secret name into rule text", f.RuleID)
+		}
+	}
+}
+
+// The "pass" counterpart: hardened workflows shaped like the vendor guidance
+// (gated trigger, read token, persist-credentials false, exact-command tools,
+// harden-runner block). None of the CI rules may fire.
+func TestScan_CIAgentWorkflowSafeVariantsStaySilent(t *testing.T) {
+	dir := t.TempDir()
+	const gate = `contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)`
+	for rel, body := range map[string]string{
+		".github/workflows/claude.yml": `name: claude
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+jobs:
+  claude:
+    if: ` + gate + `
+    runs-on: ubuntu-latest
+    steps:
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: block
+          allowed-endpoints: api.anthropic.com:443
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --allowedTools "Bash(npm test),Read"
+`,
+		".github/workflows/dispatch.yml": `name: dispatch
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  invoke:
+    if: ` + gate + `
+    uses: ./.github/workflows/invoke.yml
+    permissions:
+      contents: read
+`,
+		".github/workflows/invoke.yml": `name: invoke
+on:
+  workflow_call:
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: 'false'
+      - uses: google-github-actions/run-gemini-cli@v0
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: '{"tools": {"core": []}}'
+`,
+		".github/workflows/codex.yml": `name: codex
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+`,
+	} {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "CI-") {
+			t.Errorf("%s fired on a hardened workflow (%s:%d job=%s)", f.RuleID, f.FilePath, f.StartLine, f.ToolName)
+		}
+	}
+}
+
+// Ties the finding-granularity text in the CI rule YAML and docs to behaviour:
+// one finding per step that runs an offending agent, one per actions/checkout
+// step for CI-003, and two agent CLIs in one run: step share a line and give
+// one finding.
+func TestScan_CIFindingGranularity(t *testing.T) {
+	dir := t.TempDir()
+	const wf = `name: granularity
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  two:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          path: other
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_non_write_users: "*"
+          claude_args: --allowedTools "Bash"
+      - uses: google-github-actions/run-gemini-cli@v0
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: '{"tools": {"core": ["run_shell_command"]}}'
+  cli:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: |
+          claude --dangerously-skip-permissions -p hi && codex --dangerously-bypass-approvals-and-sandbox exec hi
+`
+	full := filepath.Join(dir, ".github/workflows/granularity.yml")
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(wf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	type site struct {
+		job  string
+		line int
+	}
+	got := map[string][]site{}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "CI-") {
+			got[f.RuleID] = append(got[f.RuleID], site{f.ToolName, f.StartLine})
+		}
+	}
+	// job "two": 2 agent steps, 2 checkout steps. job "cli": 1 run step with
+	// 2 agent CLIs, bypass flags on both, no gate (CI-001) and no egress
+	// block (CI-005), no write token or extra secret (no CI-002).
+	want := map[string]int{"CI-001": 3, "CI-002": 2, "CI-003": 2, "CI-004": 3, "CI-005": 3}
+	for id, n := range want {
+		sites := got[id]
+		if len(sites) != n {
+			t.Errorf("%s: %d findings %v, want %d", id, len(sites), sites, n)
+		}
+		seen := map[site]bool{}
+		for _, s := range sites {
+			if seen[s] {
+				t.Errorf("%s: duplicate site %+v", id, s)
+			}
+			seen[s] = true
+		}
+	}
+	for id, sites := range got {
+		if _, ok := want[id]; !ok {
+			t.Errorf("unexpected rule %s fired: %v", id, sites)
+		}
+	}
+	// CI-003 is attributed to the checkout steps of job "two", not to "cli".
+	for _, s := range got["CI-003"] {
+		if s.job != "two" {
+			t.Errorf("CI-003 attributed to job %q, want %q", s.job, "two")
+		}
+	}
+}
+
+// The facts the OBS-006..012 rules read are published in the report, so a
+// finding can be checked against them. Not folded into ScanID.
+func TestScan_ReportsOtelLabels(t *testing.T) {
+	dir := t.TempDir()
+	src := `from agent_reliability_otel_labels import Run, mark_run_end
+
+
+def run_agent(root):
+    run = Run()
+    run.mark_start(root)
+    mark_run_end(root, exit_reason="final_answer")
+`
+	if err := os.WriteFile(filepath.Join(dir, "agent.py"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scanner.Run: %v", err)
+	}
+	kinds := map[models.OtelLabelsSignalKind]bool{}
+	for _, s := range res.OtelLabels {
+		kinds[s.Kind] = true
+	}
+	for _, k := range []models.OtelLabelsSignalKind{
+		models.OtelLabelsImport, models.OtelLabelsRunConstruct,
+		models.OtelLabelsRunStart, models.OtelLabelsRunEnd,
+	} {
+		if !kinds[k] {
+			t.Errorf("report has no %q signal: %+v", k, res.OtelLabels)
+		}
+	}
+}
+
+// otelCorrectnessSrc builds an instrumented, fully labelled agent and lets a
+// case swap one part for a broken version.
+func otelCorrectnessSrc(moduleRun, runDecl, attempt, tool, runEnd string) string {
+	return `from agents import Agent, function_tool
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from agent_reliability_otel_labels import Run, canonical_fp, mark_run_end, mark_tool_span
+
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+` + moduleRun + `
+
+@function_tool
+def search_flights(origin: str) -> str:
+    """Search flights from an airport."""
+    return origin
+
+
+agent = Agent(name="travel-booker", tools=[search_flights])
+
+
+def run_agent(args):
+` + runDecl + `
+    attempts = {}
+    with tracer.start_as_current_span("invoke_agent") as root:
+        run.mark_start(root)
+        try:
+            with tracer.start_as_current_span("execute_tool") as span:
+                key = canonical_fp(args)
+                attempts[key] = attempts.get(key, 0) + 1
+` + strings.ReplaceAll(tool, "ATTEMPT", attempt) + `
+` + runEnd
+}
+
+const (
+	otelGoodRun     = "    run = Run()"
+	otelGoodAttempt = "attempts[key]"
+	otelGoodTool    = `                result = None
+                try:
+                    result = search_flights(args)
+                finally:
+                    mark_tool_span(span, args=args, result=result, attempt=ATTEMPT,
+                                   step_index=run.next_step(), run_id=run.run_id)`
+	otelUnsafeTool = `                result = search_flights(args)
+                mark_tool_span(span, args=args, result=result, attempt=ATTEMPT,
+                               step_index=run.next_step(), run_id=run.run_id)`
+	otelGoodRunEnd = `            mark_run_end(root, exit_reason="final_answer")
+        except Exception:
+            mark_run_end(root, exit_reason="error")
+            raise
+`
+	otelSuccessOnlyRunEnd = `            mark_run_end(root, exit_reason="final_answer")
+        finally:
+            pass
+`
+)
+
+func TestScan_OtelLabelsCorrectness(t *testing.T) {
+	cases := []struct {
+		name     string
+		src      string
+		testFile string
+		want     []string
+		wantLine string // a line of src the single finding must point at
+	}{
+		{"correct labelling", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelGoodRunEnd), "", nil, ""},
+		{"shared module-scope Run", otelCorrectnessSrc("RUN = Run()\n", "    run = RUN", otelGoodAttempt, otelGoodTool, otelGoodRunEnd), "", []string{"OBS-009"}, "RUN = Run()"},
+		{"label skipped on failure", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelUnsafeTool, otelGoodRunEnd), "", []string{"OBS-010"}, "mark_tool_span(span"},
+		{"constant attempt", otelCorrectnessSrc("", otelGoodRun, "1", otelGoodTool, otelGoodRunEnd), "", []string{"OBS-011"}, "mark_tool_span(span"},
+		{"run end on success only", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelSuccessOnlyRunEnd), "", []string{"OBS-012"}, `mark_run_end(root, exit_reason="final_answer")`},
+		{"misuse only in a test file", otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelGoodRunEnd),
+			`from agent_reliability_otel_labels import Run, mark_tool_span
+
+RUN = Run()
+
+
+def test_label(span):
+    mark_tool_span(span, args={}, result=None, attempt=1)
+`, nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			manifest := "[project]\nname = \"f\"\ndependencies = [\"openai-agents\", \"opentelemetry-sdk\", \"agent-reliability-otel-labels\"]\n"
+			files := map[string]string{"pyproject.toml": manifest, "agent.py": tc.src}
+			if tc.testFile != "" {
+				files["tests/test_agent.py"] = tc.testFile
+			}
+			for name, body := range files {
+				p := filepath.Join(dir, name)
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scanner.Run: %v", err)
+			}
+			var got []string
+			var hit models.Finding
+			for _, f := range res.Findings {
+				switch f.RuleID {
+				case "OBS-006", "OBS-007", "OBS-008", "OBS-009", "OBS-010", "OBS-011", "OBS-012":
+					got = append(got, f.RuleID)
+					hit = f
+				}
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("otel-labels findings: got %v, want %v", got, tc.want)
+			}
+			if tc.wantLine == "" {
+				return
+			}
+			wantLine := 0
+			for i, line := range strings.Split(tc.src, "\n") {
+				if strings.Contains(line, tc.wantLine) {
+					wantLine = i + 1
+					break
+				}
+			}
+			if hit.FilePath != "agent.py" || hit.StartLine != wantLine {
+				t.Errorf("finding at %s:%d, want agent.py:%d", hit.FilePath, hit.StartLine, wantLine)
+			}
+		})
+	}
+}
+
+// Forge tells a coding model how to write the labels and scan judges the
+// result. The code in forge's label blocks must not trip the rules that judge
+// it. Go blocks are out of scope (the Go binding is not inspected).
+func TestScan_ForgeLabelBlocksPassOtelLabelsRules(t *testing.T) {
+	fence := regexp.MustCompile("(?s)```(python|typescript)\n(.*?)```")
+	paths, _ := filepath.Glob("../forge/tracingtext/*_labels.md")
+	recipes, _ := filepath.Glob("../forge/tracingtext/recipes/*_labels.md")
+	blocks := map[string][]string{}
+	for _, p := range append(paths, recipes...) {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range fence.FindAllStringSubmatch(string(raw), -1) {
+			blocks[m[1]] = append(blocks[m[1]], m[2])
+		}
+	}
+	setups := []struct {
+		lang, ext, manifestName, manifest, setup string
+	}{
+		{"python", ".py", "pyproject.toml",
+			"[project]\nname = \"f\"\ndependencies = [\"openai-agents\", \"opentelemetry-sdk\", \"agent-reliability-otel-labels\"]\n",
+			`from agents import Agent
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+agent = Agent(name="travel-booker")
+`},
+		{"typescript", ".ts", "package.json",
+			`{"name": "f", "dependencies": {"@openai/agents": "*", "@opentelemetry/sdk-node": "*", "@trustabl/agent-reliability-otel-labels": "*"}}`,
+			`import { NodeSDK } from "@opentelemetry/sdk-node";
+import { Agent } from "@openai/agents";
+
+const sdk = new NodeSDK({});
+sdk.start();
+export const agent = new Agent({ name: "travel-booker" });
+`},
+	}
+	for _, s := range setups {
+		if len(blocks[s.lang]) == 0 {
+			t.Fatalf("no %s label blocks found under internal/forge/tracingtext", s.lang)
+		}
+		// One repo per block: scanning them together would let one correct
+		// block mask a bad one (a run_end here crediting a missing one there).
+		for i, b := range blocks[s.lang] {
+			t.Run(fmt.Sprintf("%s/%d", s.lang, i), func(t *testing.T) {
+				dir := t.TempDir()
+				write := func(name, body string) {
+					if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				write(s.manifestName, s.manifest)
+				write("tracing_setup"+s.ext, s.setup)
+				write("labels"+s.ext, b)
+				res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+				if err != nil {
+					t.Fatalf("scanner.Run: %v", err)
+				}
+				// Anchors, so the check cannot pass vacuously: tracing is
+				// initialized and the block was read as labelling code.
+				var initialized bool
+				for _, o := range res.Observability {
+					if o.Kind == models.ObsSignalInit {
+						initialized = true
+					}
+				}
+				kinds := map[models.OtelLabelsSignalKind]bool{}
+				for _, l := range res.OtelLabels {
+					kinds[l.Kind] = true
+				}
+				if !initialized || !kinds[models.OtelLabelsToolSpan] || !kinds[models.OtelLabelsRunEnd] {
+					t.Fatalf("anchors missing: initialized=%v kinds=%v\n%s", initialized, kinds, b)
+				}
+				for _, f := range res.Findings {
+					if strings.HasPrefix(f.RuleID, "OBS-0") && f.RuleID >= "OBS-006" && f.RuleID <= "OBS-012" {
+						t.Errorf("forge's own %s label block %d trips %s at %s:%d\n%s", s.lang, i, f.RuleID, f.FilePath, f.StartLine, b)
+					}
+				}
+			})
+		}
 	}
 }

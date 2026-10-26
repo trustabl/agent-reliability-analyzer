@@ -3565,6 +3565,49 @@ def summarize(state):
 `, wantFires: false},
 }
 
+// otelLabelsCorrectnessInv is an instrumented repo that is fully labelled
+// except for the signals passed in, so OBS-006..008 are silent and only the
+// correctness rule under test can fire.
+func otelLabelsCorrectnessInv(extra ...models.OtelLabelsSignal) models.RepoInventory {
+	base := []models.OtelLabelsSignal{
+		{Kind: models.OtelLabelsImport, File: "agent.py", StartLine: 1, EndLine: 1},
+		{Kind: models.OtelLabelsRunStart, File: "agent.py", StartLine: 5, EndLine: 5},
+	}
+	return models.RepoInventory{
+		SDKsDetected: []models.SDK{models.SDKOpenAIAgents},
+		Manifest:     models.ScanManifest{PythonFiles: []string{"agent.py"}},
+		ObservabilitySignals: []models.ObservabilitySignal{
+			{Vendor: models.VendorOTel, Kind: models.ObsSignalInit},
+		},
+		Tools:             []models.ToolDef{{Name: "search", Kind: models.KindOpenAITool}},
+		OtelLabelsSignals: append(base, extra...),
+	}
+}
+
+var otelLabelsCorrectnessProfile = models.RepoProfile{
+	Languages:            []models.Language{models.LanguagePython},
+	OtelLabelsDeclaredIn: []string{"pyproject.toml"},
+}
+
+// Correct labelling: a per-run Run, a counted attempt, a failure-safe tool
+// span, and a run end on the error path.
+var otelLabelsGood = []models.OtelLabelsSignal{
+	{Kind: models.OtelLabelsRunConstruct, File: "agent.py", StartLine: 4, EndLine: 4},
+	{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9, EndLine: 9, FailureSafe: true},
+	{Kind: models.OtelLabelsRunEnd, File: "agent.py", StartLine: 11, EndLine: 11, ExitReason: "final_answer"},
+	{Kind: models.OtelLabelsRunEnd, File: "agent.py", StartLine: 13, EndLine: 13, ExitReason: "error", ErrorPath: true},
+}
+
+// withOtel returns a copy of the good signals with one replaced or added.
+func withOtel(replace int, s models.OtelLabelsSignal) []models.OtelLabelsSignal {
+	out := append([]models.OtelLabelsSignal(nil), otelLabelsGood...)
+	if replace >= 0 {
+		out[replace] = s
+		return out
+	}
+	return append(out, s)
+}
+
 // policyRepoRuleCases covers repo-scoped rules.
 var policyRepoRuleCases = []policyRepoCase{
 	// ─── LangChain repo rule (LC-201) ───────────────────────────────────────
@@ -3728,6 +3771,22 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoProfile{},
 		models.RepoInventory{},
 		false},
+	{"MCPCFG-002 silent when only an unpinned-launch fact is present", "MCPCFG-002",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{UnpinnedMCPLaunch: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	{"MCPCFG-003 fires on an unpinned MCP package launch with no SDK detected", "MCPCFG-003",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{UnpinnedMCPLaunch: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"MCPCFG-003 silent when no unpinned-launch fact exists", "MCPCFG-003",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"MCPCFG-003 silent when only a local-launch fact is present", "MCPCFG-003",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{LocalMCPLaunch: []models.ConfigHit{{Reason: "x"}}}},
+		false},
 	{"AGCFG-004 silent when only an unrelated fact is present", "AGCFG-004",
 		models.RepoProfile{},
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{RiskyHooks: []models.ConfigHit{{Reason: "x"}}}},
@@ -3785,6 +3844,52 @@ var policyRepoRuleCases = []policyRepoCase{
 	{"AGCFG-009 silent when only a harness hidden-text fact is present", "AGCFG-009",
 		models.RepoProfile{},
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{HiddenHarnessText: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+
+	// ─── ci rules (repo-scoped, no SDK gate, one fact slice each) ────────────
+	{"CI-001 fires on a CI hit with no SDK detected", "CI-001",
+		models.RepoProfile{},
+		models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{UntrustedUngated: []models.CIHit{{Reason: "x"}}}},
+		true},
+	{"CI-001 silent when no CI fact exists", "CI-001",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"CI-002 fires on a CI hit with no SDK detected", "CI-002",
+		models.RepoProfile{},
+		models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{UntrustedPrivileged: []models.CIHit{{Reason: "x"}}}},
+		true},
+	{"CI-002 silent when no CI fact exists", "CI-002",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"CI-003 fires on a CI hit with no SDK detected", "CI-003",
+		models.RepoProfile{},
+		models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{CheckoutPersists: []models.CIHit{{Reason: "x"}}}},
+		true},
+	{"CI-003 silent when no CI fact exists", "CI-003",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"CI-004 fires on a CI hit with no SDK detected", "CI-004",
+		models.RepoProfile{},
+		models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{UnrestrictedShell: []models.CIHit{{Reason: "x"}}}},
+		true},
+	{"CI-004 silent when no CI fact exists", "CI-004",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"CI-005 fires on a CI hit with no SDK detected", "CI-005",
+		models.RepoProfile{},
+		models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{NoEgressRestriction: []models.CIHit{{Reason: "x"}}}},
+		true},
+	{"CI-005 silent when no CI fact exists", "CI-005",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"CI-001 silent when only another CI fact is present", "CI-001",
+		models.RepoProfile{},
+		models.RepoInventory{CIWorkflows: models.CIWorkflowFacts{UnrestrictedShell: []models.CIHit{{Reason: "x"}}}},
 		false},
 
 	// ─── AGCFG-011 pre-approved fetch from user-content hosts (repo-scoped, no SDK gate) ──
@@ -4505,6 +4610,44 @@ var policyRepoRuleCases = []policyRepoCase{
 			},
 		},
 		false},
+	// agent-reliability-otel-labels correctness (OBS-009..012). Each starts
+	// from a fully labelled repo and breaks one thing.
+	{"OBS-009 fires on a module-scope Run", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(0, models.OtelLabelsSignal{Kind: models.OtelLabelsRunConstruct, File: "agent.py", StartLine: 2, ModuleScope: true})...),
+		true},
+	{"OBS-009 fires on a literal run id", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(0, models.OtelLabelsSignal{Kind: models.OtelLabelsRunConstruct, File: "agent.py", StartLine: 4, RunIDConst: true})...),
+		true},
+	{"OBS-009 silent on a per-run Run", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-009 silent when the shared Run is in a test file", "OBS-009", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsRunConstruct, File: "tests/test_agent.py", StartLine: 3, ModuleScope: true, TestOrigin: true})...),
+		false},
+	{"OBS-010 fires when no tool-span label runs on failure", "OBS-010", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(1, models.OtelLabelsSignal{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9})...),
+		true},
+	{"OBS-010 silent when a tool-span label is failure-safe", "OBS-010", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-010 silent when labels are only in a success hook", "OBS-010", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(1, models.OtelLabelsSignal{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9, HookUnknown: true})...),
+		false},
+	{"OBS-011 fires when every attempt is a constant", "OBS-011", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(1, models.OtelLabelsSignal{Kind: models.OtelLabelsToolSpan, File: "agent.py", StartLine: 9, FailureSafe: true, AttemptConst: true})...),
+		true},
+	{"OBS-011 silent when the attempt is counted", "OBS-011", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-012 fires when the run end is recorded only on success", "OBS-012", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood[:3]...), true},
+	{"OBS-012 silent when the error path records the run end", "OBS-012", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...), false},
+	{"OBS-012 silent when the repo is not instrumented", "OBS-012",
+		otelLabelsCorrectnessProfile,
+		func() models.RepoInventory {
+			inv := otelLabelsCorrectnessInv(otelLabelsGood[:3]...)
+			inv.ObservabilitySignals = nil
+			return inv
+		}(),
+		false},
 	// Mutual exclusion with the absence rules: a declared-but-unwired dep is
 	// OBS-005 at medium, NOT "this project wires no observability" at low.
 	{"OAI-203 silent when the dep is declared (OBS-005 owns that case)", "OAI-203",
@@ -4658,6 +4801,22 @@ var policySubagentRuleCases = []policySubagentCase{
 	{"CSDK-112 silent without WebSearch", "CSDK-112",
 		models.SubagentDef{Name: "reader3", Location: models.Location{FilePath: ".claude/agents/reader3.md"},
 			Tools: []string{"Read", "Grep", "Glob"}}, models.RepoInventory{}, false},
+
+	{"CSDK-115 fires when canonical subagent omits tools", "CSDK-115",
+		models.SubagentDef{Name: "inheritor", Location: models.Location{FilePath: ".claude/agents/inheritor.md"},
+			ToolsOmitted: true, Canonical: true}, models.RepoInventory{}, true},
+	{"CSDK-115 silent when tools listed", "CSDK-115",
+		models.SubagentDef{Name: "reader", Location: models.Location{FilePath: ".claude/agents/reader.md"},
+			Tools: []string{"Read", "Grep"}, Canonical: true}, models.RepoInventory{}, false},
+	{"CSDK-115 silent on empty tools key", "CSDK-115",
+		models.SubagentDef{Name: "empty", Location: models.Location{FilePath: ".claude/agents/empty.md"},
+			Canonical: true}, models.RepoInventory{}, false},
+	{"CSDK-115 silent with disallowedTools denylist", "CSDK-115",
+		models.SubagentDef{Name: "denylist", Location: models.Location{FilePath: ".claude/agents/denylist.md"},
+			ToolsOmitted: true, Canonical: true, DisallowedTools: []string{"Bash", "Write"}}, models.RepoInventory{}, false},
+	{"CSDK-115 silent on shape-fallback file", "CSDK-115",
+		models.SubagentDef{Name: "planner", Location: models.Location{FilePath: "agents/planner.md"},
+			ToolsOmitted: true, Model: "sonnet"}, models.RepoInventory{}, false},
 }
 
 // policySkillRuleCases covers skill-scoped rules (CSKILL-*).

@@ -90,6 +90,10 @@ const (
 	// code or grants authority before the user trusts the folder (AGCFG-*,
 	// MCPCFG-*). Not an SDK; loads unconditionally, the rule predicate gates.
 	CategoryAgentConfig DetectorCategory = "agent_config"
+	// CategoryCI covers coding agents run from GitHub Actions workflows on
+	// events any GitHub user can cause (CI-*). Not an SDK; loads
+	// unconditionally, the rule predicate gates.
+	CategoryCI DetectorCategory = "ci"
 )
 
 // display order. It is the single source of truth for category membership:
@@ -101,7 +105,7 @@ var AllCategories = []DetectorCategory{
 	CategoryClaudeSDK, CategoryOpenAISDK, CategoryOpenShell, CategoryGoogleADK,
 	CategoryMCP, CategoryLangChain, CategoryCrewAI, CategoryPydanticAI,
 	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill, CategoryObservability,
-	CategoryRawLLMSDK, CategoryAgentConfig,
+	CategoryRawLLMSDK, CategoryAgentConfig, CategoryCI,
 }
 
 // ValidCategory reports whether c is a category this build recognizes. The rule
@@ -248,6 +252,9 @@ const (
 	// guardrails.md, LongTermMEMORY.md, tool_descriptions/*.md), recognised only
 	// when systemprompt.md and guardrails.md sit side by side.
 	ComponentHarnessGuidance ComponentKind = "harness_guidance"
+	// ComponentGitHubWorkflow is a workflow file directly under the repo-root
+	// .github/workflows/ (category ci); parsed by DiscoverCIWorkflows.
+	ComponentGitHubWorkflow ComponentKind = "github_workflow"
 )
 
 // AgentComponent is a non-tool agent-related artifact discovered during
@@ -348,7 +355,11 @@ type ScanManifest struct {
 	MarkdownFiles   []string `json:"markdown_files,omitempty"`
 	// ConfigFiles holds the non-source harness config files the walk keeps:
 	// any file named .env and .codex/config.toml. Sorted.
-	ConfigFiles            []string         `json:"config_files,omitempty"`
+	ConfigFiles []string `json:"config_files,omitempty"`
+	// WorkflowFiles holds the GitHub Actions workflow files directly under the
+	// repo-root .github/workflows/ (*.yml, *.yaml). Sorted. Kept apart from
+	// YAMLFiles so no existing YAMLFiles consumer sees them.
+	WorkflowFiles          []string         `json:"workflow_files,omitempty"`
 	HasClaudeSDKDependency bool             `json:"has_claude_sdk_dependency"`
 	HasOpenShellArtifact   bool             `json:"has_openshell_artifact"`
 	Components             []AgentComponent `json:"components,omitempty"`
@@ -465,6 +476,9 @@ const (
 	OtelLabelsRunStart OtelLabelsSignalKind = "run_start"
 	OtelLabelsToolSpan OtelLabelsSignalKind = "tool_span"
 	OtelLabelsRunEnd   OtelLabelsSignalKind = "run_end"
+	// OtelLabelsRunConstruct is a Run() / new Run() resolved through the
+	// file's import of the library.
+	OtelLabelsRunConstruct OtelLabelsSignalKind = "run_construct"
 	// OtelLabelsAttrLiteral is a trustabl.* label key written to a span by
 	// hand (set_attribute / setAttribute), without the library.
 	OtelLabelsAttrLiteral OtelLabelsSignalKind = "attr_literal"
@@ -478,7 +492,8 @@ const (
 // repo_observability_initialized — the library would clear its own
 // prerequisite and OBS-001 would misfire on it.
 //
-// The fact fields are zero when they do not apply to the Kind.
+// The fact fields are zero when they do not apply to the Kind, or when the
+// value is not a literal.
 type OtelLabelsSignal struct {
 	Kind      OtelLabelsSignalKind `json:"kind"`
 	File      string               `json:"file"`
@@ -486,8 +501,16 @@ type OtelLabelsSignal struct {
 	EndLine   int                  `json:"end_line"`
 	Language  Language             `json:"language"`
 
-	TestOrigin bool   `json:"test_origin,omitempty"` // all kinds: File classifies as a test
-	Key        string `json:"key,omitempty"`         // attr_literal: the trustabl.* key
+	TestOrigin   bool   `json:"test_origin,omitempty"`   // all kinds: File classifies as a test
+	ModuleScope  bool   `json:"module_scope,omitempty"`  // run_construct: built once, not per run
+	RunIDConst   bool   `json:"run_id_const,omitempty"`  // run_construct: the run id is a string literal
+	FailureSafe  bool   `json:"failure_safe,omitempty"`  // tool_span: runs when the tool raises
+	HookUnknown  bool   `json:"hook_unknown,omitempty"`  // tool_span: inside a framework success hook
+	ErrorPath    bool   `json:"error_path,omitempty"`    // run_end: on the error path (not finally)
+	AttemptConst bool   `json:"attempt_const,omitempty"` // tool_span: attempt is an integer literal
+	SideEffect   string `json:"side_effect,omitempty"`   // tool_span: literal side_effect value
+	ExitReason   string `json:"exit_reason,omitempty"`   // run_end: literal exit_reason value
+	Key          string `json:"key,omitempty"`           // attr_literal: the trustabl.* key
 }
 
 // DepRef is one dependency declared in a repo manifest — the agent-path
@@ -578,6 +601,7 @@ type RepoInventory struct {
 	ClaudeSettings     []ClaudeSettings        `json:"claude_settings"`
 	ClaudeAgentOptions []ClaudeAgentOptionsDef `json:"claude_agent_options,omitempty"`
 	ProjectConfig      ProjectConfigFacts      `json:"project_config,omitempty"`
+	CIWorkflows        CIWorkflowFacts         `json:"ci_workflows,omitempty"`
 	AgentRunCalls      []AgentRunCallDef       `json:"agent_run_calls,omitempty"`
 	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	SDKsDetected       []SDK                   `json:"sdks_detected"`
@@ -700,26 +724,31 @@ type ScanResult struct {
 	// Observability reports the instrumentation found in code — the positive
 	// signal, not only the findings. Additive inventory, NOT folded into ScanID
 	// (same treatment as Dependencies).
-	Observability      []ObservabilitySignal `json:"observability,omitempty"`
-	Entrypoints        []EntrypointDef       `json:"entrypoints,omitempty"`     // server entrypoints (Python): a fact only, no rule consumes it yet
-	Vulnerabilities    []DepVuln             `json:"vulnerabilities,omitempty"` // --vuln-scan OSV matches (TR-271); absent on the default path
-	Secrets            []SecretMatch         `json:"secrets,omitempty"`         // --secret-scan hardcoded-credential matches; absent on the default path
-	SlashCommands      []SlashCommandDef     `json:"slash_commands"`
-	PluginManifests    []PluginManifest      `json:"plugin_manifests"`
-	ClaudeSettings     []ClaudeSettings      `json:"claude_settings"`
-	Findings           []Finding             `json:"findings"`
-	Surfaces           []SurfaceReadiness    `json:"surfaces"`
-	OverallScore       float64               `json:"overall_score"`
-	ProjectedScores    ProjectedScores       `json:"projected_scores"`
-	RulesSource        string                `json:"rules_source"`                   // repo the rule pack came from
-	RulesVersion       string                `json:"rules_version"`                  // resolved rules commit SHA
-	RulesFromCache     bool                  `json:"rules_from_cache"`               // true if rules came from cache (network skipped/unreachable)
-	RulesStale         bool                  `json:"rules_stale,omitempty"`          // true if the cached signed bundle's channel statement has expired
-	RulesSchemaVersion int                   `json:"rules_schema_version,omitempty"` // pack manifest's declared schema_version
-	RulesSchemaNewer   bool                  `json:"rules_schema_newer,omitempty"`   // pack targets a schema newer than this build supports
-	RulesSkipped       []string              `json:"rules_skipped,omitempty"`        // rule IDs dropped as forward-incompatible (sorted, deduped)
-	RulesOrigin        RulesOrigin           `json:"rules_origin"`                   // provenance of the rules (signed channel / unsigned / custom)
-	Coverage           Coverage              `json:"coverage"`                       // how many source files parsed vs. were skipped
+	Observability []ObservabilitySignal `json:"observability,omitempty"`
+	// OtelLabels reports the agent-reliability-otel-labels calls and
+	// hand-written label keys found in code, with the facts the OBS-006..012
+	// rules read. Additive inventory, NOT folded into ScanID (same treatment
+	// as Observability).
+	OtelLabels         []OtelLabelsSignal `json:"otel_labels,omitempty"`
+	Entrypoints        []EntrypointDef    `json:"entrypoints,omitempty"`     // server entrypoints (Python): a fact only, no rule consumes it yet
+	Vulnerabilities    []DepVuln          `json:"vulnerabilities,omitempty"` // --vuln-scan OSV matches (TR-271); absent on the default path
+	Secrets            []SecretMatch      `json:"secrets,omitempty"`         // --secret-scan hardcoded-credential matches; absent on the default path
+	SlashCommands      []SlashCommandDef  `json:"slash_commands"`
+	PluginManifests    []PluginManifest   `json:"plugin_manifests"`
+	ClaudeSettings     []ClaudeSettings   `json:"claude_settings"`
+	Findings           []Finding          `json:"findings"`
+	Surfaces           []SurfaceReadiness `json:"surfaces"`
+	OverallScore       float64            `json:"overall_score"`
+	ProjectedScores    ProjectedScores    `json:"projected_scores"`
+	RulesSource        string             `json:"rules_source"`                   // repo the rule pack came from
+	RulesVersion       string             `json:"rules_version"`                  // resolved rules commit SHA
+	RulesFromCache     bool               `json:"rules_from_cache"`               // true if rules came from cache (network skipped/unreachable)
+	RulesStale         bool               `json:"rules_stale,omitempty"`          // true if the cached signed bundle's channel statement has expired
+	RulesSchemaVersion int                `json:"rules_schema_version,omitempty"` // pack manifest's declared schema_version
+	RulesSchemaNewer   bool               `json:"rules_schema_newer,omitempty"`   // pack targets a schema newer than this build supports
+	RulesSkipped       []string           `json:"rules_skipped,omitempty"`        // rule IDs dropped as forward-incompatible (sorted, deduped)
+	RulesOrigin        RulesOrigin        `json:"rules_origin"`                   // provenance of the rules (signed channel / unsigned / custom)
+	Coverage           Coverage           `json:"coverage"`                       // how many source files parsed vs. were skipped
 	// NoAgentSurfaces marks a scan that found nothing to evaluate: no tools,
 	// agents, subagents or skills. Scoring an empty set yields 1.0, which reads
 	// as a perfect result when in fact nothing was checked, so consumers must be
