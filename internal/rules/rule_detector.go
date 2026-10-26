@@ -159,6 +159,9 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 		}
 		return out
 	}
+	if s := otelLabelsEvidence(d.rule.Match, inv); s != nil {
+		return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, s.File, s.StartLine, s.EndLine, "")}
+	}
 	file, line := configHitLocation(d.rule.Match, inv.ProjectConfig)
 	return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, file, line, line, "")}
 }
@@ -210,6 +213,41 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		return "", 0
 	}
 	return hits[0].FilePath, hits[0].Line
+}
+
+// otelLabelsEvidence returns the offending call for a rule that asserts one of
+// the agent-reliability-otel-labels correctness predicates (set to true), so
+// the finding names the file and line instead of "somewhere in the repo" (spec
+// D3). Test-file signals are never returned. A predicate under `not` is not
+// evidence and is not searched.
+func otelLabelsEvidence(e MatchExpr, inv models.RepoInventory) *models.OtelLabelsSignal {
+	lookups := []struct {
+		set      *bool
+		offender func(models.RepoInventory) *models.OtelLabelsSignal
+	}{
+		{e.RepoOtelLabelsRunShared, otelRunSharedOffender},
+		{e.RepoOtelLabelsToolSpanFailureUnsafe, otelToolSpanFailureUnsafeOffender},
+		{e.RepoOtelLabelsAttemptConstant, otelAttemptConstantOffender},
+		{e.RepoOtelLabelsRunEndSuccessOnly, otelRunEndSuccessOnlyOffender},
+	}
+	for _, l := range lookups {
+		if l.set != nil && *l.set {
+			if s := l.offender(inv); s != nil {
+				return s
+			}
+		}
+	}
+	for _, sub := range e.All {
+		if s := otelLabelsEvidence(sub, inv); s != nil {
+			return s
+		}
+	}
+	for _, sub := range e.Any {
+		if s := otelLabelsEvidence(sub, inv); s != nil {
+			return s
+		}
+	}
+	return nil
 }
 
 func agentKindMatches(kind string, a models.AgentDef) bool {

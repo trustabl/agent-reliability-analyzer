@@ -28,6 +28,6 @@ package rules
 // That rename discipline is what keeps lenient loading safe without a hard
 // version gate.
 //
-// Schema 30 adds the CI workflow predicates (repo_ci_agent_*), the `ci`
+// Schema 28 adds the CI workflow predicates (repo_ci_agent_*), the `ci`
 // category and the `github_actions` repo applies_to token.
-const SupportedSchemaVersion = 30
+const SupportedSchemaVersion = 28

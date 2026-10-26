@@ -488,7 +488,7 @@ file and line (`configHitLocation` in `rule_detector.go`), so `pathclass` can ta
 a vendored fixture as test-origin. The pack loads unconditionally and the
 `agent_config` `applies_to` token skips the SDK gate.
 
-**GitHub Actions workflows (category `ci`, `schema_version` 30).** The walk
+**GitHub Actions workflows (category `ci`, `schema_version` 28, provisional).** The walk
 enters `.github/` only at the scan root and, inside it, only `.github/workflows/`
 (a nested `.github` and the other `.github` subdirectories are skipped like any
 dot-directory). Files `.github/workflows/*.yml|yaml` go to
@@ -619,13 +619,26 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   `@trustabl/agent-reliability-otel-labels` is imported), `run_start` (`<run>.mark_start(...)` /
   `<run>.markStart(...)` — receiver required, since it is a method on `Run`),
   `tool_span` (`mark_tool_span` / `markToolSpan`) and `run_end` (`mark_run_end`
-  / `markRunEnd`). The call names are plausible names for a project's own
+  / `markRunEnd`). `run_construct` records a `Run()` / `new Run()` resolved through
+  the file's own import (never repo-wide: `Run` is too generic a name), with
+  `ModuleScope` (built once: no enclosing function, a Python class body, a
+  TypeScript/JavaScript `static` class field, or a Python default parameter; a
+  non-static TypeScript/JavaScript class field initializer runs per instance and
+  is exempt, as is a Python `__main__` guard, parenthesized or not) and `RunIDConst`
+  (a string-literal run id). The call names are plausible names for a project's own
   helpers, so they count only when the library is imported somewhere in the
   repo; each file's own imports are followed, so a renamed import
-  (`mark_tool_span as mts`, `markToolSpan as label`) still resolves. Every
-  signal carries `TestOrigin` when its file classifies as a test
-  (`pathclass.Classify`). That gate is repo-wide, not per-file: a `Run` is
-  routinely built in one module and started in another that imports nothing.
+  (`mark_tool_span as mts`, `markToolSpan as label`) still resolves. That gate
+  is repo-wide, not per-file: a `Run` is routinely built in one module and
+  started in another that imports nothing. Every signal carries `TestOrigin`
+  when its file classifies as a test (`pathclass.Classify`).
+  `tool_span` signals carry `FailureSafe` (inside `finally` / `except` /
+  `catch` before the enclosing function, in a named error callback, or in a
+  function passed to `.finally(` / `.catch(`), `HookUnknown` (an `on_tool_end`
+  method of a `RunHooks` / `AgentHooks` subclass, whose failure behaviour is
+  unverified), `AttemptConst` (an integer-literal `attempt`) and the literal
+  `SideEffect`. `run_end` signals carry `ErrorPath` (except / catch / error
+  callback / `.catch(`, never `finally`) and the literal `ExitReason`.
   `attr_literal` records a label key written to a span by hand
   (`set_attribute` / `setAttribute` first argument, or a key of the literal
   passed to `set_attributes` / `setAttributes`), collected whether or not the
@@ -659,6 +672,20 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   a tool span for — a bare `shell_invocation` function and a `langgraph_node`
   do not count). The predicates prove the calls exist, not that labels land:
   with no current span each call is a silent no-op.
+
+  Four more repo-scope predicates back `OBS-009..012`, which check that the
+  labels written are right, not only present: `repo_otel_labels_run_shared`
+  (a `run_construct` with `ModuleScope` or `RunIDConst`),
+  `repo_otel_labels_tool_span_failure_unsafe` (tool-span labels exist, none is
+  `FailureSafe`; `HookUnknown` labels are left out),
+  `repo_otel_labels_attempt_constant` (every tool-span label has
+  `AttemptConst`) and `repo_otel_labels_run_end_success_only` (no run end has
+  `ErrorPath`, a literal `"error"`, or a variable reason). All four drop
+  test-file signals, and one correct call credits the repo. A repo finding
+  whose rule asserts one of them carries the offending call's file and line
+  (`otelLabelsEvidence` in `rule_detector.go`); every other repo finding keeps
+  an empty location. Hand-written `trustabl.*` keys credit the `OBS-006..008`
+  ladder but are not read by these four.
 
 - **DiscoverSubagents** (`subagents.go`) — **hybrid** discovery in two passes.
   Pass 1 reads every `.claude/agents/*.md` component (matched at any path depth

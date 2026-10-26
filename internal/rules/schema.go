@@ -177,6 +177,13 @@ type MatchExpr struct {
 	RepoOtelLabelsInitialized *bool `yaml:"repo_otel_labels_initialized,omitempty"`
 	RepoOtelLabelsImplemented *bool `yaml:"repo_otel_labels_implemented,omitempty"`
 
+	// agent-reliability-otel-labels correctness predicates (OBS-009..012).
+	// Test-file signals never count (spec D8).
+	RepoOtelLabelsRunShared             *bool `yaml:"repo_otel_labels_run_shared,omitempty"`
+	RepoOtelLabelsToolSpanFailureUnsafe *bool `yaml:"repo_otel_labels_tool_span_failure_unsafe,omitempty"`
+	RepoOtelLabelsAttemptConstant       *bool `yaml:"repo_otel_labels_attempt_constant,omitempty"`
+	RepoOtelLabelsRunEndSuccessOnly     *bool `yaml:"repo_otel_labels_run_end_success_only,omitempty"`
+
 	// RepoLangGraphPlatformConfigPresent is ALSO valid at agent scope (dual-scope,
 	// like repo_has_observability): a langgraph.json means LangGraph Platform
 	// injects its own checkpointer.

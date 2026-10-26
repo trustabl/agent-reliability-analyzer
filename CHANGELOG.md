@@ -8,7 +8,7 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Added
 
-- **Coding agents in GitHub Actions workflows (rule schema 26 -> 30, provisional).** A new
+- **Coding agents in GitHub Actions workflows (rule schema 27 -> 28, provisional).** A new
   unconditionally loaded `ci` category (CI-001..005) with five repo-scope
   predicates backed by `RepoInventory.CIWorkflows`. The walk now reads the
   repo-root `.github/workflows/*.yml|yaml` into `ScanManifest.WorkflowFiles` and

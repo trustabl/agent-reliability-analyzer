@@ -656,6 +656,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 		Dependencies:        inventory.Dependencies,
 		Observability:       inventory.ObservabilitySignals,
 		Entrypoints:         inventory.Entrypoints,
+		OtelLabels:          inventory.OtelLabelsSignals,
 		Vulnerabilities:     vulns,
 		Secrets:             secrets,
 		SlashCommands:       inventory.SlashCommands,

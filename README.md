@@ -470,6 +470,13 @@ files in the scanned repo. Each run produces a `ScanResult` containing:
   instrumented in its manifest and produces no traces at all. Detected
   statically in Python and TypeScript/JavaScript only — Trustabl does not ingest
   runtime traces.
+- **Process labels** (`otel_labels`) — the `agent-reliability-otel-labels`
+  calls found in code (import, `Run` construction, run start, tool-span label,
+  run end) and any `trustabl.*` label keys written by hand, with the file and
+  line and the facts the OBS-006..012 rules read: whether a `Run` is shared,
+  whether a label runs when the tool fails, whether `attempt` is a fixed
+  number, and the literal `side_effect` / `exit_reason` values. Python and
+  TypeScript/JavaScript only. Not folded into the scan ID.
 
 - **Server entrypoints** (`entrypoints`, omitted when none) — Python functions a
   server framework invokes for an external request or job: FastAPI and Flask
