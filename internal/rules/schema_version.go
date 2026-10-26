@@ -30,4 +30,6 @@ package rules
 //
 // Schema 28 adds the CI workflow predicates (repo_ci_agent_*), the `ci`
 // category and the `github_actions` repo applies_to token.
-const SupportedSchemaVersion = 28
+//
+// Schema 29 adds the subagent_inherits_all_tools predicate (subagent scope).
+const SupportedSchemaVersion = 29

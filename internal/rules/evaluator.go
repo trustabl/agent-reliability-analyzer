@@ -279,6 +279,9 @@ func (e MatchExpr) EvaluateSubagent(s models.SubagentDef, inv models.RepoInvento
 	if len(e.SubagentGrantsTool) > 0 && !PredSubagentGrantsTool(s, e.SubagentGrantsTool) {
 		return false
 	}
+	if e.SubagentInheritsAllTools != nil && PredSubagentInheritsAllTools(s) != *e.SubagentInheritsAllTools {
+		return false
+	}
 	return true
 }
 
@@ -526,7 +529,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_langgraph_platform_config_present": true,
 	},
 	models.ScopeSubagent: {
-		"subagent_grants_tool": true,
+		"subagent_grants_tool":        true,
+		"subagent_inherits_all_tools": true,
 	},
 	models.ScopeSkill: {
 		"skill_allows_unrestricted_shell":               true,
@@ -646,6 +650,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentServerReachable != nil, "agent_server_reachable")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
+	add(e.SubagentInheritsAllTools != nil, "subagent_inherits_all_tools")
 	// Skill scope
 	add(e.SkillAllowsUnrestrictedShell != nil, "skill_allows_unrestricted_shell")
 	add(len(e.SkillAllowsTool) > 0, "skill_allows_tool")

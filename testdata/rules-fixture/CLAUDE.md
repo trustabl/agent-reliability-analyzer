@@ -136,12 +136,14 @@ against a fixed token:
 | `claude_subagent`  | A `.claude/agents/*.md` subagent declaration (any path depth)   |
 
 Subagent rules use the `subagent_grants_tool` predicate (true when
-`SubagentDef.Tools` contains a listed tool name). They carry **no `language:`
+`SubagentDef.Tools` contains a listed tool name) or `subagent_inherits_all_tools`
+(true for a `.claude/agents/` file with no `tools` key and no `disallowedTools`
+entries; CSDK-115). They carry **no `language:`
 field** — subagents are markdown frontmatter, not code, and the
 `subagentRuleDetector.Applies` method does not gate on language. The shipped
-rules are CSDK-110 ("Subagent granted the built-in Bash tool") and CSDK-111
-("Subagent granted filesystem-write or web-fetch built-ins"), both in
-`claude_sdk/subagent_safety.yaml`.
+rules are CSDK-110 ("Subagent granted the built-in Bash tool"), CSDK-111
+("Subagent granted filesystem-write or web-fetch built-ins"), CSDK-112 and
+CSDK-115, all in `claude_sdk/subagent_safety.yaml`.
 
 ## "Add a rule for X"
 

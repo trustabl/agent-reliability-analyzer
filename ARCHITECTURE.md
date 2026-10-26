@@ -706,7 +706,7 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   the permission grammar — bare, parametered `Bash(...)`, or `mcp__server__tool`
   forms), `disallowedTools`, `permissionMode` (incl. `bypassPermissions`),
   `mcpServers`, `skills`, `isolation`, and `HasHooks` (true only when `hooks:`
-  is a non-empty mapping). Files without frontmatter, with malformed YAML, or
+  is a non-empty mapping). Two in-memory fields (`json:"-"`) record `ToolsOmitted` (the `tools` key is absent; `tools: []` and `tools:` count as declared) and `Canonical` (found in pass 1, a `.claude/agents/` path) for `subagent_inherits_all_tools` (CSDK-115). Files without frontmatter, with malformed YAML, or
   with no `name` are skipped silently. The `tools:` field accepts both the
   comma/space-separated scalar form and the YAML-list form.
 - **DiscoverSkills** (`skills.go`) — emits one `SkillDef` per `SKILL.md`
@@ -1398,6 +1398,7 @@ Shipped rules (one row per YAML rule entry):
 | CSDK-108 | tool     | claude_sdk | high     | `claude_sdk/shell_safety.yaml`     | Tool body spawns a subprocess                                                         |
 | CSDK-110 | subagent | claude_sdk | high     | `claude_sdk/subagent_safety.yaml`  | Subagent granted the built-in Bash tool                                               |
 | CSDK-111 | subagent | claude_sdk | high     | `claude_sdk/subagent_safety.yaml`  | Subagent granted filesystem-write or web-fetch built-ins                              |
+| CSDK-115 | subagent | claude_sdk | high     | `claude_sdk/subagent_safety.yaml`  | Subagent omits tools and inherits the full subagent tool pool                         |
 | CSDK-201 | repo     | claude_sdk | high     | `claude_sdk/repo.yaml`             | Project default permission mode bypasses approvals                                    |
 | CSDK-202 | repo     | claude_sdk | high     | `claude_sdk/repo.yaml`             | Session permission mode bypasses approvals with no tool deny-list |
 | CSDK-203 | repo     | claude_sdk | low      | `claude_sdk/repo_hygiene.yaml`     | Claude Agent SDK code with no agent-guidance doc (AGENTS.md/CLAUDE.md)                |
@@ -1935,6 +1936,8 @@ SubagentDef {
     HasHooks        bool        // true only when hooks: is a non-empty mapping
     Isolation       string      // "" | "worktree"
     Location                    // file_path = path to .md; Line = opening "---"; EndLine = closing "---"
+    ToolsOmitted    bool        // in-memory (json:"-"): frontmatter has no `tools` key
+    Canonical       bool        // in-memory (json:"-"): found under .claude/agents/ (discovery pass 1)
 }
 
 // ToolGrant is one parsed entry from a markdown agent's tools: / allowed-tools:

@@ -520,6 +520,34 @@ func TestScan_SkillNameMatch(t *testing.T) {
 	}
 }
 
+func TestScan_SubagentToolsInherit(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "subagent-tools-inherit")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+
+	if len(res.Subagents) != 5 {
+		t.Errorf("subagents = %d, want 5", len(res.Subagents))
+	}
+	var hits []models.Finding
+	for _, f := range res.Findings {
+		switch f.RuleID {
+		case "CSDK-115":
+			hits = append(hits, f)
+		case "CSDK-110", "CSDK-111", "CSDK-112":
+			t.Errorf("unexpected %s fired on subagent-tools-inherit", f.RuleID)
+		}
+	}
+	if len(hits) != 1 {
+		t.Fatalf("CSDK-115 findings = %d, want 1: %+v", len(hits), hits)
+	}
+	if hits[0].FilePath != ".claude/agents/inheritor.md" || hits[0].StartLine != 1 {
+		t.Errorf("CSDK-115 at %s:%d, want .claude/agents/inheritor.md:1", hits[0].FilePath, hits[0].StartLine)
+	}
+}
+
 func TestScan_SkillAgentSpecific(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "skill-agent-specific")
