@@ -110,6 +110,7 @@ SDK enum values used by the `repo_has_sdk_in_code` predicate:
 | `vercel_ai`        | Vercel AI SDK (TypeScript)           |
 | `autogen`          | AutoGen / AG2                        |
 | `raw_llm_sdk`      | Bare `anthropic` / `openai` client usage (no agent framework); category `raw_llm_sdk` loads unconditionally, the rule's own predicate gates |
+| `github_actions`   | Coding agents in GitHub Actions workflows (repo-root `.github/workflows/*.yml`); category `ci` loads unconditionally, the rule's own `repo_ci_agent_*` predicate gates. One finding per step that runs an offending agent (CI-003: per checkout step), carrying that step's file and line |
 | `agent_config`     | Pre-trust harness config committed to the repo (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`, `.codex/hooks.json`, `AGENTS.md`, staged harness guidance files); category `agent_config` loads unconditionally, the rule's own `repo_*` predicate gates. Findings carry the offending file and line |
 
 Repo-scope rules typically combine `applies_to` with a `repo_has_sdk_in_code`
@@ -135,12 +136,14 @@ against a fixed token:
 | `claude_subagent`  | A `.claude/agents/*.md` subagent declaration (any path depth)   |
 
 Subagent rules use the `subagent_grants_tool` predicate (true when
-`SubagentDef.Tools` contains a listed tool name). They carry **no `language:`
+`SubagentDef.Tools` contains a listed tool name) or `subagent_inherits_all_tools`
+(true for a `.claude/agents/` file with no `tools` key and no `disallowedTools`
+entries; CSDK-115). They carry **no `language:`
 field** — subagents are markdown frontmatter, not code, and the
 `subagentRuleDetector.Applies` method does not gate on language. The shipped
-rules are CSDK-110 ("Subagent granted the built-in Bash tool") and CSDK-111
-("Subagent granted filesystem-write or web-fetch built-ins"), both in
-`claude_sdk/subagent_safety.yaml`.
+rules are CSDK-110 ("Subagent granted the built-in Bash tool"), CSDK-111
+("Subagent granted filesystem-write or web-fetch built-ins"), CSDK-112 and
+CSDK-115, all in `claude_sdk/subagent_safety.yaml`.
 
 ## "Add a rule for X"
 

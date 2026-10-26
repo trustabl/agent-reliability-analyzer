@@ -124,7 +124,7 @@ func (d repoRuleDetector) Applies(p models.RepoProfile, inv models.RepoInventory
 			continue
 		}
 		// "raw_llm_sdk" is likewise not an SDK; the rule's own predicate gates.
-		if k == "raw_llm_sdk" || k == "agent_config" {
+		if k == "raw_llm_sdk" || k == "agent_config" || k == "github_actions" {
 			return true
 		}
 		// The repo-scope applies_to tokens are category labels, which equal
@@ -150,8 +150,39 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 	if !d.rule.Match.EvaluateRepo(p, inv) {
 		return nil
 	}
+	// CI rules report one finding per step that runs an offending agent (per
+	// checkout step for CI-003), so two agents in one repo keep their own site.
+	if hits := ciHitsFor(d.rule.Match, inv.CIWorkflows); len(hits) > 0 {
+		out := make([]models.Finding, 0, len(hits))
+		for _, h := range hits {
+			out = append(out, findingFromRule(d.rule, models.ScopeRepo, h.FilePath, h.Line, h.EndLine, h.Job))
+		}
+		return out
+	}
+	if s := otelLabelsEvidence(d.rule.Match, inv); s != nil {
+		return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, s.File, s.StartLine, s.EndLine, "")}
+	}
 	file, line := configHitLocation(d.rule.Match, inv.ProjectConfig)
 	return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, file, line, line, "")}
+}
+
+// ciHitsFor returns the CI facts behind the CI predicate a rule asks for (set
+// to true), or nil for any other repo rule.
+func ciHitsFor(m MatchExpr, f models.CIWorkflowFacts) []models.CIHit {
+	on := func(b *bool) bool { return b != nil && *b }
+	switch {
+	case on(m.RepoCIAgentUntrustedTriggerUngated):
+		return f.UntrustedUngated
+	case on(m.RepoCIAgentUntrustedTriggerPrivileged):
+		return f.UntrustedPrivileged
+	case on(m.RepoCIAgentCheckoutPersistsCredentials):
+		return f.CheckoutPersists
+	case on(m.RepoCIAgentUnrestrictedShell):
+		return f.UnrestrictedShell
+	case on(m.RepoCIAgentNoEgressRestriction):
+		return f.NoEgressRestriction
+	}
+	return nil
 }
 
 // configHitLocation attributes an agent_config repo finding to the first
@@ -184,6 +215,41 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		return "", 0
 	}
 	return hits[0].FilePath, hits[0].Line
+}
+
+// otelLabelsEvidence returns the offending call for a rule that asserts one of
+// the agent-reliability-otel-labels correctness predicates (set to true), so
+// the finding names the file and line instead of "somewhere in the repo" (spec
+// D3). Test-file signals are never returned. A predicate under `not` is not
+// evidence and is not searched.
+func otelLabelsEvidence(e MatchExpr, inv models.RepoInventory) *models.OtelLabelsSignal {
+	lookups := []struct {
+		set      *bool
+		offender func(models.RepoInventory) *models.OtelLabelsSignal
+	}{
+		{e.RepoOtelLabelsRunShared, otelRunSharedOffender},
+		{e.RepoOtelLabelsToolSpanFailureUnsafe, otelToolSpanFailureUnsafeOffender},
+		{e.RepoOtelLabelsAttemptConstant, otelAttemptConstantOffender},
+		{e.RepoOtelLabelsRunEndSuccessOnly, otelRunEndSuccessOnlyOffender},
+	}
+	for _, l := range lookups {
+		if l.set != nil && *l.set {
+			if s := l.offender(inv); s != nil {
+				return s
+			}
+		}
+	}
+	for _, sub := range e.All {
+		if s := otelLabelsEvidence(sub, inv); s != nil {
+			return s
+		}
+	}
+	for _, sub := range e.Any {
+		if s := otelLabelsEvidence(sub, inv); s != nil {
+			return s
+		}
+	}
+	return nil
 }
 
 func agentKindMatches(kind string, a models.AgentDef) bool {
@@ -350,6 +416,10 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 		// agent_config (pre-trust harness config) is not an SDK either: the files
 		// it reads exist with no SDK code in the repo. Predicates do the gating.
 		"agent_config": true,
+		// ci (GitHub Actions workflows running coding agents) is not an SDK:
+		// the workflow files exist with no SDK code in the repo. The rule
+		// predicates do the gating.
+		"ci": true,
 	}
 	for _, sdk := range sdks {
 		switch sdk {

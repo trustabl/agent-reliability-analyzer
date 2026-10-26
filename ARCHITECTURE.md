@@ -493,6 +493,41 @@ file and line (`configHitLocation` in `rule_detector.go`), so `pathclass` can ta
 a vendored fixture as test-origin. The pack loads unconditionally and the
 `agent_config` `applies_to` token skips the SDK gate.
 
+**GitHub Actions workflows (category `ci`, `schema_version` 28, provisional).** The walk
+enters `.github/` only at the scan root and, inside it, only `.github/workflows/`
+(a nested `.github` and the other `.github` subdirectories are skipped like any
+dot-directory). Files `.github/workflows/*.yml|yaml` go to
+`ScanManifest.WorkflowFiles` (not `YAMLFiles`, so no existing consumer sees them)
+and become `github_workflow` components. `analysis.DiscoverCIWorkflows`
+([ci_workflows.go](internal/analysis/ci_workflows.go)) parses them with
+`yaml.v3` nodes (aliases and `<<` merges resolved under a depth and node budget;
+a file that fails to parse is listed in `CIWorkflowFacts.Unparsed` and produces
+no finding) into `RepoInventory.CIWorkflows` (`CIWorkflowFacts`): sorted, deduped
+`CIHit{file, line, job, agent, reason}` lists behind five repo-scope predicates
+(`repo_ci_agent_untrusted_trigger_ungated`, `..._privileged`,
+`repo_ci_agent_checkout_persists_credentials`, `repo_ci_agent_unrestricted_shell`,
+`repo_ci_agent_no_egress_restriction`) read by CI-001..005. An agent step is a
+`uses:` of `anthropics/claude-code-action` (and its `base-action` /
+`claude-code-base-action` forms), `google-github-actions/run-gemini-cli` or
+`openai/codex-action`, or a `run:` command word `claude`, `gemini`, `codex`,
+`cline` or `aider` (also via `npx` / `bunx` / `pnpm dlx`). Untrusted triggers are
+`pull_request_target`, `issue_comment`, `issues`, `discussion`,
+`discussion_comment` and `pull_request_review_comment`. `${{ }}` expressions are
+never evaluated: an `if:` is matched textually for an `author_association`
+allow-list, a literal actor check or (for `pull_request_target`) a same-repo
+check, on the job, the step or a `needs` ancestor; `claude-code-action` and
+`codex-action` count as gated through their own write-access check unless a `*`
+bypass input is set. A job-level `uses: ./.github/workflows/x.yml` is followed one
+hop (the callee inherits the caller's triggers, gate, permissions and
+`secrets: inherit`); remote reusable workflows, composite actions and matrix
+values are not resolved. Hits carry event, action and secret *names* only. Unlike
+`agent_config`, a CI rule reports one finding per step that runs an offending agent
+(`ciHitsFor` in `rule_detector.go`), attributed to that step with the job id in
+`ToolName`; CI-003 reports one per `actions/checkout` step in the agent's job.
+Two agents in one `run:` step share a line and give one finding. A local
+reusable workflow is evaluated once per caller job and callee job pair. The pack loads unconditionally
+and the `github_actions` `applies_to` token skips the SDK gate.
+
 ### Step 2 — Inventory ([internal/analysis/](internal/analysis/))
 
 For each language recon cleared, do the AST work and produce a `RepoInventory`:
@@ -589,13 +624,26 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   `@trustabl/agent-reliability-otel-labels` is imported), `run_start` (`<run>.mark_start(...)` /
   `<run>.markStart(...)` — receiver required, since it is a method on `Run`),
   `tool_span` (`mark_tool_span` / `markToolSpan`) and `run_end` (`mark_run_end`
-  / `markRunEnd`). The call names are plausible names for a project's own
+  / `markRunEnd`). `run_construct` records a `Run()` / `new Run()` resolved through
+  the file's own import (never repo-wide: `Run` is too generic a name), with
+  `ModuleScope` (built once: no enclosing function, a Python class body, a
+  TypeScript/JavaScript `static` class field, or a Python default parameter; a
+  non-static TypeScript/JavaScript class field initializer runs per instance and
+  is exempt, as is a Python `__main__` guard, parenthesized or not) and `RunIDConst`
+  (a string-literal run id). The call names are plausible names for a project's own
   helpers, so they count only when the library is imported somewhere in the
   repo; each file's own imports are followed, so a renamed import
-  (`mark_tool_span as mts`, `markToolSpan as label`) still resolves. Every
-  signal carries `TestOrigin` when its file classifies as a test
-  (`pathclass.Classify`). That gate is repo-wide, not per-file: a `Run` is
-  routinely built in one module and started in another that imports nothing.
+  (`mark_tool_span as mts`, `markToolSpan as label`) still resolves. That gate
+  is repo-wide, not per-file: a `Run` is routinely built in one module and
+  started in another that imports nothing. Every signal carries `TestOrigin`
+  when its file classifies as a test (`pathclass.Classify`).
+  `tool_span` signals carry `FailureSafe` (inside `finally` / `except` /
+  `catch` before the enclosing function, in a named error callback, or in a
+  function passed to `.finally(` / `.catch(`), `HookUnknown` (an `on_tool_end`
+  method of a `RunHooks` / `AgentHooks` subclass, whose failure behaviour is
+  unverified), `AttemptConst` (an integer-literal `attempt`) and the literal
+  `SideEffect`. `run_end` signals carry `ErrorPath` (except / catch / error
+  callback / `.catch(`, never `finally`) and the literal `ExitReason`.
   `attr_literal` records a label key written to a span by hand
   (`set_attribute` / `setAttribute` first argument, or a key of the literal
   passed to `set_attributes` / `setAttributes`), collected whether or not the
@@ -630,6 +678,20 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   do not count). The predicates prove the calls exist, not that labels land:
   with no current span each call is a silent no-op.
 
+  Four more repo-scope predicates back `OBS-009..012`, which check that the
+  labels written are right, not only present: `repo_otel_labels_run_shared`
+  (a `run_construct` with `ModuleScope` or `RunIDConst`),
+  `repo_otel_labels_tool_span_failure_unsafe` (tool-span labels exist, none is
+  `FailureSafe`; `HookUnknown` labels are left out),
+  `repo_otel_labels_attempt_constant` (every tool-span label has
+  `AttemptConst`) and `repo_otel_labels_run_end_success_only` (no run end has
+  `ErrorPath`, a literal `"error"`, or a variable reason). All four drop
+  test-file signals, and one correct call credits the repo. A repo finding
+  whose rule asserts one of them carries the offending call's file and line
+  (`otelLabelsEvidence` in `rule_detector.go`); every other repo finding keeps
+  an empty location. Hand-written `trustabl.*` keys credit the `OBS-006..008`
+  ladder but are not read by these four.
+
 - **DiscoverSubagents** (`subagents.go`) — **hybrid** discovery in two passes.
   Pass 1 reads every `.claude/agents/*.md` component (matched at any path depth
   — monorepos that nest agent projects under `agent/.claude/agents/` or
@@ -649,7 +711,7 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   the permission grammar — bare, parametered `Bash(...)`, or `mcp__server__tool`
   forms), `disallowedTools`, `permissionMode` (incl. `bypassPermissions`),
   `mcpServers`, `skills`, `isolation`, and `HasHooks` (true only when `hooks:`
-  is a non-empty mapping). Files without frontmatter, with malformed YAML, or
+  is a non-empty mapping). Two in-memory fields (`json:"-"`) record `ToolsOmitted` (the `tools` key is absent; `tools: []` and `tools:` count as declared) and `Canonical` (found in pass 1, a `.claude/agents/` path) for `subagent_inherits_all_tools` (CSDK-115). Files without frontmatter, with malformed YAML, or
   with no `name` are skipped silently. The `tools:` field accepts both the
   comma/space-separated scalar form and the YAML-list form.
 - **DiscoverSkills** (`skills.go`) — emits one `SkillDef` per `SKILL.md`
@@ -1341,6 +1403,7 @@ Shipped rules (one row per YAML rule entry):
 | CSDK-108 | tool     | claude_sdk | high     | `claude_sdk/shell_safety.yaml`     | Tool body spawns a subprocess                                                         |
 | CSDK-110 | subagent | claude_sdk | high     | `claude_sdk/subagent_safety.yaml`  | Subagent granted the built-in Bash tool                                               |
 | CSDK-111 | subagent | claude_sdk | high     | `claude_sdk/subagent_safety.yaml`  | Subagent granted filesystem-write or web-fetch built-ins                              |
+| CSDK-115 | subagent | claude_sdk | high     | `claude_sdk/subagent_safety.yaml`  | Subagent omits tools and inherits the full subagent tool pool                         |
 | CSDK-201 | repo     | claude_sdk | high     | `claude_sdk/repo.yaml`             | Project default permission mode bypasses approvals                                    |
 | CSDK-202 | repo     | claude_sdk | high     | `claude_sdk/repo.yaml`             | Session permission mode bypasses approvals with no tool deny-list |
 | CSDK-203 | repo     | claude_sdk | low      | `claude_sdk/repo_hygiene.yaml`     | Claude Agent SDK code with no agent-guidance doc (AGENTS.md/CLAUDE.md)                |
@@ -1878,6 +1941,8 @@ SubagentDef {
     HasHooks        bool        // true only when hooks: is a non-empty mapping
     Isolation       string      // "" | "worktree"
     Location                    // file_path = path to .md; Line = opening "---"; EndLine = closing "---"
+    ToolsOmitted    bool        // in-memory (json:"-"): frontmatter has no `tools` key
+    Canonical       bool        // in-memory (json:"-"): found under .claude/agents/ (discovery pass 1)
 }
 
 // ToolGrant is one parsed entry from a markdown agent's tools: / allowed-tools:

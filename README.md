@@ -310,7 +310,8 @@ flowchart LR
    `.claude/agents/*.md` subagents at any depth, `SKILL.md` skills,
    slash commands at both `.claude/commands/*.md` and
    `<plugin-root>/commands/*.md`, `.claude-plugin/{plugin,marketplace}.json`
-   manifests, sandbox policies). No
+   manifests, sandbox policies, and the repo-root `.github/workflows/*.yml`
+   GitHub Actions workflows). No
    tree-sitter parses happen here — this step decides whether the
    expensive AST work is even worth attempting.
 2. **Inventory** — for each language Recon cleared, do the AST work and
@@ -469,6 +470,13 @@ files in the scanned repo. Each run produces a `ScanResult` containing:
   instrumented in its manifest and produces no traces at all. Detected
   statically in Python and TypeScript/JavaScript only — Trustabl does not ingest
   runtime traces.
+- **Process labels** (`otel_labels`) — the `agent-reliability-otel-labels`
+  calls found in code (import, `Run` construction, run start, tool-span label,
+  run end) and any `trustabl.*` label keys written by hand, with the file and
+  line and the facts the OBS-006..012 rules read: whether a `Run` is shared,
+  whether a label runs when the tool fails, whether `attempt` is a fixed
+  number, and the literal `side_effect` / `exit_reason` values. Python and
+  TypeScript/JavaScript only. Not folded into the scan ID.
 
 - **Server entrypoints** (`entrypoints`, omitted when none) — Python functions a
   server framework invokes for an external request or job: FastAPI and Flask
@@ -1117,6 +1125,7 @@ trustabl forge --policy google_adk --lang go
 | `claude_skill` | Claude Code skills (`SKILL.md`) |
 | `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework) |
 | `agent_config` | Harness config committed to a repo that runs code or grants authority before the folder is trusted (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`) |
+| `ci` | Coding agents run from GitHub Actions workflows (`.github/workflows/*.yml`) on events any GitHub user can cause |
 | `openshell` | Shell-invocation tools (no rules in the current pack) |
 
 Multiple categories are comma-separated: `--policy openai_sdk,mcp`.

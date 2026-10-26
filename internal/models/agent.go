@@ -206,6 +206,15 @@ type SubagentDef struct {
 	HasHooks        bool        `json:"has_hooks,omitempty"`
 	Isolation       string      `json:"isolation,omitempty"`
 	Location                    // file_path / start_line / end_line (flat in JSON via anonymous embed)
+
+	// ToolsOmitted is true when the frontmatter has no `tools` key. A `tools:`
+	// key with an empty or null value is not omitted. In-memory only; read by
+	// subagent_inherits_all_tools (CSDK-115).
+	ToolsOmitted bool `json:"-"`
+	// Canonical is true when the file was found in a .claude/agents/ directory
+	// (DiscoverSubagents pass 1), false for the frontmatter-shape fallback.
+	// In-memory only.
+	Canonical bool `json:"-"`
 }
 
 // SkillDef is one parsed Claude Code skill (a SKILL.md file). allowed-tools and

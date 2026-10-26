@@ -108,7 +108,8 @@ type MatchExpr struct {
 	AgentServerReachable *bool `yaml:"agent_server_reachable,omitempty"`
 
 	// Subagent-scope predicates
-	SubagentGrantsTool []string `yaml:"subagent_grants_tool,omitempty"`
+	SubagentGrantsTool       []string `yaml:"subagent_grants_tool,omitempty"`
+	SubagentInheritsAllTools *bool    `yaml:"subagent_inherits_all_tools,omitempty"`
 
 	// Skill-scope predicates
 	SkillAllowsUnrestrictedShell            *bool               `yaml:"skill_allows_unrestricted_shell,omitempty"`
@@ -153,6 +154,14 @@ type MatchExpr struct {
 	RepoAgentsMdHasHiddenText            *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
 	RepoHarnessGuidanceHasHiddenText     *bool `yaml:"repo_harness_guidance_has_hidden_text,omitempty"`
 
+	// CI workflow predicates (category ci). Each is true when the corresponding
+	// CIWorkflowFacts slice is non-empty (one hit per agent step; per checkout step for CI-003).
+	RepoCIAgentUntrustedTriggerUngated     *bool `yaml:"repo_ci_agent_untrusted_trigger_ungated,omitempty"`
+	RepoCIAgentUntrustedTriggerPrivileged  *bool `yaml:"repo_ci_agent_untrusted_trigger_privileged,omitempty"`
+	RepoCIAgentCheckoutPersistsCredentials *bool `yaml:"repo_ci_agent_checkout_persists_credentials,omitempty"`
+	RepoCIAgentUnrestrictedShell           *bool `yaml:"repo_ci_agent_unrestricted_shell,omitempty"`
+	RepoCIAgentNoEgressRestriction         *bool `yaml:"repo_ci_agent_no_egress_restriction,omitempty"`
+
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
 	RepoHasObservability             *bool    `yaml:"repo_has_observability,omitempty"`
@@ -169,6 +178,13 @@ type MatchExpr struct {
 	RepoOtelLabelsInstalled   *bool `yaml:"repo_otel_labels_installed,omitempty"`
 	RepoOtelLabelsInitialized *bool `yaml:"repo_otel_labels_initialized,omitempty"`
 	RepoOtelLabelsImplemented *bool `yaml:"repo_otel_labels_implemented,omitempty"`
+
+	// agent-reliability-otel-labels correctness predicates (OBS-009..012).
+	// Test-file signals never count (spec D8).
+	RepoOtelLabelsRunShared             *bool `yaml:"repo_otel_labels_run_shared,omitempty"`
+	RepoOtelLabelsToolSpanFailureUnsafe *bool `yaml:"repo_otel_labels_tool_span_failure_unsafe,omitempty"`
+	RepoOtelLabelsAttemptConstant       *bool `yaml:"repo_otel_labels_attempt_constant,omitempty"`
+	RepoOtelLabelsRunEndSuccessOnly     *bool `yaml:"repo_otel_labels_run_end_success_only,omitempty"`
 
 	// RepoLangGraphPlatformConfigPresent is ALSO valid at agent scope (dual-scope,
 	// like repo_has_observability): a langgraph.json means LangGraph Platform

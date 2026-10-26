@@ -350,14 +350,20 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **Unpinned MCP package launch (2026-10-21, `schema_version` 26 → 28, provisional; +1 rule):** **MCPCFG-003** (high, 0.7, repo scope,
+> **Unpinned MCP package launch (2026-10-21, `schema_version` 29 → 30, provisional; +1 rule):** **MCPCFG-003** (high, 0.7, repo scope,
 > category `agent_config`) over the new predicate `repo_mcp_config_launches_unpinned_package`, backed by
 > `ProjectConfigFacts.UnpinnedMCPLaunch`. It flags an MCP client config entry started by `npx` / `bunx` / `pnpm dlx` / `uvx` /
 > `uv tool run` / `pipx run` / `docker run` on a package or image with no exact version (docker: an `@sha256:` digest). Git, URL,
 > local-path and `$VAR` specs are not judged; a command inside the repo stays with MCPCFG-002, so the two never judge one entry.
-> Schema 27 is held by CSDK-115 on an open branch, so this number is provisional and the later merge renumbers. The fixture holds
-> **344** rules (343 + 1; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`, a separate follow-up round.
+> Schema 29 is held by CSDK-115 on main, so this number is provisional and a later merge may renumber. The fixture holds
+> **354** rules (353 + 1; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`, a separate follow-up round.
 > Not judged and not built: git refs, `deno` / `podman` / `yarn dlx` / `npm exec` launchers, lockfile pins.
+> **CI workflows (2026-10-19, `schema_version` 27 → 28, provisional; +5 rules):** new unconditionally-loaded category `ci` (**CI-001..005**, repo
+> scope, `applies_to: [github_actions]`) over five `repo_ci_agent_*` predicates backed by `RepoInventory.CIWorkflows`
+> (`analysis.DiscoverCIWorkflows`). The walk reads only the repo-root `.github/workflows/*.yml|yaml` (into `ScanManifest.WorkflowFiles`, not
+> `YAMLFiles`). The IDs sit outside the SDK-prefix `NNN`/`1NN`/`2NN` convention, like AGCFG. A CI rule emits one finding per step that runs an
+> offending agent, and for CI-003 one per `actions/checkout` step in that job (not one per scan). Hits carry event, action and secret names only, never a `with` / `env` / `run` value. Rulebook docs (`docs/Policy/ci/`) are a
+> separate follow-up. Built in parallel with the otel-labels correctness batch, which merged first and took 26 → 27, so this batch takes 28. The fixture holds **352** rules (347 + 5; re-derive, do not trust this figure).
 >
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`
@@ -395,6 +401,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > **rank 2** (required span attributes — the SDK or instrumentor writes them, so a well-instrumented repo has no literals to find, and the
 > OTel GenAI semconv is still Development with renamed keys), and **rank 4** (run-level correlation id — session / `group_id` — needs a
 > run-call kwarg predicate, tracked with the HTTP-entrypoint design ticket). See `COVERAGE.md`.
+>
+> **agent-reliability-otel-labels correctness, Batch 1 (2026-10-08, `schema_version` 26 → 27):** the fixture now holds **347** rules
+> (343 + 4; re-derive, do not trust this figure). Built in parallel with LC-116 (21 → 22) and the `agent_config` pack (22 → 26), which merged first, so this batch takes 27. **OBS-009** (shared `Run`) / **OBS-010** (tool span labelled only on success) /
+> **OBS-011** (constant `attempt`) / **OBS-012** (run end only on success) read new facts on `OtelLabelsSignal`; test-file
+> signals never count and findings point at the offending call. Hand-written `trustabl.*` keys now credit OBS-006..008.
+> Spec: `.superpowers/specs/2026-10-04-otel-labels-correctness-rules-design.md`. Not built: the handoff rule (spec O7),
+> the `side_effect` rules (Batch 2). OBS-009..012 must not reach production before library 0.1.1 is published (spec O1): the 0.1.0 README example trips all four.
 >
 > **agent-reliability-otel-labels batch (2026-10-04, `schema_version` 20 → 21):** the fixture now holds **333** rules
 > (330 + 3; re-derive, do not trust this figure). Built in parallel with the HTTPS-only batch, which had already taken

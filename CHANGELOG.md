@@ -8,7 +8,7 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ### Added
 
-- **Unpinned MCP package launches (rule schema 26 -> 28, provisional).** New
+- **Unpinned MCP package launches (rule schema 29 -> 30, provisional).** New
   repo-scope predicate `repo_mcp_config_launches_unpinned_package` and rule
   **MCPCFG-003** (high, 0.7) flag a committed MCP client config
   (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`,
@@ -22,8 +22,21 @@ to follow Semantic Versioning once it reaches 1.0.
   image name is never echoed. MCPCFG-002's explanation no longer implies that an
   unpinned package might be flagged by it. **Release order:** this engine first,
   then the rules pack; a rule that needs a new predicate is skipped on an older
-  engine. The schema number is provisional; whichever of this and CSDK-115 (27)
-  merges later renumbers.
+  engine. The schema number is provisional; it follows CSDK-115 (29), and
+  whichever open branch merges later renumbers.
+- **Coding agents in GitHub Actions workflows (rule schema 27 -> 28, provisional).** A new
+  unconditionally loaded `ci` category (CI-001..005) with five repo-scope
+  predicates backed by `RepoInventory.CIWorkflows`. The walk now reads the
+  repo-root `.github/workflows/*.yml|yaml` into `ScanManifest.WorkflowFiles` and
+  `github_workflow` components. CI-001 and CI-002 flag an agent job on an
+  untrusted trigger (issues, issue and review comments, discussions,
+  `pull_request_target`) with no actor gate, CI-002 when it also holds a write
+  token or extra secrets; CI-003..005 flag persisted checkout credentials,
+  unrestricted shell and a missing egress restriction. `claude-code-action` and
+  `codex-action` count as gated through their own write-access check unless a
+  `*` bypass input is set. One finding per step that runs an offending agent (for CI-003, per
+  `actions/checkout` step in an agent job). `workflow_run` is not in
+  the trigger set yet.
 
 ### Fixed
 
