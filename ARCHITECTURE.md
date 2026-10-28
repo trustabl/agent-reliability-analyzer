@@ -540,6 +540,17 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
 - **DiscoverTools** (`discovery.go`) — two-pass Python discovery (decorated
   functions and bare shell-invoking functions). Also captures decorator kwargs
   into `ToolDef.Config` for rules that inspect `@function_tool(strict_mode=...)`.
+  For a decorated tool that declares a parameter named `claim` (an EBTE-style
+  `ToolInvocationExplanation`), `pythonClaimUse` (`claim_use.go`) stamps the
+  `claim_use` fact (`models.FactClaimUse`): `unused` (the body never reads it),
+  `passthrough` (every read is an argument to print / a logger method /
+  `json.dumps` / `str` / `repr`, or part of a return value), `checked` (some read
+  feeds another call, a comparison or a condition), or `wrapped` (a second
+  decorator, or for an OpenAI tool an attached tool input guardrail, may
+  mediate). A tool with no `claim` parameter carries no fact, so scan output for
+  repos that do not use claims is unchanged. The `tool_claim_use` predicate
+  (`schema_version` 32) reads it; its `absent` value is decided from
+  `ParamNames`. Read by OAI-034..036, MCP-033..035 and LC-028..030.
 - **DiscoverAgents** (`agents.go`) — finds `Agent(...)` / `SandboxAgent(...)` /
   `AgentDefinition(...)` constructor calls; captures all constructor kwargs into
   a typed `KwargTree`; sets `Opaque=true` for `Agent(**config)` or
@@ -2143,6 +2154,10 @@ internal/
 │   │                            stamps a structural shells_out fact via
 │   │                            pythonBodyShellsOut so agent rules can see a
 │   │                            decorated tool that shells out).
+│   ├── claim_use.go             pythonClaimUse: the claim_use fact on a decorated
+│   │                            tool with a `claim` parameter (unused /
+│   │                            passthrough / checked / wrapped), plus
+│   │                            openAIToolHasInputGuardrail.
 │   ├── agents.go                Python agent / guardrail / session discovery and
 │   │                            edge resolution (DiscoverAgents, DiscoverGuardrails,
 │   │                            DiscoverSessions, ResolveEdges, SessionClasses).
@@ -2186,7 +2201,7 @@ internal/
 ├── rules/                       YAML-driven detection engine. Authoritative.
 │   ├── schema.go                PolicyFile / RuleDef / MatchExpr types.
 │   ├── schema_version.go        SupportedSchemaVersion const (engine ↔ pack gate).
-│   ├── loader.go                Validating YAML loader (recursive walk; skips manifest.yaml). Rejects repo_has_sdk_in_code values that are not SDK-enum tokens (catches the claude_sdk-vs-claude_agent_sdk silent never-fire).
+│   ├── loader.go                Validating YAML loader (recursive walk; skips manifest.yaml). Rejects repo_has_sdk_in_code values that are not SDK-enum tokens (catches the claude_sdk-vs-claude_agent_sdk silent never-fire), and tool_claim_use values outside absent / unused / passthrough / checked / wrapped.
 │   ├── predicates.go            One Pred* per detection primitive. TS-aware: PredHasShellCall/PredHasWriteCall/PredHasCodeExecCall/PredHasDynamicURLCall / PredHasUnpinnedSchemeURLCall read the shells_out/writes_fs/code_exec/dynamic_url/url_scheme_unpinned facts for TypeScript and walk the AST for Python; PredHasBodyText uses a [Line, EndLine] span substring fallback (bodyTextFromSpan), kept for textual-absence checks only.
 │   ├── evaluator.go             MatchExpr.Evaluate — recursive walker.
 │   └── rule_detector.go         RuleDetector adapter + LoadRegistry.
@@ -2363,6 +2378,10 @@ negation.
 - Required-field validation, enum validation (severity / category),
   duplicate-rule-ID detection across files. Every error is collected via
   `errors.Join` so a contributor sees every problem in one run.
+- **Closed-value predicates**: a `repo_has_sdk_in_code` value that is not an
+  SDK-enum token, or a `tool_claim_use` value outside `absent` / `unused` /
+  `passthrough` / `checked` / `wrapped`, is rejected, since either would
+  silently never match.
 - **`applies_to`-vs-scope** check (`validAppliesToForScope`): the declared
   `applies_to` kinds must be legal for the rule's `scope`.
 - **`match`-vs-scope** check (`MatchExpr.outOfScopePredicates`): every predicate

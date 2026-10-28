@@ -117,6 +117,13 @@ func toolsInFile(pf ParsedFile) []models.ToolDef {
 		}
 		tool := buildTool(fn, pf, kind)
 		tool.Config = extractDecoratorKwargs(dec, pf.Source)
+		if use := pythonClaimUse(fn, dec, pf.Source); use != "" {
+			if kind == models.KindOpenAITool && use != models.ClaimUseChecked &&
+				openAIToolHasInputGuardrail(tool, root, pf.Source) {
+				use = models.ClaimUseWrapped
+			}
+			tool.Facts[models.FactClaimUse] = use
+		}
 		out = append(out, tool)
 	}
 
