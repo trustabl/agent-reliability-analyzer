@@ -478,11 +478,20 @@ components: `mcp_config` (now also `.mcp.json`, `.cursor/mcp.json`,
 (`repo_project_mcp_autoenable`, `repo_project_hook_runs_untrusted_command`,
 `repo_workspace_env_overrides_trust`, `repo_editor_agent_auto_approve`,
 `repo_mcp_config_launches_local_command`,
-`repo_mcp_config_launches_unpinned_package`) read by AGCFG-004..007, MCPCFG-002
-and MCPCFG-003. The two MCP predicates never judge the same server entry:
-`classifyMCPLaunch` (repo-controlled code) and `classifyMCPPin` (a runner on a
-registry package or image with no exact version or digest) accept disjoint
-commands.
+`repo_mcp_config_launches_unpinned_package`,
+`repo_mcp_config_unscoped_credential`, `repo_mcp_config_remote_plain_http`) read by
+AGCFG-004..007 and MCPCFG-002..005. MCPCFG-002 and MCPCFG-003 never judge the same
+server entry: `classifyMCPLaunch` (repo-controlled code) and `classifyMCPPin` (a runner
+on a registry package or image with no exact version or digest) accept disjoint
+commands. `mcpHits` runs all four classifiers over one entry and returns one hit list per
+rule. The classifiers added by MCPCFG-004 and MCPCFG-005 live in
+[mcp_client_scope.go](internal/analysis/mcp_client_scope.go): `classifyMCPScope` (a
+`github-mcp-server` launch with `GITHUB_PERSONAL_ACCESS_TOKEN` and no read-only or toolset
+option, the deprecated npm GitHub package with that token, the Supabase server with neither
+`--read-only` nor `--project-ref`, or an env key containing `SERVICE_ROLE`; a command inside
+the repo is skipped) and `classifyMCPRemoteURL` (an `http` URL on a non-loopback host).
+Server `env` maps and docker `-e` arguments are read by key name; the value of
+`GITHUB_READ_ONLY` and `GITHUB_TOOLSETS` is reduced to a state at once and never stored.
 `repo_settings_preapprove_user_content_fetch` (AGCFG-011) reads the already-parsed
 `permissions.allow/deny/ask` rules (`DiscoverClaudeSettings`): `userContentFetchHits`
 matches each WebFetch allow entry against a fixed host list using the documented

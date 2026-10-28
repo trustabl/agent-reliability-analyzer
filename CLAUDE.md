@@ -350,6 +350,16 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **MCP client config: unscoped credential and plain http remote (2026-10-28, `schema_version` 36 -> 38, provisional; +2 rules):** **MCPCFG-004**
+> (high, 0.6) over `repo_mcp_config_unscoped_credential` (`ProjectConfigFacts.UnscopedMCPCredential`) and **MCPCFG-005** (medium, 0.6) over
+> `repo_mcp_config_remote_plain_http` (`PlainHTTPMCPServer`), both in `agent_config/mcp_client_config.yaml`; classifiers in
+> `internal/analysis/mcp_client_scope.go`. 004 judges a `github-mcp-server` launch with `GITHUB_PERSONAL_ACCESS_TOKEN` and no read-only or
+> toolset option, the deprecated npm GitHub package with that token, the Supabase server with neither `--read-only` nor `--project-ref`, and
+> any env key containing `SERVICE_ROLE` (ADMIN, ROOT, _SUPERUSER and GITHUB_TOKEN have no vendor source and are not judged). **Secrecy:** env
+> keys are read by name; the value of `GITHUB_READ_ONLY` / `GITHUB_TOOLSETS` is reduced to a state in the same function and never stored.
+> 005 does not judge a missing credential (four clients document OAuth with nothing in the file). Schema 37 is held by AGCFG-012 on its open
+> branch, so 38 is provisional. The fixture holds **384** rules (382 + 2; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`.
+>
 > **Tool-call claims, EBTE (2026-10-19, `schema_version` 31 → 32; +9 rules; main took 27 for OBS-009..012, 28 for CI-001..005, 29 for CSDK-115, 30 for MCPCFG-003, 31 for AGCFG-011):** new tool-scope predicate `tool_claim_use` over the
 > `claim_use` fact that Python decorated-tool discovery stamps on a tool declaring a `claim` parameter (`internal/analysis/claim_use.go`;
 > `absent` is decided from `ParamNames`). A three-rung ladder per SDK: **OAI-034 / MCP-033 / LC-028** (info, 0.5; the pack's first info rules) side-effecting tool with

@@ -381,3 +381,319 @@ func TestProjectConfig_UserContentFetchAllowLine(t *testing.T) {
 		t.Errorf("reason should name the host: %q", f.UserContentFetchAllow[0].Reason)
 	}
 }
+
+// scopeSrv wraps one server body in an mcpServers document.
+func scopeSrv(body string) string { return `{"mcpServers":{"s":` + body + `}}` }
+
+func TestProjectConfig_UnscopedMCPCredential_GitHub(t *testing.T) {
+	tok := `"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"${GITHUB_PAT}"`
+	dockerArgs := func(extra ...string) string {
+		a := `"run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN"`
+		for _, e := range extra {
+			a += `,` + e
+		}
+		return a + `,"ghcr.io/github/github-mcp-server"`
+	}
+	fire := []string{
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `}}`,
+		`{"command":"/usr/local/bin/github-mcp-server.exe","args":["stdio"],` + tok + `}}`,
+		`{"command":"docker","args":[` + dockerArgs() + `],` + tok + `}}`,
+		`{"command":"docker","args":[` + dockerArgs() + `,"stdio"],` + tok + `}}`,
+		`{"command":"docker","args":["run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN=${PAT}","ghcr.io/github/github-mcp-server:v1.0.0"]}`,
+		// a falsy GITHUB_READ_ONLY is not read-only; the server parses it with ParseBool
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_READ_ONLY":"0"}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_READ_ONLY":"yes"}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_READ_ONLY":"on"}}`,
+		`{"command":"github-mcp-server","args":["stdio","--read-only=false"],` + tok + `}}`,
+		// toolsets that widen
+		`{"command":"github-mcp-server","args":["stdio","--toolsets=all"],` + tok + `}}`,
+		`{"command":"github-mcp-server","args":["stdio","--toolsets","default"],` + tok + `}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_TOOLSETS":"default,repos"}}`,
+		// --tools is additive once a toolset list widens
+		`{"command":"github-mcp-server","args":["stdio","--toolsets=all","--tools=get_me"],` + tok + `}}`,
+		// docker's own --read-only (before the image) is not the server's
+		`{"command":"docker","args":[` + dockerArgs(`"--read-only"`) + `],` + tok + `}}`,
+	}
+	for _, body := range fire {
+		f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig)
+		if len(f.UnscopedMCPCredential) != 1 {
+			t.Errorf("%s: want one unscoped hit, got %+v", body, f.UnscopedMCPCredential)
+		}
+		if len(f.LocalMCPLaunch) != 0 {
+			t.Errorf("%s: MCPCFG-002 must not also fire", body)
+		}
+	}
+	silent := []string{
+		`{"command":"github-mcp-server","args":["stdio","--read-only"],` + tok + `}}`,
+		`{"command":"github-mcp-server","args":["stdio","--read_only"],` + tok + `}}`,
+		`{"command":"github-mcp-server","args":["stdio","--read-only=true"],` + tok + `}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_READ_ONLY":"1"}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_READ_ONLY":"true"}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_READ_ONLY":"${RO}"}}`,
+		`{"command":"docker","args":[` + dockerArgs(`"-e"`, `"GITHUB_READ_ONLY=1"`) + `],` + tok + `}}`,
+		`{"command":"docker","args":[` + dockerArgs() + `,"stdio","--read-only"],` + tok + `}}`,
+		// sheet case: toolsets and read-only together
+		`{"command":"github-mcp-server","args":["stdio","--read-only"],` + tok + `,"GITHUB_TOOLSETS":"repos"}}`,
+		`{"command":"github-mcp-server","args":["stdio","--toolsets=repos,issues"],` + tok + `}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_TOOLSETS":"repos"}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_TOOLSETS":"${TS}"}}`,
+		`{"command":"github-mcp-server","args":["stdio","--tools=get_me,list_issues"],` + tok + `}}`,
+		`{"command":"github-mcp-server","args":["stdio"],` + tok + `,"GITHUB_TOOLS":"get_me"}}`,
+		// a flag that is read-only wins over a falsy env var
+		`{"command":"github-mcp-server","args":["stdio","--read-only"],` + tok + `,"GITHUB_READ_ONLY":"0"}}`,
+		// no token: OAuth login, nothing to scope
+		`{"command":"github-mcp-server","args":["stdio"]}`,
+		// GITHUB_TOKEN is not a variable the server documents
+		`{"command":"github-mcp-server","args":["stdio"],"env":{"GITHUB_TOKEN":"${T}"}}`,
+		// a command inside the repo is MCPCFG-002's
+		`{"command":"./github-mcp-server","args":["stdio"],` + tok + `}}`,
+		// a remote URL is out of scope
+		`{"url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${PAT}"}}`,
+		`{"command":"npx","args":["-y","@example/other-server"],` + tok + `}}`,
+	}
+	for _, body := range silent {
+		if f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig); len(f.UnscopedMCPCredential) != 0 {
+			t.Errorf("%s: want silent, got %+v", body, f.UnscopedMCPCredential)
+		}
+	}
+}
+
+func TestProjectConfig_UnscopedMCPCredential_OldGitHubPackage(t *testing.T) {
+	tok := `"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"${GITHUB_PAT}"}`
+	for _, body := range []string{
+		`{"command":"npx","args":["-y","@modelcontextprotocol/server-github"],` + tok + `}`,
+		`{"command":"npx","args":["-y","@modelcontextprotocol/server-github@2025.4.8"],` + tok + `}`,
+		`{"command":"bunx","args":["@modelcontextprotocol/server-github"],` + tok + `}`,
+		`{"command":"pnpm","args":["dlx","@modelcontextprotocol/server-github"],` + tok + `}`,
+	} {
+		f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig)
+		if len(f.UnscopedMCPCredential) != 1 {
+			t.Errorf("%s: want one hit, got %+v", body, f.UnscopedMCPCredential)
+		}
+	}
+	for _, body := range []string{
+		`{"command":"npx","args":["-y","@modelcontextprotocol/server-github"]}`,
+		`{"command":"npx","args":["-y","@modelcontextprotocol/server-github-extra"],` + tok + `}`,
+		`{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem"],` + tok + `}`,
+	} {
+		if f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig); len(f.UnscopedMCPCredential) != 0 {
+			t.Errorf("%s: want silent, got %+v", body, f.UnscopedMCPCredential)
+		}
+	}
+}
+
+func TestProjectConfig_UnscopedMCPCredential_Supabase(t *testing.T) {
+	fire := []string{
+		// the sheet's fail case
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--access-token","$TOKEN"]}`,
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase@latest"]}`,
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase@0.14.0"],"env":{"SUPABASE_ACCESS_TOKEN":"${T}"}}`,
+		`{"command":"bunx","args":["@supabase/mcp-server-supabase"]}`,
+		`{"command":"mcp-server-supabase","args":[]}`,
+		// --read-only=true is not a form the CLI accepts
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--read-only=true"]}`,
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--features=database"]}`,
+	}
+	for _, body := range fire {
+		f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig)
+		if len(f.UnscopedMCPCredential) != 1 {
+			t.Errorf("%s: want one hit, got %+v", body, f.UnscopedMCPCredential)
+		}
+	}
+	silent := []string{
+		// the sheet's pass case
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--read-only","--project-ref=abc"]}`,
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--read-only"]}`,
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--project-ref=abc"]}`,
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--project-ref","abc"]}`,
+		`{"command":"mcp-server-supabase","args":["--read-only"]}`,
+		`{"command":"npx","args":["-y","@supabase/mcp-server-supabase-extra"]}`,
+		`{"command":"npx","args":["-y","@example/other"]}`,
+		`{"url":"https://mcp.supabase.com/mcp"}`,
+		`{"command":"./mcp-server-supabase","args":[]}`,
+	}
+	for _, body := range silent {
+		if f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig); len(f.UnscopedMCPCredential) != 0 {
+			t.Errorf("%s: want silent, got %+v", body, f.UnscopedMCPCredential)
+		}
+	}
+}
+
+func TestProjectConfig_UnscopedMCPCredential_ServiceRole(t *testing.T) {
+	for _, body := range []string{
+		`{"command":"node","args":["/opt/s.js"],"env":{"SUPABASE_SERVICE_ROLE_KEY":"${K}"}}`,
+		`{"command":"npx","args":["-y","pkg@1.2.3"],"env":{"service_role_key":"${K}"}}`,
+		`{"url":"https://mcp.example.invalid/mcp","env":{"SERVICE_ROLE":"${K}"}}`,
+		`{"command":"docker","args":["run","-i","-e","SUPABASE_SERVICE_ROLE_KEY","img@sha256:` + strings.Repeat("0", 64) + `"]}`,
+	} {
+		f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig)
+		if len(f.UnscopedMCPCredential) != 1 {
+			t.Errorf("%s: want one hit, got %+v", body, f.UnscopedMCPCredential)
+		}
+	}
+	// The dropped name patterns stay silent.
+	for _, key := range []string{"PROJECT_ROOT", "ROOT_DIR", "ADMIN_EMAIL", "DB_SUPERUSER", "ADMIN_TOKEN", "SUPABASE_ANON_KEY"} {
+		body := `{"command":"node","args":["/opt/s.js"],"env":{"` + key + `":"${K}"}}`
+		if f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig); len(f.UnscopedMCPCredential) != 0 {
+			t.Errorf("%s: want silent, got %+v", key, f.UnscopedMCPCredential)
+		}
+	}
+	// A command inside the repo is MCPCFG-002's.
+	f := discoverWith(t, ".mcp.json", scopeSrv(`{"command":"./srv.sh","env":{"SUPABASE_SERVICE_ROLE_KEY":"${K}"}}`), models.ComponentMCPConfig)
+	if len(f.UnscopedMCPCredential) != 0 || len(f.LocalMCPLaunch) == 0 {
+		t.Errorf("repo-relative command: want MCPCFG-002 only, got scope=%+v local=%+v", f.UnscopedMCPCredential, f.LocalMCPLaunch)
+	}
+}
+
+// The same classifier runs over every parsed config shape.
+func TestProjectConfig_UnscopedMCPCredential_EveryClientFile(t *testing.T) {
+	tok := `"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"${PAT}"}`
+	gh := `"command":"github-mcp-server","args":["stdio"],` + tok
+	cases := []struct {
+		rel, body string
+		kind      models.ComponentKind
+	}{
+		{".mcp.json", `{"mcpServers":{"s":{` + gh + `}}}`, models.ComponentMCPConfig},
+		{".cursor/mcp.json", `{"mcpServers":{"s":{` + gh + `}}}`, models.ComponentMCPConfig},
+		{".vscode/mcp.json", `{"servers":{"s":{` + gh + `}}}`, models.ComponentMCPConfig},
+		{"claude_desktop_config.json", `{"mcpServers":{"s":{` + gh + `}}}`, models.ComponentMCPConfig},
+		{".gemini/settings.json", `{"mcpServers":{"s":{` + gh + `}}}`, models.ComponentGeminiSettings},
+		{".codex/config.toml", "[mcp_servers.s]\ncommand = \"github-mcp-server\"\nargs = [\"stdio\"]\n[mcp_servers.s.env]\nGITHUB_PERSONAL_ACCESS_TOKEN = \"${PAT}\"\n", models.ComponentCodexConfig},
+	}
+	for _, c := range cases {
+		f := discoverWith(t, c.rel, c.body, c.kind)
+		if len(f.UnscopedMCPCredential) != 1 {
+			t.Errorf("%s: want one hit, got %+v", c.rel, f.UnscopedMCPCredential)
+		}
+	}
+	// Read-only through the Codex env table is credited too.
+	toml := "[mcp_servers.s]\ncommand = \"github-mcp-server\"\nargs = [\"stdio\"]\n[mcp_servers.s.env]\nGITHUB_PERSONAL_ACCESS_TOKEN = \"${PAT}\"\nGITHUB_READ_ONLY = \"1\"\n"
+	if f := discoverWith(t, ".codex/config.toml", toml, models.ComponentCodexConfig); len(f.UnscopedMCPCredential) != 0 {
+		t.Errorf("codex read-only: want silent, got %+v", f.UnscopedMCPCredential)
+	}
+}
+
+// Malformed config never panics and never hides the other rules' hits.
+func TestProjectConfig_UnscopedMCPCredential_Malformed(t *testing.T) {
+	for _, c := range []struct {
+		rel, body string
+		kind      models.ComponentKind
+	}{
+		{".mcp.json", `{"mcpServers": {`, models.ComponentMCPConfig},
+		{".codex/config.toml", "[mcp_servers.s\ncommand = ", models.ComponentCodexConfig},
+	} {
+		f := discoverWith(t, c.rel, c.body, c.kind)
+		if len(f.UnscopedMCPCredential) != 0 || len(f.PlainHTTPMCPServer) != 0 {
+			t.Errorf("%s: malformed config must give no hit, got %+v", c.rel, f)
+		}
+	}
+	// An env that is an array or holds a number does not fail the document.
+	for _, env := range []string{`["A","B"]`, `{"N":5,"GITHUB_PERSONAL_ACCESS_TOKEN":5}`, `"x"`} {
+		body := `{"mcpServers":{"a":{"command":"npx","args":["pkg"],"env":` + env + `},"b":{"command":"bash","args":["-c","x"]}}}`
+		f := discoverWith(t, ".mcp.json", body, models.ComponentMCPConfig)
+		if len(f.UnpinnedMCPLaunch) != 1 || len(f.LocalMCPLaunch) != 1 {
+			t.Errorf("env %s: MCPCFG-002/003 hits lost: unpinned=%+v local=%+v", env, f.UnpinnedMCPLaunch, f.LocalMCPLaunch)
+		}
+	}
+}
+
+// A planted fake token never reaches a fact, a Reason or the marshalled output.
+func TestProjectConfig_UnscopedMCPCredential_NoValueLeaks(t *testing.T) {
+	const fake = "fake-value-not-real-9f3a"
+	body := `{"mcpServers":{
+	  "gh":{"command":"github-mcp-server","args":["stdio","--note=` + fake + `"],"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"` + fake + `","GITHUB_READ_ONLY":"` + fake + `","GITHUB_TOOLSETS":"` + fake + `"}},
+	  "gh2":{"command":"github-mcp-server","args":["stdio"],"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"` + fake + `","GITHUB_READ_ONLY":"0"}},
+	  "sb":{"command":"npx","args":["-y","@supabase/mcp-server-supabase","--access-token","` + fake + `"]},
+	  "sr":{"command":"node","args":["/opt/s.js"],"env":{"SUPABASE_SERVICE_ROLE_KEY":"` + fake + `"}},
+	  "dk":{"command":"docker","args":["run","-e","GITHUB_PERSONAL_ACCESS_TOKEN=` + fake + `","ghcr.io/github/github-mcp-server"]},
+	  "rm":{"url":"http://mcp.example.invalid/mcp?token=` + fake + `","headers":{"Authorization":"Bearer ` + fake + `"}}
+	}}`
+	f := discoverWith(t, ".mcp.json", body, models.ComponentMCPConfig)
+	if len(f.UnscopedMCPCredential) == 0 || len(f.PlainHTTPMCPServer) == 0 {
+		t.Fatalf("fixture should produce hits: %+v", f)
+	}
+	out, err := json.Marshal(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), fake) {
+		t.Errorf("a planted value reached the facts: %s", out)
+	}
+}
+
+func TestProjectConfig_PlainHTTPMCPServer(t *testing.T) {
+	fire := []string{
+		`{"url":"http://mcp.example.invalid/mcp"}`,
+		`{"url":"HTTP://MCP.EXAMPLE.INVALID/mcp"}`,
+		`{"type":"http","url":"http://mcp.example.invalid/mcp","headers":{"Authorization":"Bearer ${T}"}}`,
+		`{"httpUrl":"http://mcp.example.invalid/mcp"}`,
+		`{"url":"http://10.0.0.5/mcp"}`,
+		`{"url":"http://192.168.1.2:8080/mcp"}`,
+		`{"url":"http://host.docker.internal:8000/mcp"}`,
+		`{"url":"http://box.local/mcp"}`,
+		`{"url":"http://localhost.evil.invalid/mcp"}`,
+		`{"url":"http://127.0.0.1.evil.invalid/mcp"}`,
+		`{"url":"http://localhost@mcp.example.invalid/mcp"}`,
+		`{"command":"npx","args":["pkg@1.2.3"],"url":"http://mcp.example.invalid/mcp"}`,
+	}
+	for _, body := range fire {
+		f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig)
+		if len(f.PlainHTTPMCPServer) != 1 {
+			t.Errorf("%s: want one hit, got %+v", body, f.PlainHTTPMCPServer)
+		}
+		if len(f.LocalMCPLaunch) != 0 || len(f.UnpinnedMCPLaunch) != 0 {
+			t.Errorf("%s: MCPCFG-002/003 must not fire on a url entry", body)
+		}
+	}
+	silent := []string{
+		`{"url":"http://localhost:3000/mcp"}`,
+		`{"url":"http://LOCALHOST/mcp"}`,
+		`{"url":"http://localhost./mcp"}`,
+		`{"url":"http://127.0.0.1:8080/mcp"}`,
+		`{"url":"http://127.0.0.2/mcp"}`,
+		`{"url":"http://[::1]:8080/mcp"}`,
+		`{"url":"http://user@localhost/mcp"}`,
+		`{"url":"https://mcp.example.invalid/mcp"}`,
+		`{"url":"https://mcp.example.invalid/mcp","headers":{"Authorization":"Bearer ${T}"}}`,
+		`{"url":"http://${HOST}/mcp"}`,
+		`{"url":"${MCP_URL}"}`,
+		`{"url":"ws://mcp.example.invalid/mcp"}`,
+		`{"url":""}`,
+		`{"command":"npx","args":["pkg@1.2.3"]}`,
+		`{"url":"not a url"}`,
+	}
+	for _, body := range silent {
+		if f := discoverWith(t, ".mcp.json", scopeSrv(body), models.ComponentMCPConfig); len(f.PlainHTTPMCPServer) != 0 {
+			t.Errorf("%s: want silent, got %+v", body, f.PlainHTTPMCPServer)
+		}
+	}
+
+	// Every parsed config shape.
+	if f := discoverWith(t, ".vscode/mcp.json", `{"servers":{"s":{"type":"http","url":"http://mcp.example.invalid/mcp"}}}`, models.ComponentMCPConfig); len(f.PlainHTTPMCPServer) != 1 {
+		t.Error(".vscode/mcp.json servers: want a hit")
+	}
+	if f := discoverWith(t, ".cursor/mcp.json", scopeSrv(`{"url":"http://mcp.example.invalid/mcp"}`), models.ComponentMCPConfig); len(f.PlainHTTPMCPServer) != 1 {
+		t.Error(".cursor/mcp.json: want a hit")
+	}
+	if f := discoverWith(t, "claude_desktop_config.json", scopeSrv(`{"url":"http://mcp.example.invalid/mcp"}`), models.ComponentMCPConfig); len(f.PlainHTTPMCPServer) != 1 {
+		t.Error("claude_desktop_config.json: want a hit")
+	}
+	for _, body := range []string{`{"httpUrl":"http://mcp.example.invalid/mcp"}`, `{"url":"http://mcp.example.invalid/sse"}`} {
+		if f := discoverWith(t, ".gemini/settings.json", scopeSrv(body), models.ComponentGeminiSettings); len(f.PlainHTTPMCPServer) != 1 {
+			t.Errorf(".gemini/settings.json %s: want a hit", body)
+		}
+	}
+	toml := "[mcp_servers.s]\nurl = \"http://mcp.example.invalid/mcp\"\n"
+	if f := discoverWith(t, ".codex/config.toml", toml, models.ComponentCodexConfig); len(f.PlainHTTPMCPServer) != 1 {
+		t.Error("codex url: want a hit")
+	}
+	if f := discoverWith(t, ".codex/config.toml", "[mcp_servers.s]\nurl = \"http://localhost:3000/mcp\"\n", models.ComponentCodexConfig); len(f.PlainHTTPMCPServer) != 0 {
+		t.Error("codex localhost: want silent")
+	}
+
+	// The reason names the server and a fixed phrase, never the URL.
+	f := discoverWith(t, ".mcp.json", scopeSrv(`{"url":"http://secret-host.example.invalid/mcp?k=v"}`), models.ComponentMCPConfig)
+	if len(f.PlainHTTPMCPServer) != 1 || strings.Contains(f.PlainHTTPMCPServer[0].Reason, "secret-host") {
+		t.Errorf("reason must not echo the URL: %+v", f.PlainHTTPMCPServer)
+	}
+}

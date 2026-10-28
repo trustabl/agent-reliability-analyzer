@@ -51,4 +51,7 @@ package rules
 // Schema 35 adds the claim_use fact on TypeScript OpenAI Agents tools.
 //
 // Schema 36 adds the claim_use fact on Google ADK FunctionTool and AutoGen tools.
-const SupportedSchemaVersion = 36
+//
+// Schema 38 adds the repo_mcp_config_unscoped_credential and
+// repo_mcp_config_remote_plain_http predicates (repo scope).
+const SupportedSchemaVersion = 38

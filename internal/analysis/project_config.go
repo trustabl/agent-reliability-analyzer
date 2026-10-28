@@ -24,6 +24,14 @@ import (
 // Secrecy contract: env files are read for KEY NAMES only. A value is never
 // stored in a struct, a Reason, a log, or a test fixture. Reasons are fixed
 // phrases built from key names, server names, and hook event names.
+//
+// MCP server entries follow the same contract for their env maps (and docker
+// -e / --env arguments): key names are read, and the value of a key is never
+// kept. Two allowlisted, non-secret keys are the exception to reading: the
+// value of GITHUB_READ_ONLY and GITHUB_TOOLSETS is inspected inside
+// mcp_client_scope.go and reduced at once to a state (true, false, restricting,
+// widening, unknown). Only that state leaves the function; the value is never
+// assigned to a struct field, a Reason or a log. MCPCFG-004 reads these.
 
 // DiscoverProjectConfig reads the pre-trust config components in the manifest
 // and returns the sorted, deduped facts. claude is the already-parsed
@@ -53,14 +61,10 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 			raw := readConfig(manifest.RepoRoot, c.Path)
 			f.RiskyHooks = append(f.RiskyHooks, hooksHits(c.Path, raw)...)
 			if c.Kind == models.ComponentGeminiSettings {
-				local, unpinned := jsonMCPHits(c.Path, raw)
-				f.LocalMCPLaunch = append(f.LocalMCPLaunch, local...)
-				f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, unpinned...)
+				addMCPHits(&f, jsonMCPHits(c.Path, raw))
 			}
 		case models.ComponentMCPConfig:
-			local, unpinned := jsonMCPHits(c.Path, readConfig(manifest.RepoRoot, c.Path))
-			f.LocalMCPLaunch = append(f.LocalMCPLaunch, local...)
-			f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, unpinned...)
+			addMCPHits(&f, jsonMCPHits(c.Path, readConfig(manifest.RepoRoot, c.Path)))
 		case models.ComponentEditorSettings:
 			f.EditorAutoApprove = append(f.EditorAutoApprove, editorHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentAgentEnvFile:
@@ -74,9 +78,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 		case models.ComponentCodexConfig:
 			raw := readConfig(manifest.RepoRoot, c.Path)
 			f.TrustOverrideEnv = append(f.TrustOverrideEnv, codexTrustHits(c.Path, raw)...)
-			local, unpinned := codexMCPHits(c.Path, raw)
-			f.LocalMCPLaunch = append(f.LocalMCPLaunch, local...)
-			f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, unpinned...)
+			addMCPHits(&f, codexMCPHits(c.Path, raw))
 		}
 	}
 
@@ -86,6 +88,8 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.EditorAutoApprove = sortHits(f.EditorAutoApprove)
 	f.LocalMCPLaunch = sortHits(f.LocalMCPLaunch)
 	f.UnpinnedMCPLaunch = sortHits(f.UnpinnedMCPLaunch)
+	f.UnscopedMCPCredential = sortHits(f.UnscopedMCPCredential)
+	f.PlainHTTPMCPServer = sortHits(f.PlainHTTPMCPServer)
 	f.CodexRiskyHooks = sortHits(f.CodexRiskyHooks)
 	f.HiddenAgentText = sortHits(f.HiddenAgentText)
 	f.HiddenHarnessText = sortHits(f.HiddenHarnessText)
@@ -379,6 +383,11 @@ type mcpServer struct {
 	Args    []string `json:"args"`
 	URL     string   `json:"url"`
 	HTTPURL string   `json:"httpUrl"`
+	// Env is the server's env map. It is typed any so a malformed value (an
+	// array, a number) cannot fail the whole document and hide the other
+	// entries from MCPCFG-002 and MCPCFG-003. See mcp_client_scope.go for how it
+	// is read.
+	Env any `json:"env"`
 }
 
 var launcherShells = map[string]bool{
@@ -421,60 +430,78 @@ func classifyMCPLaunch(s mcpServer) string {
 	return ""
 }
 
-// mcpHit classifies one server entry: a repo-controlled launch (MCPCFG-002) or
-// an unpinned package launch (MCPCFG-003). The two classifiers never accept the
-// same entry, so at most one hit is returned.
-func mcpHit(s mcpServer, path string, line int, name string) (local, unpinned *models.ConfigHit) {
-	if why := classifyMCPLaunch(s); why != "" {
-		h := hit(path, line, "MCP server "+name+" "+why)
-		return &h, nil
-	}
-	if why := classifyMCPPin(s); why != "" {
-		h := hit(path, line, "MCP server "+name+" "+why)
-		return nil, &h
-	}
-	return nil, nil
+// mcpFileHits are the hits of one config file, one list per MCP rule.
+type mcpFileHits struct {
+	local, unpinned, scope, plainHTTP []models.ConfigHit
 }
 
-func jsonMCPHits(path string, raw []byte) (local, unpinned []models.ConfigHit) {
+// mcpHits classifies one server entry. A repo-controlled launch (MCPCFG-002)
+// and an unpinned package launch (MCPCFG-003) never both apply to an entry. An
+// unscoped credential (MCPCFG-004, a command or env judgement) and a plain http
+// remote URL (MCPCFG-005, a url judgement) are independent of both and of each
+// other, so one entry can carry several hits.
+func mcpHits(s mcpServer, path string, line int, name string) mcpFileHits {
+	var h mcpFileHits
+	add := func(dst *[]models.ConfigHit, why string) {
+		*dst = append(*dst, hit(path, line, "MCP server "+name+" "+why))
+	}
+	if why := classifyMCPLaunch(s); why != "" {
+		add(&h.local, why)
+	} else if why := classifyMCPPin(s); why != "" {
+		add(&h.unpinned, why)
+	}
+	for _, why := range classifyMCPScope(s) {
+		add(&h.scope, why)
+	}
+	if why := classifyMCPRemoteURL(s); why != "" {
+		add(&h.plainHTTP, why)
+	}
+	return h
+}
+
+func (h *mcpFileHits) merge(o mcpFileHits) {
+	h.local = append(h.local, o.local...)
+	h.unpinned = append(h.unpinned, o.unpinned...)
+	h.scope = append(h.scope, o.scope...)
+	h.plainHTTP = append(h.plainHTTP, o.plainHTTP...)
+}
+
+func addMCPHits(f *models.ProjectConfigFacts, h mcpFileHits) {
+	f.LocalMCPLaunch = append(f.LocalMCPLaunch, h.local...)
+	f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, h.unpinned...)
+	f.UnscopedMCPCredential = append(f.UnscopedMCPCredential, h.scope...)
+	f.PlainHTTPMCPServer = append(f.PlainHTTPMCPServer, h.plainHTTP...)
+}
+
+func jsonMCPHits(path string, raw []byte) mcpFileHits {
 	var doc struct {
 		McpServers map[string]mcpServer `json:"mcpServers"`
 		Servers    map[string]mcpServer `json:"servers"`
 	}
+	var out mcpFileHits
 	if !parseJSONC(raw, &doc) {
-		return nil, nil
+		return out
 	}
 	for _, m := range []map[string]mcpServer{doc.McpServers, doc.Servers} {
 		for name, s := range m {
-			l, u := mcpHit(s, path, lineOfText(raw, `"`+name+`"`), name)
-			if l != nil {
-				local = append(local, *l)
-			}
-			if u != nil {
-				unpinned = append(unpinned, *u)
-			}
+			out.merge(mcpHits(s, path, lineOfText(raw, `"`+name+`"`), name))
 		}
 	}
-	return local, unpinned
+	return out
 }
 
-func codexMCPHits(path string, raw []byte) (local, unpinned []models.ConfigHit) {
+func codexMCPHits(path string, raw []byte) mcpFileHits {
 	var doc struct {
 		McpServers map[string]mcpServer `toml:"mcp_servers"`
 	}
+	var out mcpFileHits
 	if len(raw) == 0 || toml.Unmarshal(raw, &doc) != nil {
-		return nil, nil
+		return out
 	}
 	for name, s := range doc.McpServers {
-		l, u := mcpHit(s, path, lineOfText(raw, "mcp_servers."+name), name)
-		if l != nil {
-			local = append(local, *l)
-		}
-		if u != nil {
-			unpinned = append(unpinned, *u)
-		}
+		out.merge(mcpHits(s, path, lineOfText(raw, "mcp_servers."+name), name))
 	}
-	return local, unpinned
+	return out
 }
 
 // ── MCPCFG-003: unpinned package launches ───────────────────────────────────

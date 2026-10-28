@@ -187,6 +187,12 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoMCPConfigLaunchesUnpinnedPackage != nil && (len(inv.ProjectConfig.UnpinnedMCPLaunch) > 0) != *e.RepoMCPConfigLaunchesUnpinnedPackage {
 		return false
 	}
+	if e.RepoMCPConfigUnscopedCredential != nil && (len(inv.ProjectConfig.UnscopedMCPCredential) > 0) != *e.RepoMCPConfigUnscopedCredential {
+		return false
+	}
+	if e.RepoMCPConfigRemotePlainHTTP != nil && (len(inv.ProjectConfig.PlainHTTPMCPServer) > 0) != *e.RepoMCPConfigRemotePlainHTTP {
+		return false
+	}
 	if e.RepoCodexHookRunsRepoCommand != nil && (len(inv.ProjectConfig.CodexRiskyHooks) > 0) != *e.RepoCodexHookRunsRepoCommand {
 		return false
 	}
@@ -594,6 +600,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_editor_agent_auto_approve":               true,
 		"repo_mcp_config_launches_local_command":       true,
 		"repo_mcp_config_launches_unpinned_package":    true,
+		"repo_mcp_config_unscoped_credential":          true,
+		"repo_mcp_config_remote_plain_http":            true,
 		"repo_codex_hook_runs_repo_command":            true,
 		"repo_agents_md_has_hidden_text":               true,
 		"repo_harness_guidance_has_hidden_text":        true,
@@ -699,6 +707,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoEditorAgentAutoApprove != nil, "repo_editor_agent_auto_approve")
 	add(e.RepoMCPConfigLaunchesLocalCommand != nil, "repo_mcp_config_launches_local_command")
 	add(e.RepoMCPConfigLaunchesUnpinnedPackage != nil, "repo_mcp_config_launches_unpinned_package")
+	add(e.RepoMCPConfigUnscopedCredential != nil, "repo_mcp_config_unscoped_credential")
+	add(e.RepoMCPConfigRemotePlainHTTP != nil, "repo_mcp_config_remote_plain_http")
 	add(e.RepoCodexHookRunsRepoCommand != nil, "repo_codex_hook_runs_repo_command")
 	add(e.RepoAgentsMdHasHiddenText != nil, "repo_agents_md_has_hidden_text")
 	add(e.RepoHarnessGuidanceHasHiddenText != nil, "repo_harness_guidance_has_hidden_text")

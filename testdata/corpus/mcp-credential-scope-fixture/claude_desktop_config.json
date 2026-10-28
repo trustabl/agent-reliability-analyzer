@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "service-role-key": {
+      "command": "node",
+      "args": ["/opt/example/mcp-server.js"],
+      "env": { "EXAMPLE_SERVICE_ROLE_KEY": "${EXAMPLE_KEY}" }
+    },
+    "anon-key": {
+      "command": "node",
+      "args": ["/opt/example/mcp-server.js"],
+      "env": { "EXAMPLE_ANON_KEY": "${EXAMPLE_KEY}" }
+    }
+  }
+}

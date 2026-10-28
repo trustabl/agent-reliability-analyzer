@@ -68,3 +68,88 @@ rules:
       dlx; package@1.2.3 or --from package==1.2.3 for uvx; --spec package==1.2.3
       for pipx run; image@sha256:<digest> for docker run. Move the pin
       deliberately when you decide to take a new release.
+
+  - id: MCPCFG-004
+    title: Project MCP config starts a server with an unscoped credential
+    severity: high
+    confidence: 0.6
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_mcp_config_unscoped_credential: true
+    explanation: >
+      A committed MCP client config starts a server with a credential and with none of the
+      scope options that the server's own documentation or source offers. Four cases are
+      judged. First, a GitHub MCP server (the github-mcp-server binary or the
+      ghcr.io/github/github-mcp-server image) is given GITHUB_PERSONAL_ACCESS_TOKEN and sets
+      no read-only option (--read-only, or GITHUB_READ_ONLY set to a value that Go's
+      strconv.ParseBool reads as true, which is how the server binds it) and no toolset
+      option (--toolsets or GITHUB_TOOLSETS naming a toolset other than all or default, or
+      --tools or GITHUB_TOOLS). Its documentation says that without a toolset option the
+      server uses the default toolsets (context, issues, pull_requests, repos, users), and
+      that read-only mode disables write tools. Second, the deprecated npm package
+      @modelcontextprotocol/server-github is given that token. Its published source (version
+      2025.4.8) reads no option or variable besides the token and lists its write tools
+      unconditionally, so no flag can scope it, and its README says development moved to
+      github/github-mcp-server. Third, a Supabase MCP server (@supabase/mcp-server-supabase)
+      is started with neither --read-only nor --project-ref. Supabase's README for version
+      0.5.5 says that without --project-ref the server has access to all projects in the
+      Supabase account, and that --read-only runs SQL as a read-only Postgres user. Fourth, a
+      server entry passes an environment variable whose name contains SERVICE_ROLE. Supabase
+      documents its built-in service_role Postgres role as having full access to a project's
+      data and the BYPASSRLS attribute. In each case an agent that follows instructions from
+      untrusted content can reach whatever the credential reaches. Limits of this check: it
+      reads the command, args, env and docker -e arguments of each server entry. Env names
+      are read; the value of GITHUB_READ_ONLY and GITHUB_TOOLSETS is inspected to tell a set
+      option from an unset one, and no other value is read or kept. A value written as a
+      variable reference ($VAR) counts as a set option, because its value is not in the
+      file. The scope of the token itself is not visible, so a fine-grained token limited to
+      read access is still flagged. A GitHub token supplied outside the file is not seen.
+      A token forwarded through Codex's env_vars list (names of variables passed from the
+      developer's environment) is not read.
+      Supabase is judged without a token, because its README allows the token to be set
+      outside the config, and a server started with --project-ref but not --read-only is not
+      flagged. Remote URL servers (including the hosted GitHub and Supabase endpoints, which
+      have their own scope settings), a Docker --env-file, and a server started through a
+      shell are not judged, and neither are env names such as ADMIN or ROOT. Docker's own
+      --read-only flag, which comes before the image, is not the server's. A literal token
+      in the file is the subject of the --secret-scan rule SECRET-LIT-001, not of this rule.
+      A command inside the repo is MCPCFG-002's, and an unpinned package is MCPCFG-003's, so
+      one entry can carry findings from this rule and MCPCFG-003.
+    fix: >
+      For GitHub, move off the deprecated npm package to github-mcp-server and add
+      --read-only (or GITHUB_READ_ONLY=1) or the narrowest --toolsets that the task needs.
+      For Supabase, add --read-only and --project-ref=<project-ref>, and point the server at
+      a development project. Replace a service_role credential with one that does not skip
+      Row Level Security. Keep the token out of the committed file by reading it from the
+      developer's own environment.
+
+  - id: MCPCFG-005
+    title: Project MCP config points a client at a remote server over plain http
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_mcp_config_remote_plain_http: true
+    explanation: >
+      A committed MCP client config gives a remote server URL (url or httpUrl) that uses the
+      http:// scheme and a host that is not localhost, 127.0.0.0/8 or ::1. The MCP
+      authorization specification has the client send a bearer token in the Authorization
+      header of each HTTP request to a server that uses authorization, and RFC 6750 section
+      5.3 says clients must use TLS (https) or equivalent transport security when making
+      requests with bearer tokens, because failing to do so exposes the token to attacks. A
+      URL with the http scheme gives the client no transport security. Limits of this check:
+      it reads the url and httpUrl keys of each server entry in the MCP client config files
+      the pack covers. A scheme or host written with a variable reference ($VAR) is not
+      judged. A private address, host.docker.internal or a .local name is judged as not
+      local. A TLS-terminating proxy or a VPN in front of the host is not seen. Whether the
+      server requires a token is not judged: Claude Code, Cursor, Gemini CLI and Codex each
+      document signing in to a remote server with OAuth and nothing in the committed file,
+      so a missing header is not evidence either way. Windsurf's serverUrl is not read.
+      Stdio launches are MCPCFG-002 and MCPCFG-003's.
+    fix: >
+      Serve the MCP endpoint over https:// and use that URL in the config. For a server on
+      the developer's own machine, use localhost or 127.0.0.1.

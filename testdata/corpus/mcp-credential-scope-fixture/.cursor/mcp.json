@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "github-docker-unscoped": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PAT}" }
+    },
+    "github-docker-read-only": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "-e", "GITHUB_READ_ONLY=1", "ghcr.io/github/github-mcp-server"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PAT}" }
+    },
+    "remote-private-address": { "url": "http://10.0.0.5:8080/mcp" },
+    "remote-loopback": { "url": "http://127.0.0.1:8080/mcp" }
+  }
+}

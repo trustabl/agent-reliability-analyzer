@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "github-unscoped": {
+      "command": "github-mcp-server",
+      "args": ["stdio"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}" }
+    },
+    "github-scoped": {
+      "command": "github-mcp-server",
+      "args": ["stdio", "--read-only", "--toolsets=repos"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}" }
+    },
+    "supabase-unscoped": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@0.14.0"]
+    },
+    "supabase-scoped": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@0.14.0", "--read-only", "--project-ref=example-project-ref"]
+    },
+    "remote-plain-http": { "type": "http", "url": "http://mcp.example.invalid/mcp" },
+    "remote-tls": { "type": "http", "url": "https://mcp.example.invalid/mcp" },
+    "remote-loopback": { "type": "http", "url": "http://localhost:3000/mcp" }
+  }
+}
