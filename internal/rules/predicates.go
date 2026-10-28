@@ -359,6 +359,49 @@ func PredNameHasPrefix(prefixes []string, t models.ToolDef) bool {
 	return false
 }
 
+// ClaimUseAbsent is the tool_claim_use value for a tool that declares no
+// `claim` parameter. It is decided from ToolDef.ParamNames, so it holds for
+// every discovery path; the other values come from the FactClaimUse fact,
+// which only Python decorated-tool discovery stamps.
+const ClaimUseAbsent = "absent"
+
+// PredToolClaimUse reports whether the tool's use of its `claim` argument is
+// one of uses. A tool that declares `claim` but carries no FactClaimUse fact
+// (a discovery path that does not classify it) matches no value: unknown is
+// never a match, so the rule stays silent rather than guessing.
+func PredToolClaimUse(uses []string, t models.ToolDef) bool {
+	got := t.Facts[models.FactClaimUse]
+	declared := false
+	for _, p := range t.ParamNames {
+		if p == "claim" {
+			declared = true
+			break
+		}
+	}
+	for _, u := range uses {
+		if u == ClaimUseAbsent {
+			if !declared {
+				return true
+			}
+			continue
+		}
+		if declared && got != "" && u == got {
+			return true
+		}
+	}
+	return false
+}
+
+// validToolClaimUse reports whether v is a value tool_claim_use can match.
+func validToolClaimUse(v string) bool {
+	switch v {
+	case ClaimUseAbsent, models.ClaimUseUnused, models.ClaimUsePassthrough,
+		models.ClaimUseChecked, models.ClaimUseWrapped:
+		return true
+	}
+	return false
+}
+
 func PredHasBodyText(needles []string, t models.ToolDef, pf analysis.ParsedFile) bool {
 	var body string
 	if root := analysis.FindFunctionNode(t, pf); root != nil {

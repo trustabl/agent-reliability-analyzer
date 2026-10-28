@@ -350,6 +350,14 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Tool-call claims, EBTE (2026-10-19, `schema_version` 31 → 32; +9 rules; main took 27 for OBS-009..012, 28 for CI-001..005, 29 for CSDK-115, 30 for MCPCFG-003, 31 for AGCFG-011):** new tool-scope predicate `tool_claim_use` over the
+> `claim_use` fact that Python decorated-tool discovery stamps on a tool declaring a `claim` parameter (`internal/analysis/claim_use.go`;
+> `absent` is decided from `ParamNames`). A three-rung ladder per SDK: **OAI-034 / MCP-033 / LC-028** (info, 0.5; the pack's first info rules) side-effecting tool with
+> no claim, **OAI-035 / MCP-034 / LC-029** (medium, 0.6) claim never read, **OAI-036 / MCP-035 / LC-030** (medium, 0.55) claim only
+> printed / logged / serialized / returned. A second decorator, or an OpenAI tool input guardrail, makes the fact `wrapped` (silent). Rules
+> live in `<sdk>/tool_call_claims.yaml`; rulebook docs in `docs/Policy/<sdk>/tool_call_claims.md`. Python only; TypeScript, Claude SDK,
+> ADK, CrewAI, Pydantic AI, AutoGen and Vercel AI are follow-ups. The fixture holds **364** rules (355 + 9; re-derive).
+>
 > **Pre-approved fetch from a user-content host (2026-10-21, `schema_version` 30 -> 31, provisional; +1 rule):** **AGCFG-011** (high, 0.7, repo
 > scope, category `agent_config`, new pack file `agent_config/fetch_permissions.yaml`) over the new predicate
 > `repo_settings_preapprove_user_content_fetch`, backed by `ProjectConfigFacts.UserContentFetchAllow`. It flags a WebFetch rule in

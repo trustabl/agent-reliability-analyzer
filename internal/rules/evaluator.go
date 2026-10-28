@@ -491,6 +491,9 @@ func (e MatchExpr) EvaluateTool(t models.ToolDef, pf analysis.ParsedFile) bool {
 	if len(e.ToolDecoratorKwargPresent) > 0 && !PredToolDecoratorKwargPresent(e.ToolDecoratorKwargPresent, t) {
 		return false
 	}
+	if len(e.ToolClaimUse) > 0 && !PredToolClaimUse(e.ToolClaimUse, t) {
+		return false
+	}
 
 	return true
 }
@@ -513,6 +516,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"param_name_matches": true, "call_without_kwarg": true,
 		"call_uses_unnormalized_path_param": true,
 		"tool_decorator_kwarg_value":        true, "tool_decorator_kwarg_present": true,
+		"tool_claim_use": true,
 	},
 	models.ScopeAgent: {
 		"agent_class": true, "agent_kwarg_present": true, "agent_kwarg_missing": true,
@@ -636,6 +640,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.CallUsesUnnormalizedPathParam != nil, "call_uses_unnormalized_path_param")
 	add(e.ToolDecoratorKwargValue != nil, "tool_decorator_kwarg_value")
 	add(len(e.ToolDecoratorKwargPresent) > 0, "tool_decorator_kwarg_present")
+	add(len(e.ToolClaimUse) > 0, "tool_claim_use")
 	// Agent scope
 	add(len(e.AgentClass) > 0, "agent_class")
 	add(len(e.AgentKwargPresent) > 0, "agent_kwarg_present")
@@ -747,6 +752,23 @@ func (e MatchExpr) outOfScopePredicates(scope models.Scope) []string {
 		bad = append(bad, e.Not.outOfScopePredicates(scope)...)
 	}
 	return bad
+}
+
+// toolClaimUseValues collects every tool_claim_use value in the tree, for the
+// loader's value check.
+func (e MatchExpr) toolClaimUseValues() []string {
+	var vals []string
+	vals = append(vals, e.ToolClaimUse...)
+	for _, sub := range e.All {
+		vals = append(vals, sub.toolClaimUseValues()...)
+	}
+	for _, sub := range e.Any {
+		vals = append(vals, sub.toolClaimUseValues()...)
+	}
+	if e.Not != nil {
+		vals = append(vals, e.Not.toolClaimUseValues()...)
+	}
+	return vals
 }
 
 // repoSDKInCodeValues collects every value passed to a repo_has_sdk_in_code

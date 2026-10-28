@@ -38,4 +38,7 @@ package rules
 //
 // Schema 31 adds the repo_settings_preapprove_user_content_fetch predicate
 // (repo scope).
-const SupportedSchemaVersion = 31
+//
+// Schema 32 adds the tool_claim_use predicate (tool scope) and the claim_use
+// discovery fact.
+const SupportedSchemaVersion = 32
