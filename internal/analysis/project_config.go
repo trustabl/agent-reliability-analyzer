@@ -47,6 +47,9 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	// AGCFG-011: WebFetch allow rules that cover a user-content host.
 	f.UserContentFetchAllow = userContentFetchHits(manifest.RepoRoot, claude)
 
+	// AGCFG-012: Bash allow rules that pre-approve an exec-capable command prefix.
+	f.ExecCapableAllow = execCapableAllowHits(manifest.RepoRoot, claude)
+
 	for _, c := range manifest.Components {
 		switch c.Kind {
 		case models.ComponentClaudeSettings, models.ComponentGeminiSettings:
@@ -90,6 +93,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.HiddenAgentText = sortHits(f.HiddenAgentText)
 	f.HiddenHarnessText = sortHits(f.HiddenHarnessText)
 	f.UserContentFetchAllow = sortHits(f.UserContentFetchAllow)
+	f.ExecCapableAllow = sortHits(f.ExecCapableAllow)
 	return f
 }
 
@@ -888,4 +892,95 @@ func anyCovers(rules []models.PermissionRule, host string) bool {
 		}
 	}
 	return false
+}
+
+// ── AGCFG-012: pre-approved command prefix that can run other programs ─────
+
+// execCapablePrefixes are the bare command names AGCFG-012 judges, each with the
+// fixed clause the hit's Reason uses. Each entry rests on Claude Code's
+// permissions page (code.claude.com/docs/en/permissions): a wildcard in place of
+// a git subcommand matches the options before it, including -c, which makes git
+// run a program you name; xargs with flags is matched as an xargs command; and
+// npx runs its arguments as a command and is not a stripped wrapper. find and the
+// exec wrappers are not listed because the same page says a prefix rule cannot
+// auto-approve their exec forms.
+var execCapablePrefixes = map[string]string{
+	"git":   "a git prefix whose options include -c, which runs a program",
+	"xargs": "an xargs prefix, and xargs runs the command it is given",
+	"npx":   "an npx prefix, and npx runs the command it is given",
+}
+
+// execPrefixWord returns the bare command a Bash rule pattern covers when the
+// pattern is that command followed by a trailing wildcard (":*" or " *"), and
+// the command is one execCapablePrefixes lists. A narrower prefix such as
+// "git status *" and an exact command are not matched.
+func execPrefixWord(pattern string) (string, bool) {
+	p := strings.TrimSpace(pattern)
+	var word string
+	switch {
+	case strings.HasSuffix(p, ":*"):
+		word = strings.TrimSuffix(p, ":*")
+	case strings.HasSuffix(p, " *"):
+		word = strings.TrimSuffix(p, " *")
+	default:
+		return "", false
+	}
+	if word == "" || strings.ContainsAny(word, " \t*") {
+		return "", false
+	}
+	_, ok := execCapablePrefixes[word]
+	return word, ok
+}
+
+// coversExecPrefix reports whether a deny or ask rule restricts the whole
+// prefix: a bare Bash rule, Bash(*), or the same bare-prefix wildcard rule. A
+// narrower deny such as Bash(git push *) does not, since the allow still covers
+// git -c.
+func coversExecPrefix(r models.PermissionRule, word string) bool {
+	if r.Tool != "Bash" {
+		return false
+	}
+	if r.Pattern == "" || strings.TrimSpace(r.Pattern) == "*" {
+		return true
+	}
+	w, ok := execPrefixWord(r.Pattern)
+	return ok && w == word
+}
+
+func execCapableAllowHits(root string, claude []models.ClaudeSettings) []models.ConfigHit {
+	restrict := map[string][]models.PermissionRule{}
+	for _, cs := range claude {
+		dir := path.Dir(cs.FilePath)
+		restrict[dir] = append(restrict[dir], cs.Permissions.Deny...)
+		restrict[dir] = append(restrict[dir], cs.Permissions.Ask...)
+	}
+	var out []models.ConfigHit
+	for _, cs := range claude {
+		for _, r := range cs.Permissions.Allow {
+			if r.Tool != "Bash" {
+				continue
+			}
+			word, ok := execPrefixWord(r.Pattern)
+			if !ok {
+				continue
+			}
+			cancelled := false
+			for _, d := range restrict[path.Dir(cs.FilePath)] {
+				if coversExecPrefix(d, word) {
+					cancelled = true
+					break
+				}
+			}
+			if cancelled {
+				continue
+			}
+			line := r.Line
+			if line < 1 {
+				enc, _ := json.Marshal(r.Raw)
+				line = lineOfText(readConfig(root, cs.FilePath), string(enc))
+			}
+			out = append(out, hit(cs.FilePath, line, "permissions.allow entry "+r.Raw+" pre-approves "+execCapablePrefixes[word]))
+		}
+	}
+	return out
 }

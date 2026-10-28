@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git:*)",
+      "Bash(xargs *)",
+      "Bash(git diff --stat)"
+    ]
+  }
+}

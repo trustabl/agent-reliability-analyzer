@@ -1379,6 +1379,34 @@ func TestScan_FetchPermissionsFixture(t *testing.T) {
 	}
 }
 
+// End to end: the exec-allow fixture pairs bare git, xargs and npx prefixes with
+// exact commands, a narrower git prefix, a find prefix and a same-folder deny.
+// AGCFG-012 fires on the git and xargs entries in the root file (the npx entry
+// in pkg/ is cancelled by a deny), and no other agent_config rule fires.
+func TestScan_ExecAllowFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "exec-allow-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var hits []models.Finding
+	for _, f := range res.Findings {
+		switch {
+		case f.RuleID == "AGCFG-012":
+			hits = append(hits, f)
+		case strings.HasPrefix(f.RuleID, "AGCFG-") || strings.HasPrefix(f.RuleID, "MCPCFG-"):
+			t.Errorf("%s fired on the exec-allow fixture (%s:%d)", f.RuleID, f.FilePath, f.StartLine)
+		}
+	}
+	if len(hits) != 1 {
+		t.Fatalf("AGCFG-012 fired %d times, want once; findings: %v", len(hits), res.Findings)
+	}
+	if !strings.HasSuffix(hits[0].FilePath, ".claude/settings.json") || hits[0].StartLine != 5 {
+		t.Errorf("AGCFG-012 attributed to %s:%d, want .claude/settings.json:5", hits[0].FilePath, hits[0].StartLine)
+	}
+}
+
 // The "pass" counterpart of the pre-trust fixture: the same five config files
 // rewritten to their safe forms. None of the agent_config rules may fire.
 func TestScan_PreTrustConfigSafeVariantsStaySilent(t *testing.T) {

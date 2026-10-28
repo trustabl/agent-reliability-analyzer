@@ -350,6 +350,14 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Exec-capable pre-approved command prefix (2026-10-28, `schema_version` 36 → 37, provisional; +1 rule):** **AGCFG-012** (medium, 0.6, repo
+> scope, category `agent_config`, new pack file `agent_config/exec_capable_allow.yaml`) over the new predicate
+> `repo_settings_allow_exec_capable_prefix`, backed by `ProjectConfigFacts.ExecCapableAllow`. It flags a `Bash` rule in `permissions.allow`
+> of `.claude/settings.json` / `settings.local.json` that is a bare `git`, `xargs` or `npx` followed by a trailing wildcard, using the
+> permissions page's wildcard matching; a narrower prefix and an exact command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or
+> ask rule in the same `.claude/` folder cancels. `find` and the exec wrappers are not listed (the vendor page says a prefix rule cannot
+> auto-approve their exec forms). Gap: no rule flags a committed `Bash(*)` or bare `Bash` allow entry. The fixture holds **383** rules (382 + 1; re-derive).
+>
 > **Tool-call claims, EBTE (2026-10-19, `schema_version` 31 → 32; +9 rules; main took 27 for OBS-009..012, 28 for CI-001..005, 29 for CSDK-115, 30 for MCPCFG-003, 31 for AGCFG-011):** new tool-scope predicate `tool_claim_use` over the
 > `claim_use` fact that Python decorated-tool discovery stamps on a tool declaring a `claim` parameter (`internal/analysis/claim_use.go`;
 > `absent` is decided from `ParamNames`). A three-rung ladder per SDK: **OAI-034 / MCP-033 / LC-028** (info, 0.5; the pack's first info rules) side-effecting tool with

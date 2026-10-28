@@ -6,8 +6,8 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 36 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 382 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+Rule schema 31 → 37 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 383 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
 CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
 OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
 ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
@@ -15,6 +15,16 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Added
 
+- **Exec-capable pre-approved command prefix (rule schema 36 → 37, provisional).**
+  New repo-scope predicate `repo_settings_allow_exec_capable_prefix` and rule
+  **AGCFG-012** (medium, 0.6, pack file `agent_config/exec_capable_allow.yaml`) flag a
+  `Bash` rule in `permissions.allow` of a committed `.claude/settings.json` or
+  `settings.local.json` that is a bare `git`, `xargs` or `npx` command followed by a
+  trailing wildcard (`Bash(git:*)`, `Bash(npx *)`). A narrower prefix, an exact command
+  and `find` are not flagged. A bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in
+  the same `.claude/` folder cancels the finding. Backed by
+  `ProjectConfigFacts.ExecCapableAllow`. A committed bare `Bash` or `Bash(*)` allow entry
+  is not flagged by any rule.
 - **Forge: Tool-Call Claims section (template 3 → 4).** `trustabl forge` now
   emits a `## Tool-Call Claims` section after the apply loop. It tells the
   coding agent to give every tool with an effect a typed `claim` argument (an

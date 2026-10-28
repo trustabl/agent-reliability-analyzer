@@ -381,3 +381,87 @@ func TestProjectConfig_UserContentFetchAllowLine(t *testing.T) {
 		t.Errorf("reason should name the host: %q", f.UserContentFetchAllow[0].Reason)
 	}
 }
+
+func TestProjectConfig_ExecCapableAllow(t *testing.T) {
+	settings := func(allow, deny, ask string) string {
+		return `{"permissions": {"allow": [` + allow + `], "deny": [` + deny + `], "ask": [` + ask + `]}}`
+	}
+	cases := []struct {
+		name, body string
+		want       int
+	}{
+		{"git colon star", settings(`"Bash(git:*)"`, "", ""), 1},
+		{"git space star", settings(`"Bash(git *)"`, "", ""), 1},
+		{"xargs colon star", settings(`"Bash(xargs:*)"`, "", ""), 1},
+		{"xargs space star", settings(`"Bash(xargs *)"`, "", ""), 1},
+		{"npx colon star", settings(`"Bash(npx:*)"`, "", ""), 1},
+		{"npx space star", settings(`"Bash(npx *)"`, "", ""), 1},
+		{"two entries", settings(`"Bash(git:*)", "Bash(npx *)"`, "", ""), 2},
+		{"narrower deny does not cancel", settings(`"Bash(git:*)"`, `"Bash(git push *)"`, ""), 1},
+		{"deny for another prefix does not cancel", settings(`"Bash(git:*)"`, `"Bash(npx *)"`, ""), 1},
+
+		{"exact git status", settings(`"Bash(git status)"`, "", ""), 0},
+		{"exact git diff stat", settings(`"Bash(git diff --stat)"`, "", ""), 0},
+		{"narrower git prefix", settings(`"Bash(git status *)"`, "", ""), 0},
+		{"narrower git prefix colon", settings(`"Bash(git diff:*)"`, "", ""), 0},
+		{"find is not listed", settings(`"Bash(find:*)"`, "", ""), 0},
+		{"exec wrapper is not listed", settings(`"Bash(watch *)"`, "", ""), 0},
+		{"unrelated prefix", settings(`"Bash(npm run *)"`, "", ""), 0},
+		{"bare Bash is out of scope", settings(`"Bash"`, "", ""), 0},
+		{"empty parens is out of scope", settings(`"Bash()"`, "", ""), 0},
+		{"Bash star is out of scope", settings(`"Bash(*)"`, "", ""), 0},
+		{"no space before star", settings(`"Bash(git*)"`, "", ""), 0},
+		{"two words before star", settings(`"Bash(git status:*)"`, "", ""), 0},
+		{"other tool", settings(`"Read(git:*)"`, "", ""), 0},
+		{"same prefix deny cancels", settings(`"Bash(git:*)"`, `"Bash(git *)"`, ""), 0},
+		{"same prefix ask cancels", settings(`"Bash(npx *)"`, "", `"Bash(npx:*)"`), 0},
+		{"bare Bash deny cancels", settings(`"Bash(xargs *)"`, `"Bash"`, ""), 0},
+		{"Bash star ask cancels", settings(`"Bash(git:*)"`, "", `"Bash(*)"`), 0},
+		{"allow list under another key", `{"other": {"allow": ["Bash(git:*)"]}}`, 0},
+		{"malformed json", `{"permissions": {"allow": ["Bash(git:*)",]}}`, 0},
+	}
+	for _, c := range cases {
+		f := discoverWith(t, ".claude/settings.json", c.body, models.ComponentClaudeSettings)
+		if got := len(f.ExecCapableAllow); got != c.want {
+			t.Errorf("%s: got %d hits, want %d (%+v)", c.name, got, c.want, f.ExecCapableAllow)
+		}
+	}
+}
+
+func TestProjectConfig_ExecCapableAllowCancelScope(t *testing.T) {
+	run := func(files map[string]string) models.ProjectConfigFacts {
+		k := map[string]models.ComponentKind{}
+		for rel := range files {
+			k[rel] = models.ComponentClaudeSettings
+		}
+		m := projectConfigFixture(t, files, k)
+		return DiscoverProjectConfig(m, DiscoverClaudeSettings(m))
+	}
+
+	same := run(map[string]string{
+		".claude/settings.json":       `{"permissions": {"allow": ["Bash(git:*)"]}}`,
+		".claude/settings.local.json": `{"permissions": {"deny": ["Bash(git *)"]}}`,
+	})
+	if len(same.ExecCapableAllow) != 0 {
+		t.Errorf("same-folder deny did not cancel the allow: %+v", same.ExecCapableAllow)
+	}
+
+	nested := run(map[string]string{
+		".claude/settings.json":     `{"permissions": {"allow": ["Bash(git:*)"]}}`,
+		"pkg/.claude/settings.json": `{"permissions": {"deny": ["Bash(git:*)"]}}`,
+	})
+	if len(nested.ExecCapableAllow) != 1 || nested.ExecCapableAllow[0].FilePath != ".claude/settings.json" {
+		t.Errorf("nested deny must not cancel the root allow: %+v", nested.ExecCapableAllow)
+	}
+}
+
+func TestProjectConfig_ExecCapableAllowLine(t *testing.T) {
+	body := "{\n  \"permissions\": {\n    \"allow\": [\n      \"Read\",\n      \"Bash(xargs *)\"\n    ]\n  }\n}\n"
+	f := discoverWith(t, ".claude/settings.json", body, models.ComponentClaudeSettings)
+	if len(f.ExecCapableAllow) != 1 || f.ExecCapableAllow[0].Line != 5 {
+		t.Fatalf("want one hit on line 5, got %+v", f.ExecCapableAllow)
+	}
+	if !strings.Contains(f.ExecCapableAllow[0].Reason, "Bash(xargs *)") {
+		t.Errorf("reason should name the entry: %q", f.ExecCapableAllow[0].Reason)
+	}
+}

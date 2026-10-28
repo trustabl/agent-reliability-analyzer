@@ -28,6 +28,7 @@ These were authored in this repository as test fixtures.
 | `subagent-tools-inherit/` | Synthetic `.claude/agents/*.md` subagents (no `tools`, a listed `tools`, an empty `tools: []`, a `disallowedTools` denylist), a non-canonical `agents/planner.md`, and an in-code `AgentDefinition` with no `tools`, exercising CSDK-115. All values are fake placeholders |
 | `mcp-unpinned-launch-fixture/` | Synthetic MCP client configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`) pairing unpinned and pinned package launches (npx, bunx, uvx, pipx, docker) for MCPCFG-003. All package and image names are fake placeholders |
 | `fetch-permissions-fixture/` | Synthetic `.claude/settings.json` and `settings.local.json` pairing WebFetch allow rules for user-content hosts with a non-listed host, a single-account site and a same-folder deny, for AGCFG-011. All values are placeholders |
+| `exec-allow-fixture/` | Synthetic `.claude/settings.json` files pairing Bash allow rules on a bare git, xargs and npx prefix with exact commands, a narrower git prefix, a find prefix and a same-folder deny, for AGCFG-012. All values are placeholders |
 
 ## Vendored from `openai/openai-agents-python` (MIT)
 
