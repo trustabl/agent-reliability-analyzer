@@ -185,6 +185,10 @@ func discoverADKToolsInFile(pf ParsedFile) []models.ToolDef {
 			return true
 		}
 		seen[name] = true
+		facts := map[string]string{}
+		if use := wrappedFuncClaimUse(fnDef, nil, pf.Source); use != "" {
+			facts[models.FactClaimUse] = use
+		}
 		out = append(out, models.ToolDef{
 			Name:     name,
 			Kind:     models.KindADKFunctionTool,
@@ -198,6 +202,7 @@ func discoverADKToolsInFile(pf ParsedFile) []models.ToolDef {
 			HasTypedParams: astutil.FunctionHasTypedParams(fnDef, pf.Source),
 			ParamNames:     toolParamNames(fnDef, pf.Source),
 			Config:         functionToolKwargs(args, pf.Source),
+			Facts:          facts,
 		})
 		return true
 	})

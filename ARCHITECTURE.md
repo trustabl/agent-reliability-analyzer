@@ -550,7 +550,47 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   mediate). A tool with no `claim` parameter carries no fact, so scan output for
   repos that do not use claims is unchanged. The `tool_claim_use` predicate
   (`schema_version` 32) reads it; its `absent` value is decided from
-  `ParamNames`. Read by OAI-034..036, MCP-033..035 and LC-028..030.
+  `ParamNames`. Read by OAI-034..036, MCP-033..035 and LC-028..030, and (schema
+  33) by CREW-016..018 and PYD-016..018. LangChain and Pydantic AI factory tools
+  (`StructuredTool.from_function(fn)`, `Tool(fn)`) get the fact from the wrapped
+  function via `stampFactoryClaim`.
+- **ApplyClaimMediators** (`claim_mediators.go`) — runs in the scanner after
+  every tool discovery pass. It upgrades a CrewAI or Pydantic AI tool's
+  `claim_use` from `unused` / `passthrough` to `wrapped` when the repo registers
+  that SDK's pre-tool hook (CrewAI `@before_tool_call`,
+  `register_before_tool_call_hook(...)`, `@on(InterceptionPoint.PRE_TOOL_CALL)`;
+  Pydantic AI `@<hooks>.on.before_tool_execute` / `.on.tool_execute`,
+  `Hooks(before_tool_execute=...)` / `Hooks(tool_execute=...)`), or the Pydantic
+  AI tool has its own `args_validator=`. The credit is repo-wide per SDK: hooks
+  are global, per crew or per agent and may filter by tool name, so a tool is
+  not linked to the hook that covers it. Claude Agent SDK tools (schema 34) are
+  credited by a `"PreToolUse"` hooks-dict key, or by
+  `ClaudeAgentOptions(can_use_tool=...)` on a call without `allowed_tools=` or
+  `permission_mode="bypassPermissions"`, since the callback does not run for
+  calls those approve.
+- **Claude tool claims** (`claude_claim.go`) — a Claude Agent SDK handler takes
+  one `args` dict, so `claudeInputKeys` records the `@tool` input schema's keys
+  in `ToolDef.InputKeys` (short dict, JSON-schema `properties`, or a same-file
+  TypedDict class or dict variable), and `claudeClaimUse` classifies
+  `args["claim"]` / `args.get("claim")` reads the way `pythonClaimUse`
+  classifies a `claim` parameter; a whole-`args` read counts as a claim read.
+  `tool_claim_use` treats `claim` in `InputKeys` as declared.
+- **TypeScript OpenAI tool claims** (`ts_claim_use.go`, schema 35) —
+  `extractTSOpenAITool` calls `stampTSOpenAIClaim`, which stamps `claim_use`
+  when the zod `parameters` declare `claim` and `execute` is an inline function
+  (or method shorthand). `tsClaimUse` reads the first parameter: a destructured
+  binding (`({ claim: c })` binds `c`) or `input.claim` / `input["claim"]`,
+  with a whole-`input` read counting as a claim read. A tool with
+  `inputGuardrails: [...]` is `wrapped` unless the claim is checked. Read by
+  OAI-037..039.
+- **ADK and AutoGen tool claims** (schema 36) — `discoverADKToolsInFile`
+  (`FunctionTool(fn)`) and AutoGen's `register_function(fn)` path stamp
+  `claim_use` with `wrappedFuncClaimUse`; AutoGen's decorator path uses
+  `autoGenClaimUse` (`autogen_tools.go`), which does not count
+  `register_for_llm` / `register_for_execution` as mediators.
+  `ApplyClaimMediators` credits ADK tools when the repo sets a
+  `before_tool_callback` (agent keyword or plugin method). Read by ADK-024..026
+  and AG2-023..025.
 - **DiscoverAgents** (`agents.go`) — finds `Agent(...)` / `SandboxAgent(...)` /
   `AgentDefinition(...)` constructor calls; captures all constructor kwargs into
   a typed `KwargTree`; sets `Opaque=true` for `Agent(**config)` or
@@ -2157,7 +2197,13 @@ internal/
 │   ├── claim_use.go             pythonClaimUse: the claim_use fact on a decorated
 │   │                            tool with a `claim` parameter (unused /
 │   │                            passthrough / checked / wrapped), plus
-│   │                            openAIToolHasInputGuardrail.
+│   │                            openAIToolHasInputGuardrail, stampFactoryClaim.
+│   ├── claim_mediators.go       ApplyClaimMediators: repo-level CrewAI / Pydantic AI /
+│   │                            Claude / ADK pre-tool hooks mark a claim as wrapped.
+│   ├── claude_claim.go          claudeInputKeys / claudeClaimUse: the claim as a
+│   │                            Claude @tool input-schema key read from args.
+│   ├── ts_claim_use.go          stampTSOpenAIClaim / tsClaimUse: claim_use on a
+│   │                            TS OpenAI Agents tool({...}) execute function.
 │   ├── agents.go                Python agent / guardrail / session discovery and
 │   │                            edge resolution (DiscoverAgents, DiscoverGuardrails,
 │   │                            DiscoverSessions, ResolveEdges, SessionClasses).

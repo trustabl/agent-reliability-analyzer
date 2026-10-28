@@ -85,6 +85,65 @@ func pythonClaimUse(fn, dec *sitter.Node, src []byte) string {
 	}
 }
 
+// wrappedFuncClaimUse classifies the claim of a function that a factory call
+// registers as a tool (StructuredTool.from_function(fn), Tool(fn),
+// FunctionTool(fn)), returning one of the models.ClaimUse* values, or "" when
+// the function declares no `claim` parameter. dec is the function's
+// decorated_definition, or nil. No decorator registers such a tool, so any
+// decorator on it may check the claim before the body runs: ClaimUseWrapped.
+func wrappedFuncClaimUse(fn, dec *sitter.Node, src []byte) string {
+	if dec != nil && len(astutil.Decorators(dec)) > 0 {
+		for _, p := range astutil.FunctionParams(fn, src) {
+			if p == claimParam {
+				return models.ClaimUseWrapped
+			}
+		}
+		return ""
+	}
+	return pythonClaimUse(fn, nil, src)
+}
+
+// stampFactoryClaim sets the claim_use fact for a tool a factory call builds
+// from the same-file function wrappedName, and returns the tool's parameter
+// names. fnDef is the resolved undecorated function, or nil. A decorated
+// wrapped function is not in indexTopLevelFunctions, so it is looked up here
+// for its parameters and claim fact only, and a claim checked by its decorator
+// is not reported as absent.
+func stampFactoryClaim(fnDef *sitter.Node, wrappedName string, pf ParsedFile, params []string, facts map[string]string) []string {
+	fn, dec := fnDef, (*sitter.Node)(nil)
+	if fn == nil && wrappedName != "" {
+		fn, dec = topLevelDecoratedFunction(pf.Tree.RootNode(), wrappedName, pf.Source)
+		if fn != nil {
+			params = toolParamNames(fn, pf.Source)
+		}
+	}
+	if fn == nil {
+		return params
+	}
+	if use := wrappedFuncClaimUse(fn, dec, pf.Source); use != "" {
+		facts[models.FactClaimUse] = use
+	}
+	return params
+}
+
+// topLevelDecoratedFunction finds the module-level decorated function named
+// name, returning the function_definition and its decorated_definition, or
+// nils. indexTopLevelFunctions indexes undecorated functions only; this lookup
+// is kept separate so the claim fact can see a decorated wrapped function
+// without changing what the other callers of that index resolve.
+func topLevelDecoratedFunction(root *sitter.Node, name string, src []byte) (fn, dec *sitter.Node) {
+	for i := 0; i < int(root.NamedChildCount()); i++ {
+		c := root.NamedChild(i)
+		if c.Type() != "decorated_definition" {
+			continue
+		}
+		if f := astutil.FunctionDef(c); f != nil && astutil.FunctionName(f, src) == name {
+			return f, c
+		}
+	}
+	return nil, nil
+}
+
 // isClaimRead rejects an identifier spelled `claim` that is not a read of the
 // variable: the attribute name in `x.claim`, or the keyword in `f(claim=...)`.
 func isClaimRead(n *sitter.Node) bool {

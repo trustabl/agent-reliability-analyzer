@@ -288,6 +288,7 @@ func buildLangChainTool(n *sitter.Node, callee string, pf ParsedFile, funcs map[
 			facts["shells_out"] = "true"
 		}
 	}
+	params = stampFactoryClaim(fnDef, wrappedName, pf, params, facts)
 
 	// Point the location at the wrapped function body when resolved (mirrors ADK
 	// FunctionTool) so the AST-walking predicates (has_shell_call /

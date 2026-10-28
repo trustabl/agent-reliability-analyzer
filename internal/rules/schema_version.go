@@ -41,4 +41,14 @@ package rules
 //
 // Schema 32 adds the tool_claim_use predicate (tool scope) and the claim_use
 // discovery fact.
-const SupportedSchemaVersion = 32
+//
+// Schema 33 adds the claim_use fact on CrewAI and Pydantic AI tools and the
+// repo-level claim mediator pass (analysis.ApplyClaimMediators).
+//
+// Schema 34 adds ToolDef.InputKeys, so tool_claim_use sees a claim declared in a
+// Claude Agent SDK tool's input schema.
+//
+// Schema 35 adds the claim_use fact on TypeScript OpenAI Agents tools.
+//
+// Schema 36 adds the claim_use fact on Google ADK FunctionTool and AutoGen tools.
+const SupportedSchemaVersion = 36

@@ -1,0 +1,133 @@
+policy:
+  id: crewai_tool_call_claims
+  name: CrewAI tool-call claims (EBTE)
+  category: crewai
+  description: >
+    Rules that flag a CrewAI tool whose calls are not bound to a typed
+    action claim checked outside the model, after Explanation-Bound Tool
+    Execution (EBTE, arXiv 2607.25364). The claim is a reserved `claim` argument
+    (a ToolInvocationExplanation: intent class, selected tool, expected effect,
+    risk tier, uncertainty, untrusted-context dependencies, evidence digests)
+    that a mediation step compares with server-held facts before the call has
+    any effect. The three rules form a ladder over the tool's claim_use fact: no
+    claim on a side-effecting tool, a claim nothing reads, and a claim that is
+    only written out or returned. A checked claim, a tool with an extra
+    decorator that may mediate, or a repo with a CrewAI pre-tool hook is
+    silent.
+
+rules:
+  - id: CREW-016
+    title: Side-effecting tool takes no structured claim for its calls
+    severity: info
+    confidence: 0.5
+    language: python
+    applies_to:
+      - crewai_tool
+    scope: tool
+    match:
+      all:
+        - tool_claim_use: [absent]
+        - any:
+            - has_shell_call: true
+            - has_code_exec_call: true
+            - has_write_call: true
+            - name_has_prefix:
+                - send
+                - notify
+                - email
+                - post_
+                - publish
+                - delete
+                - remove
+                - drop
+                - purge
+                - refund
+                - charge
+                - payout
+                - pay_
+                - transfer
+                - deploy
+                - execute
+                - write
+                - update
+                - create
+                - insert
+                - upsert
+    explanation: >
+      This CrewAI `@tool` function has a side effect — it shells out, executes code,
+      writes a file, or its name says it sends, deletes, pays, deploys, creates
+      or updates — and it takes no `claim` argument, so nothing about why the
+      model chose this call or what it expects the call to do reaches the code
+      that runs it. The model's own reasoning is free text: it can be wrong,
+      written after the fact, or steered by a poisoned tool result or document,
+      and nothing can compare it with the task, the policy or the arguments
+      before the effect happens. This is a defense-in-depth gap, not a bug on
+      its own: the tool's existing controls still apply, and a claim never
+      grants authority. The rule only reads the parameter list, so a claim
+      carried some other way (a separate intent tool, a context object) still
+      fires.
+    fix: >
+      Add a reserved `claim` parameter typed as a ToolInvocationExplanation
+      (schema_version, intent_class, selected_tool, expected_effect, risk_tier,
+      uncertainty, untrusted_context, evidence_refs; an optional summary that no
+      check reads) and check it in a mediation step before the effect: a `@before_tool_call` hook from `crewai.hooks` (it receives the call's `tool_input` and blocks the call by returning False), or one shared decorator stacked under `@tool`.
+      The step denies a missing or mismatched claim, sends an unresolved fact or
+      a high-risk tool to review, and combines with the existing controls so the
+      most restrictive outcome wins. CrewAI has no tool-level approval gate, so block the call on review and send it to a person outside the run.
+
+  - id: CREW-017
+    title: Tool declares a claim argument that nothing checks
+    severity: medium
+    confidence: 0.6
+    language: python
+    applies_to:
+      - crewai_tool
+    scope: tool
+    match:
+      tool_claim_use: [unused]
+    explanation: >
+      This CrewAI `@tool` function takes a `claim` argument, so the model fills in a typed
+      claim about the call, but the tool body never reads it, the tool has no
+      decorator besides the one that registers it, and the repo registers no
+      CrewAI pre-tool hook, so no mediation step visible here can check it.
+      A claim nobody checks is worse than none: reviewers and auditors see a
+      claim-carrying tool and assume the call was verified against the task and
+      the policy, while a prompt-injected or mistaken call runs exactly as it
+      would have without one. The rule cannot see a mediation step that lives in
+      a dispatch layer outside the tool (custom runner code, server middleware),
+      so that shape also fires.
+    fix: >
+      Check the claim before the effect: a `@before_tool_call` hook from `crewai.hooks` (it receives the call's `tool_input` and blocks the call by returning False), or one shared decorator stacked under `@tool`. Validate it, resolve the
+      facts server-side (tool registry, the task's authorized intent, policy,
+      route), and compare. Deny a conflict, review anything unresolved, and run
+      the tool only on allow. CrewAI has no tool-level approval gate, so block the call on review and send it to a person outside the run. If the claim is checked in a dispatch
+      layer this rule cannot see, move the check into one of those places so the
+      binding is visible in the code.
+
+  - id: CREW-018
+    title: Tool's claim argument is only written out or returned, never checked
+    severity: medium
+    confidence: 0.55
+    language: python
+    applies_to:
+      - crewai_tool
+    scope: tool
+    match:
+      tool_claim_use: [passthrough]
+    explanation: >
+      This CrewAI `@tool` function reads its `claim` argument, but every read only writes
+      it out — to print, a logger, json.dumps, str or repr — or puts it in the
+      return value. Nothing compares the claim with the arguments, the task or
+      the policy before the side effect runs, so a claim that contradicts what
+      the call actually does is recorded rather than stopped. An audit trail of
+      unchecked claims is evidence of what the model said, not of what was
+      allowed. The rule follows each read to the first call it is an argument of
+      within the tool body; a check done inside a helper the claim is first
+      copied into (`c = claim`) is counted as checked and stays silent.
+    fix: >
+      Pass the claim to a verifier before the effect and act on its outcome:
+      deny on a conflict between the claim and the arguments, task or policy,
+      review on anything unresolved or high risk, and run the tool only on
+      allow. Keep writing the outcome and the per-check results to the audit
+      trail, but not the raw claim summary or untrusted content. Do it in a
+      mediation step: a `@before_tool_call` hook from `crewai.hooks` (it receives the call's `tool_input` and blocks the call by returning False), or one shared decorator stacked under `@tool`. CrewAI has no tool-level approval gate, so block the call on review and send it to a person outside the run.

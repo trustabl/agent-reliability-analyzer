@@ -356,7 +356,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > no claim, **OAI-035 / MCP-034 / LC-029** (medium, 0.6) claim never read, **OAI-036 / MCP-035 / LC-030** (medium, 0.55) claim only
 > printed / logged / serialized / returned. A second decorator, or an OpenAI tool input guardrail, makes the fact `wrapped` (silent). Rules
 > live in `<sdk>/tool_call_claims.yaml`; rulebook docs in `docs/Policy/<sdk>/tool_call_claims.md`. Python only; TypeScript, Claude SDK,
-> ADK, CrewAI, Pydantic AI, AutoGen and Vercel AI are follow-ups. The fixture holds **364** rules (355 + 9; re-derive).
+> ADK, AutoGen and Vercel AI are follow-ups. The fixture holds **364** rules (355 + 9; re-derive).
+>
+> **Tool-call claims for CrewAI and Pydantic AI (2026-10-22, `schema_version` 32 → 33; +6 rules):** **CREW-016..018** and
+> **PYD-016..018**, same rungs, in `crewai/` and `pydantic_ai/tool_call_claims.yaml`. `analysis.ApplyClaimMediators`
+> (`claim_mediators.go`, run in the scanner after tool discovery) upgrades `unused` / `passthrough` to `wrapped` when the repo has the
+> SDK's pre-tool hook (CrewAI `@before_tool_call` / `register_before_tool_call_hook` / `@on(InterceptionPoint.PRE_TOOL_CALL)`;
+> Pydantic AI `.on.before_tool_execute` / `.on.tool_execute` / `Hooks(before_tool_execute=|tool_execute=)` / the tool's
+> `args_validator=`). Repo-wide per SDK by design. LangChain factory tools get the fact from the wrapped function
+> (`stampFactoryClaim`). The fixture holds **370** rules (re-derive).
 >
 > **Pre-approved fetch from a user-content host (2026-10-21, `schema_version` 30 -> 31, provisional; +1 rule):** **AGCFG-011** (high, 0.7, repo
 > scope, category `agent_config`, new pack file `agent_config/fetch_permissions.yaml`) over the new predicate
@@ -380,6 +388,25 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > `YAMLFiles`). The IDs sit outside the SDK-prefix `NNN`/`1NN`/`2NN` convention, like AGCFG. A CI rule emits one finding per step that runs an
 > offending agent, and for CI-003 one per `actions/checkout` step in that job (not one per scan). Hits carry event, action and secret names only, never a `with` / `env` / `run` value. Rulebook docs (`docs/Policy/ci/`) are a
 > separate follow-up. Built in parallel with the otel-labels correctness batch, which merged first and took 26 → 27, so this batch takes 28. The fixture holds **352** rules (347 + 5; re-derive, do not trust this figure).
+>
+> **Tool-call claims for the Claude Agent SDK (2026-10-22, `schema_version` 33 → 34; +3 rules):** **CSDK-026..028** in
+> `claude_sdk/tool_call_claims.yaml`. Claude handlers take one `args` dict, so the claim is an input-schema key: discovery fills
+> `ToolDef.InputKeys` (`claude_claim.go`: `claudeInputKeys`, `claudeClaimUse`), and `tool_claim_use` treats `claim` in `InputKeys` as
+> declared. Mediator arm: a `"PreToolUse"` dict key, or `can_use_tool=` on a `ClaudeAgentOptions(...)` call with no `allowed_tools=`
+> and no `bypassPermissions` (the callback does not run for auto-approved calls). Settings-file hooks are not credited. The fixture
+> holds **373** rules (re-derive).
+>
+> **Tool-call claims for TypeScript OpenAI Agents (2026-10-22, `schema_version` 34 → 35; +3 rules):** **OAI-037..039**
+> (`language: typescript`) appended to `openai_sdk/tool_call_claims.yaml`. `ts_claim_use.go`: `stampTSOpenAIClaim` (called from
+> `extractTSOpenAITool`) stamps `claim_use` when `claim` is a `parameters` key and `execute` is inline; `tsClaimUse` follows the
+> destructured local or `input.claim` / `input["claim"]`. Mediator: the tool's own `inputGuardrails` property (confirmed in the JS
+> SDK guardrails guide). The fixture holds **376** rules (re-derive).
+>
+> **Tool-call claims for Google ADK and AutoGen (2026-10-22, `schema_version` 35 → 36; +6 rules):** **ADK-024..026**
+> (`google_adk/tool_call_claims.yaml`) and **AG2-023..025** (`autogen/tool_call_claims.yaml`). ADK `FunctionTool(fn)` and AutoGen
+> `register_function(fn)` stamp via `wrappedFuncClaimUse`; AutoGen decorator tools via `autoGenClaimUse`, which skips the
+> registering decorators. Mediator arm: an ADK `before_tool_callback=` kwarg or plugin method (`fileHasADKToolHook`). AutoGen has no
+> arm. ADK bare functions in `tools=[...]` stay undiscovered. The fixture holds **382** rules (re-derive).
 >
 > **Pre-trust agent config (2026-10-12, `schema_version` 22 → 23; +5 rules):** new unconditionally-loaded category `agent_config`
 > (**AGCFG-004..007**, **MCPCFG-002**, repo scope) over five new repo predicates backed by `RepoInventory.ProjectConfig`

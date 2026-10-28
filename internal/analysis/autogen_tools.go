@@ -120,7 +120,11 @@ func discoverAutoGenToolsInFile(pf ParsedFile) []models.ToolDef {
 		if description == "" {
 			description = astutil.FunctionDocstring(fn, pf.Source)
 		}
-		out = append(out, buildAutoGenToolFromFunc(fn, pf, name, description))
+		tool := buildAutoGenToolFromFunc(fn, pf, name, description)
+		if use := autoGenClaimUse(fn, dec, pf.Source); use != "" {
+			tool.Facts[models.FactClaimUse] = use
+		}
+		out = append(out, tool)
 	}
 
 	// Shape 1: register_function(fn, name=, description=, caller=, executor=).
@@ -155,6 +159,9 @@ func discoverAutoGenToolsInFile(pf ParsedFile) []models.ToolDef {
 			description = astutil.FunctionDocstring(fnDef, pf.Source)
 		}
 		tool := buildAutoGenToolFromFunc(fnDef, pf, name, description)
+		if use := wrappedFuncClaimUse(fnDef, nil, pf.Source); use != "" {
+			tool.Facts[models.FactClaimUse] = use
+		}
 		// Capture remaining constructor kwargs (e.g. api_style=) into Config,
 		// excluding the metadata/edge kwargs already consumed above.
 		if kwargs != nil {
@@ -203,6 +210,21 @@ func buildAutoGenToolFromFunc(fn *sitter.Node, pf ParsedFile, name, description 
 		ParamNames:     toolParamNames(fn, pf.Source),
 		Facts:          facts,
 	}
+}
+
+// autoGenClaimUse classifies the claim of a function registered by
+// register_for_llm / register_for_execution decorators. Those decorators only
+// register the tool, so they are not mediators; any other decorator may check
+// the claim before the body runs (ClaimUseWrapped).
+func autoGenClaimUse(fn, dec *sitter.Node, src []byte) string {
+	for _, d := range astutil.Decorators(dec) {
+		callee := decoratorCallee(d, src)
+		if strings.Contains(callee, ".") && autoGenRegisterDecorators[lastSegment(callee)] {
+			continue
+		}
+		return wrappedFuncClaimUse(fn, dec, src)
+	}
+	return pythonClaimUse(fn, nil, src)
 }
 
 // decoratorStringKwarg returns the unquoted value of a string-literal keyword

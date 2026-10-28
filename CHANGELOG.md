@@ -6,10 +6,12 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 32 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 364 rules. OAI-034 / MCP-033 / LC-028 fire at **info** on every
-side-effecting Python OpenAI Agents, MCP or LangChain tool that takes no `claim`
-argument. They never fail `--strict`, and they lower the score only slightly.
+Rule schema 31 → 36 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 382 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
+OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
+ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
+side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
 
@@ -24,6 +26,39 @@ argument. They never fail `--strict`, and they lower the score only slightly.
   output for repos that do not use claims is unchanged apart from the new
   OAI-034 / MCP-033 / LC-028 findings. **Release order:** this engine first,
   then the rules pack.
+- **Tool-call claims for CrewAI and Pydantic AI (schema 33).** CREW-016..018
+  and PYD-016..018 apply the same three rungs to CrewAI `@tool` functions and
+  Pydantic AI `@agent.tool` / `@agent.tool_plain` / `Tool(fn)` tools. A new
+  repo-level pass, `analysis.ApplyClaimMediators`, marks a claim as possibly
+  mediated (`wrapped`, silent) when the repo registers the SDK's pre-tool hook:
+  CrewAI `@before_tool_call`, `register_before_tool_call_hook(...)` or
+  `@on(InterceptionPoint.PRE_TOOL_CALL)`; Pydantic AI
+  `@<hooks>.on.before_tool_execute` / `.on.tool_execute` or
+  `Hooks(before_tool_execute=...)` / `Hooks(tool_execute=...)`, or a tool's own
+  `args_validator=`. The credit is per SDK across the repo, not per tool.
+- **Tool-call claims for the Claude Agent SDK (schema 34).** CSDK-026..028
+  apply the rungs to Python `@tool` handlers. The handler takes one `args`
+  dict, so discovery records the input schema's keys in a new
+  `ToolDef.InputKeys` (`input_keys` in JSON; short dict, JSON-schema
+  `properties`, or a same-file TypedDict / dict variable) and reads the claim
+  as `args["claim"]` / `args.get("claim")`; a whole-`args` read handed to
+  another call counts as checked. A `"PreToolUse"` hooks entry, or
+  `ClaudeAgentOptions(can_use_tool=...)` on a call without `allowed_tools=` or
+  `bypassPermissions`, counts as a possible mediator.
+- **Tool-call claims for TypeScript OpenAI Agents (schema 35).** OAI-037..039
+  (`language: typescript`) apply the rungs to `tool({...})` definitions from
+  `@openai/agents` whose zod `parameters` declare `claim`. The claim is read in
+  the inline `execute` function as a destructured binding (`({ claim })`,
+  `({ claim: c })`) or as `input.claim` / `input["claim"]`; output calls are
+  `console.*`, `JSON.stringify`, `String` and logger methods. A tool with
+  `inputGuardrails: [...]` counts as possibly mediated.
+- **Tool-call claims for Google ADK and AutoGen (schema 36).** ADK-024..026
+  over `FunctionTool(fn)` and AG2-023..025 over `register_function(fn)` and
+  `register_for_llm` / `register_for_execution` tools, with the fact taken from
+  the wrapped function. The AutoGen registering decorators are not counted as
+  mediators; any other decorator is. An ADK `before_tool_callback` (an agent
+  keyword, or a plugin method) anywhere in the repo marks ADK claims as possibly
+  mediated. AutoGen has no pre-tool hook.
 - **A one-time star line after the first interactive scan.** `trustabl scan`
   prints "⭐ Found this useful? Star Agent Reliability Analyzer" with the
   repository link to stderr once, after the first successful scan with human
@@ -73,6 +108,15 @@ argument. They never fail `--strict`, and they lower the score only slightly.
   `*` bypass input is set. One finding per step that runs an offending agent (for CI-003, per
   `actions/checkout` step in an agent job). `workflow_run` is not in
   the trigger set yet.
+
+### Changed
+
+- **Tool-call claims reach LangChain factory tools.** A tool built with
+  `StructuredTool.from_function(fn)`, `StructuredTool(func=fn)` or
+  `Tool.from_function(fn)` now gets the `claim_use` fact from its wrapped
+  function, so LC-029 and LC-030 apply to it. A decorator on the wrapped
+  function counts as a possible mediator, since no decorator registers these
+  tools. No schema change.
 
 ### Fixed
 

@@ -204,23 +204,29 @@ func ValidLanguage(l Language) bool {
 // ToolDef is one discovered surface that an agent can invoke at runtime.
 // Mirrors the Tool Discovery node in architecture §2.
 type ToolDef struct {
-	Name           string            `json:"name"`
-	VarName        string            `json:"var_name,omitempty"` // const-binding name (TS); empty for Python where Name and binding name coincide
-	Kind           ToolKind          `json:"kind"`
-	Language       Language          `json:"language"`
-	Location                         // file_path / start_line / end_line (flat in JSON via anonymous embed)
-	Description    string            `json:"description,omitempty"`
-	HasTypedParams bool              `json:"has_typed_params"`
-	ParamNames     []string          `json:"param_names,omitempty"`
-	Facts          map[string]string `json:"facts,omitempty"`
-	Config         map[string]string `json:"config,omitempty"` // decorator kwargs
+	Name           string   `json:"name"`
+	VarName        string   `json:"var_name,omitempty"` // const-binding name (TS); empty for Python where Name and binding name coincide
+	Kind           ToolKind `json:"kind"`
+	Language       Language `json:"language"`
+	Location                // file_path / start_line / end_line (flat in JSON via anonymous embed)
+	Description    string   `json:"description,omitempty"`
+	HasTypedParams bool     `json:"has_typed_params"`
+	ParamNames     []string `json:"param_names,omitempty"`
+	// InputKeys are the keys of a Claude Agent SDK Python tool's input schema
+	// (the third argument of @tool(name, description, schema)). The handler
+	// takes one args dict, so these are the model-facing argument names; kept
+	// apart from ParamNames, which the CSDK rules read as the signature.
+	InputKeys []string          `json:"input_keys,omitempty"`
+	Facts     map[string]string `json:"facts,omitempty"`
+	Config    map[string]string `json:"config,omitempty"` // decorator kwargs
 }
 
 // FactClaimUse is the ToolDef.Facts key for how a tool uses its EBTE-style
 // `claim` argument (a typed ToolInvocationExplanation the model fills in with
-// each call). It is stamped only on a Python decorated tool that declares a
-// parameter named `claim`; a tool with no such parameter carries no fact, so
-// scan output for repos that do not use claims is unchanged.
+// each call). It is stamped only on a tool that declares `claim` (a parameter,
+// a Claude input-schema key, or a TypeScript parameters key) on a discovery
+// path that classifies it; a tool with no claim carries no fact, so scan
+// output for repos that do not use claims is unchanged.
 const FactClaimUse = "claim_use"
 
 // ClaimUse* are the values of FactClaimUse.

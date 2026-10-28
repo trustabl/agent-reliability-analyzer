@@ -224,6 +224,10 @@ func Run(cfg Config) (models.ScanResult, error) {
 	tools = append(tools, analysis.DiscoverLangGraphNodes(parsed)...)
 	tools = append(tools, analysis.DiscoverAutoGenTools(parsed)...)
 	tools = append(tools, analysis.DiscoverPydanticAITools(parsed)...)
+	// A pre-tool hook elsewhere in the repo (CrewAI before_tool_call, Pydantic
+	// AI before_tool_execute) may check a tool's claim, so credit it before
+	// any rule reads claim_use.
+	analysis.ApplyClaimMediators(tools, parsed)
 	guardrails := analysis.DiscoverGuardrails(parsed)
 	sessions := analysis.DiscoverSessions(parsed)
 

@@ -105,6 +105,7 @@ func buildPydanticAITool(n *sitter.Node, pf ParsedFile, funcs map[string]*sitter
 			facts["shells_out"] = "true"
 		}
 	}
+	params = stampFactoryClaim(fnDef, wrappedName, pf, params, facts)
 
 	// Point the location at the wrapped function body when resolved; otherwise at
 	// the factory call site. The body-scanning predicates only see the function
