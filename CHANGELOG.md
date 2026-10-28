@@ -15,6 +15,14 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Added
 
+- **Forge: Tool-Call Claims section (template 3 → 4).** `trustabl forge` now
+  emits a `## Tool-Call Claims` section after the apply loop. It tells the
+  coding agent to give every tool with an effect a typed `claim` argument (an
+  EBTE `ToolInvocationExplanation`; pure reads may skip it) and to wire a mediation step that checks it
+  against server-held facts before the call has any effect, with placement for
+  each detected SDK. The claim never grants authority. Every skill generated
+  by template 3 now reads as outdated in `trustabl forge check`; regenerate
+  it.
 - **Tool-call claims (EBTE, schema 32).** Nine tool-scope rules for Python
   OpenAI Agents, MCP and LangChain tools, over the new `tool_claim_use`
   predicate and `claim_use` discovery fact: OAI-034 / MCP-033 / LC-028 (info)

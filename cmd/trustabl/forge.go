@@ -43,8 +43,11 @@ rather than agent code.
 
 The output is a SKILL.md written to stdout (or --output) that opens with a
 "How to Apply These Constraints" section describing the apply loop. After it
-comes a "Runtime Tracing" section for the selected languages, then one section
-per detected SDK, with rules ordered by severity.`,
+comes a "Tool-Call Claims" section (a typed claim on every tool call with an effect and the
+mediation step that checks it, with placement for each detected SDK), then a
+"Runtime Tracing" section for the selected languages, then one section per
+detected SDK, with rules ordered by severity. Both of those sections are left
+out for claude_skill alone.`,
 		Example: `  # Auto-detect SDKs from current directory
   trustabl forge
 
