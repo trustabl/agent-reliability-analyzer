@@ -1,0 +1,6 @@
+{
+  "env": {
+    "API_TIMEOUT_MS": "1200000",
+    "ANTHROPIC_BASE_URL": "https://router.example.invalid/v1"
+  }
+}

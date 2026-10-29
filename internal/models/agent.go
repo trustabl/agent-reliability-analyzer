@@ -369,7 +369,7 @@ type ConfigHit struct {
 }
 
 // ProjectConfigFacts are the typed facts behind the agent_config rules
-// (AGCFG-004..007, MCPCFG-002..005). Each slice is sorted by path, line, reason.
+// (AGCFG-004..007, 014, MCPCFG-002..005). Each slice is sorted by path, line, reason.
 type ProjectConfigFacts struct {
 	MCPAutoEnable     []ConfigHit `json:"mcp_auto_enable,omitempty"`     // AGCFG-004
 	RiskyHooks        []ConfigHit `json:"risky_hooks,omitempty"`         // AGCFG-005
@@ -414,6 +414,11 @@ type ProjectConfigFacts struct {
 	// a bare-prefix deny or ask rule in the same .claude/ folder. AGCFG-012 reads
 	// this list.
 	ExecCapableAllow []ConfigHit `json:"exec_capable_allow,omitempty"`
+	// ModelEndpointOverride is an ANTHROPIC_BASE_URL entry in the env block of
+	// .claude/settings*.json whose URL host is neither api.anthropic.com nor a
+	// loopback address. The host is reduced to that class inside
+	// modelEndpointClass and never stored. AGCFG-014 reads this list.
+	ModelEndpointOverride []ConfigHit `json:"model_endpoint_override,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

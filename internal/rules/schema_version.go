@@ -59,4 +59,7 @@ package rules
 // repo_mcp_config_remote_plain_http predicates (repo scope).
 //
 // Schema 39 adds the repo_guidance_file_has_hidden_text predicate (repo scope).
-const SupportedSchemaVersion = 39
+//
+// Schema 40 adds the repo_settings_env_redirects_model_endpoint predicate (repo
+// scope).
+const SupportedSchemaVersion = 40

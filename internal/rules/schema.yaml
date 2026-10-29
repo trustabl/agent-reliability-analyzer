@@ -815,6 +815,14 @@ rules:
 #       .github/copilot-instructions.md and .github/instructions/**/*.instructions.md
 #       (ProjectConfigFacts.HiddenGuidanceText). Same ranges and exemptions, text
 #       never echoed. AGCFG-013. AGENTS.md stays with repo_agents_md_has_hidden_text.
+#   repo_settings_env_redirects_model_endpoint: true | false
+#       The env block of .claude/settings.json or settings.local.json sets
+#       ANTHROPIC_BASE_URL to a URL whose host is neither api.anthropic.com nor a
+#       loopback address (localhost, 127.0.0.0/8, ::1). A value that is empty,
+#       holds a $ variable reference, does not parse, or uses a scheme other than
+#       http or https is not judged. The host is reduced to a class at once and is
+#       never stored; the hit's Reason names the key, never the URL
+#       (ProjectConfigFacts.ModelEndpointOverride). AGCFG-014.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,

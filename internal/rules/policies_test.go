@@ -4480,6 +4480,24 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{ExecCapableAllow: []models.ConfigHit{{Reason: "x"}}}},
 		false},
 
+	// ─── AGCFG-014 model endpoint override in project settings (repo-scoped, no SDK gate) ──
+	{"AGCFG-014 fires on a model endpoint override fact with no SDK detected", "AGCFG-014",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{ModelEndpointOverride: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGCFG-014 silent when no model endpoint override fact exists", "AGCFG-014",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGCFG-014 silent when only a trust-override env fact is present", "AGCFG-014",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{TrustOverrideEnv: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	{"AGCFG-006 silent when only a model endpoint override fact is present", "AGCFG-006",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{ModelEndpointOverride: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+
 	// ─── AGCFG-013 guidance file hidden text (repo-scoped, no SDK gate) ──
 	{"AGCFG-013 fires on a hidden guidance-text fact with no SDK detected", "AGCFG-013",
 		models.RepoProfile{},

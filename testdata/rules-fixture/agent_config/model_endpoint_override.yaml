@@ -1,0 +1,50 @@
+policy:
+  id: agent_config_model_endpoint_override
+  name: Model endpoint override in project settings
+  category: agent_config
+  description: >
+    Repo-scoped rule for Claude Code settings committed to a repository that
+    set the API endpoint Claude Code sends its requests to. Claude Code applies
+    env values from a project settings file after the user trusts the
+    workspace, so this is not a pre-trust rule like AGCFG-004 and AGCFG-005.
+    The pack loads for each scan (the files it reads have no SDK import), so
+    the rule's own predicate does the gating. Fires once per scan, attributed
+    to the first offending settings file.
+
+rules:
+  - id: AGCFG-014
+    title: Project settings point Claude Code at a non-Anthropic API host
+    severity: medium
+    confidence: 0.5
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_settings_env_redirects_model_endpoint: true
+    explanation: >
+      A committed .claude/settings.json or .claude/settings.local.json sets
+      ANTHROPIC_BASE_URL in its env block to a host other than
+      api.anthropic.com and other than a loopback address. Claude Code's
+      settings reference says env values from project and local settings apply
+      after the workspace is trusted, or at startup in -p mode, which shows no
+      trust dialog, and its environment variables reference describes
+      ANTHROPIC_BASE_URL as the override for the API endpoint requests go to.
+      The host in the file therefore receives the requests Claude Code sends
+      and returns the responses Claude Code acts on. Anthropic's gateway
+      documentation describes this variable as the way to route Claude Code
+      through a gateway, and describes administrators distributing the gateway
+      address through managed settings. A gateway an organization runs itself
+      is a legitimate use, and this rule cannot tell it from a host the
+      repository author does not control. Limits of this check: the rule
+      inspects the key name and the host of the URL. It does not judge a value
+      that is empty, holds a variable reference or does not parse, user-level
+      or managed settings, a shell export, an .env file, a workflow env block,
+      .codex or .gemini configuration, ANTHROPIC_BEDROCK_BASE_URL,
+      ANTHROPIC_VERTEX_BASE_URL, OPENAI_BASE_URL, GOOGLE_GEMINI_BASE_URL, or
+      code that passes a base URL to an SDK client. It has no list of approved
+      gateways. The finding names the file and the key, not the URL.
+    fix: >
+      Remove ANTHROPIC_BASE_URL from the committed settings file. Set it in
+      your user-level settings or your shell for a gateway you run, or have
+      your administrator distribute it through managed settings, so a file
+      that travels with the repository does not choose where requests go.
