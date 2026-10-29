@@ -51,4 +51,7 @@ package rules
 // Schema 35 adds the claim_use fact on TypeScript OpenAI Agents tools.
 //
 // Schema 36 adds the claim_use fact on Google ADK FunctionTool and AutoGen tools.
-const SupportedSchemaVersion = 36
+//
+// Schema 37 adds the repo_settings_allow_exec_capable_prefix predicate (repo
+// scope).
+const SupportedSchemaVersion = 37

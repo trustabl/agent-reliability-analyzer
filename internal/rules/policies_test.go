@@ -4430,6 +4430,24 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{UserContentFetchAllow: []models.ConfigHit{{Reason: "x"}}}},
 		false},
 
+	// ─── AGCFG-012 exec-capable pre-approved command prefix (repo-scoped, no SDK gate) ──
+	{"AGCFG-012 fires on an exec-capable allow fact with no SDK detected", "AGCFG-012",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{ExecCapableAllow: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGCFG-012 silent when no exec-capable allow fact exists", "AGCFG-012",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGCFG-012 silent when only a user-content fetch fact is present", "AGCFG-012",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{UserContentFetchAllow: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	{"AGCFG-011 silent when only an exec-capable allow fact is present", "AGCFG-011",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{ExecCapableAllow: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+
 	// ─── CSDK-202 session permission_mode bypass (repo-scoped) ───────────────
 	{"CSDK-202 fires when ClaudeAgentOptions permission_mode is bypassPermissions with no deny-list", "CSDK-202",
 		models.RepoProfile{},

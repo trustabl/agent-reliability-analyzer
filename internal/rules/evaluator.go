@@ -199,6 +199,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoSettingsPreapproveUserContentFetch != nil && (len(inv.ProjectConfig.UserContentFetchAllow) > 0) != *e.RepoSettingsPreapproveUserContentFetch {
 		return false
 	}
+	if e.RepoSettingsAllowExecCapablePrefix != nil && (len(inv.ProjectConfig.ExecCapableAllow) > 0) != *e.RepoSettingsAllowExecCapablePrefix {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -603,6 +606,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_ci_agent_unrestricted_shell":             true,
 		"repo_ci_agent_no_egress_restriction":          true,
 		"repo_settings_preapprove_user_content_fetch":  true,
+		"repo_settings_allow_exec_capable_prefix":      true,
 	},
 }
 
@@ -708,6 +712,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoCIAgentUnrestrictedShell != nil, "repo_ci_agent_unrestricted_shell")
 	add(e.RepoCIAgentNoEgressRestriction != nil, "repo_ci_agent_no_egress_restriction")
 	add(e.RepoSettingsPreapproveUserContentFetch != nil, "repo_settings_preapprove_user_content_fetch")
+	add(e.RepoSettingsAllowExecCapablePrefix != nil, "repo_settings_allow_exec_capable_prefix")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")
