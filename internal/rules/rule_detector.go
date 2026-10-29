@@ -204,6 +204,10 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.LocalMCPLaunch
 	case m.RepoMCPConfigLaunchesUnpinnedPackage != nil:
 		hits = pc.UnpinnedMCPLaunch
+	case m.RepoMCPConfigUnscopedCredential != nil:
+		hits = pc.UnscopedMCPCredential
+	case m.RepoMCPConfigRemotePlainHTTP != nil:
+		hits = pc.PlainHTTPMCPServer
 	case m.RepoCodexHookRunsRepoCommand != nil:
 		hits = pc.CodexRiskyHooks
 	case m.RepoAgentsMdHasHiddenText != nil:

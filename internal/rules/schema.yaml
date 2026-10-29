@@ -766,6 +766,27 @@ rules:
 #       Git, URL, local-path and $VAR specs are not judged; a command inside the
 #       repo is left to repo_mcp_config_launches_local_command, so the two never
 #       judge one entry. MCPCFG-003.
+#   repo_mcp_config_unscoped_credential: true | false
+#       True when a project MCP config (the files above) starts a server with a
+#       credential and none of the scope options the server documents: the
+#       github-mcp-server binary or ghcr.io/github/github-mcp-server image with
+#       GITHUB_PERSONAL_ACCESS_TOKEN and no --read-only / GITHUB_READ_ONLY,
+#       --toolsets / GITHUB_TOOLSETS or --tools / GITHUB_TOOLS; the deprecated
+#       npm package @modelcontextprotocol/server-github with that token (it has
+#       no such option); @supabase/mcp-server-supabase with neither --read-only
+#       nor --project-ref; or any env key whose name contains SERVICE_ROLE
+#       (ProjectConfigFacts.UnscopedMCPCredential). Env keys are read by name;
+#       only the value of GITHUB_READ_ONLY and GITHUB_TOOLSETS is inspected, and
+#       it is reduced to a state and never stored. A value with a $ reference
+#       counts as a set option. A command inside the repo is left to
+#       repo_mcp_config_launches_local_command. Remote URL servers are not
+#       judged. MCPCFG-004.
+#   repo_mcp_config_remote_plain_http: true | false
+#       True when a project MCP config (the files above) gives a url or httpUrl
+#       with the http scheme and a host that is not localhost or a loopback
+#       address (ProjectConfigFacts.PlainHTTPMCPServer). A private address,
+#       host.docker.internal or a .local name counts as not loopback. A value
+#       with a $ reference is not judged. MCPCFG-005.
 #   repo_codex_hook_runs_repo_command: true | false
 #       True when a committed .codex/hooks.json command or commandWindows runs a
 #       repo-relative script (including the documented

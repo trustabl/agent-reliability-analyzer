@@ -1,0 +1,16 @@
+{
+  "servers": {
+    "supabase-unscoped": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@0.14.0", "--features=database"]
+    },
+    "supabase-project-scoped": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@0.14.0", "--project-ref=example-project-ref"]
+    },
+    "remote-plain-http": { "type": "http", "url": "http://mcp.example.invalid/mcp" },
+    "remote-tls": { "type": "http", "url": "https://mcp.example.invalid/mcp" }
+  }
+}

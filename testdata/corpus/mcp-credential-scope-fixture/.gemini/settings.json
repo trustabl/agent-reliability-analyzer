@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "deprecated-github-package": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github@2025.4.8"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PAT" }
+    },
+    "github-toolsets": {
+      "command": "github-mcp-server",
+      "args": ["stdio", "--toolsets=issues,pull_requests"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PAT" }
+    },
+    "remote-plain-http": { "httpUrl": "http://mcp.example.invalid/mcp" },
+    "remote-tls": { "httpUrl": "https://mcp.example.invalid/mcp" }
+  }
+}

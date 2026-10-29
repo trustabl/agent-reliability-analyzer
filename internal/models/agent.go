@@ -369,7 +369,7 @@ type ConfigHit struct {
 }
 
 // ProjectConfigFacts are the typed facts behind the agent_config rules
-// (AGCFG-004..007, MCPCFG-002/003). Each slice is sorted by path, line, reason.
+// (AGCFG-004..007, MCPCFG-002..005). Each slice is sorted by path, line, reason.
 type ProjectConfigFacts struct {
 	MCPAutoEnable     []ConfigHit `json:"mcp_auto_enable,omitempty"`     // AGCFG-004
 	RiskyHooks        []ConfigHit `json:"risky_hooks,omitempty"`         // AGCFG-005
@@ -380,6 +380,16 @@ type ProjectConfigFacts struct {
 	// pnpm dlx, uvx, uv tool run, pipx run, docker run) on a package or image
 	// with no exact version or digest. Disjoint from LocalMCPLaunch. MCPCFG-003.
 	UnpinnedMCPLaunch []ConfigHit `json:"unpinned_mcp_launch,omitempty"`
+	// UnscopedMCPCredential is a server started with a credential and none of the
+	// scope options its own documentation offers: the GitHub MCP server with a
+	// personal access token and no read-only or toolset option, the deprecated
+	// npm GitHub package (which has none) with a token, the Supabase server with
+	// neither --read-only nor --project-ref, or an env key named for a
+	// service_role credential. MCPCFG-004.
+	UnscopedMCPCredential []ConfigHit `json:"unscoped_mcp_credential,omitempty"`
+	// PlainHTTPMCPServer is a remote server URL (url or httpUrl) with the http
+	// scheme and a host that is not loopback. MCPCFG-005.
+	PlainHTTPMCPServer []ConfigHit `json:"plain_http_mcp_server,omitempty"`
 	// CodexRiskyHooks is kept apart from RiskyHooks on purpose: Codex skips a
 	// project hook until the user reviews and trusts it, so AGCFG-005's "runs
 	// before trust" claim does not hold for it. AGCFG-008 reads this list.

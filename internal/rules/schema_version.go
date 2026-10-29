@@ -54,4 +54,7 @@ package rules
 //
 // Schema 37 adds the repo_settings_allow_exec_capable_prefix predicate (repo
 // scope).
-const SupportedSchemaVersion = 37
+//
+// Schema 38 adds the repo_mcp_config_unscoped_credential and
+// repo_mcp_config_remote_plain_http predicates (repo scope).
+const SupportedSchemaVersion = 38

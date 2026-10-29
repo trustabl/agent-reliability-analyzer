@@ -154,6 +154,8 @@ type MatchExpr struct {
 	RepoEditorAgentAutoApprove           *bool `yaml:"repo_editor_agent_auto_approve,omitempty"`
 	RepoMCPConfigLaunchesLocalCommand    *bool `yaml:"repo_mcp_config_launches_local_command,omitempty"`
 	RepoMCPConfigLaunchesUnpinnedPackage *bool `yaml:"repo_mcp_config_launches_unpinned_package,omitempty"`
+	RepoMCPConfigUnscopedCredential      *bool `yaml:"repo_mcp_config_unscoped_credential,omitempty"`
+	RepoMCPConfigRemotePlainHTTP         *bool `yaml:"repo_mcp_config_remote_plain_http,omitempty"`
 	RepoCodexHookRunsRepoCommand         *bool `yaml:"repo_codex_hook_runs_repo_command,omitempty"`
 	RepoAgentsMdHasHiddenText            *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
 	RepoHarnessGuidanceHasHiddenText     *bool `yaml:"repo_harness_guidance_has_hidden_text,omitempty"`

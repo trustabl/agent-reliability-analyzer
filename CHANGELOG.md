@@ -6,8 +6,8 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 37 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 383 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+Rule schema 31 → 38 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 385 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
 CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
 OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
 ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
@@ -15,6 +15,24 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Added
 
+- **MCP client config: unscoped credential and plain http remote (rule schema 37 → 38,
+  provisional).** Two repo-scope predicates and two rules in
+  `agent_config/mcp_client_config.yaml`. `repo_mcp_config_unscoped_credential` and
+  **MCPCFG-004** (high, 0.6) flag a committed MCP client config that starts the
+  `github-mcp-server` binary or image with `GITHUB_PERSONAL_ACCESS_TOKEN` and no
+  `--read-only` / `GITHUB_READ_ONLY`, `--toolsets` / `GITHUB_TOOLSETS` or `--tools` /
+  `GITHUB_TOOLS`; the deprecated npm `@modelcontextprotocol/server-github` with that token
+  (its source has no scope option); `@supabase/mcp-server-supabase` with neither
+  `--read-only` nor `--project-ref`; or any env key whose name contains `SERVICE_ROLE`.
+  `GITHUB_READ_ONLY` counts as set when `strconv.ParseBool` reads it as true, as the server
+  binds it. `repo_mcp_config_remote_plain_http` and **MCPCFG-005** (medium, 0.6) flag a
+  `url` or `httpUrl` with the `http` scheme on a host that is not `localhost` or a loopback
+  address. A remote server with no credential in the file is not flagged: Claude Code,
+  Cursor, Gemini CLI and Codex each document OAuth sign-in with nothing in the file. Backed
+  by `ProjectConfigFacts.UnscopedMCPCredential` and `PlainHTTPMCPServer`. Env keys are read
+  by name; only the value of `GITHUB_READ_ONLY` and `GITHUB_TOOLSETS` is inspected, and it is
+  reduced to a state and never stored. Remote GitHub and Supabase URLs are not judged. Schema 38
+  is provisional and a later merge may renumber.
 - **Exec-capable pre-approved command prefix (rule schema 36 → 37, provisional).**
   New repo-scope predicate `repo_settings_allow_exec_capable_prefix` and rule
   **AGCFG-012** (medium, 0.6, pack file `agent_config/exec_capable_allow.yaml`) flag a

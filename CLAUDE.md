@@ -350,6 +350,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **MCP client config: unscoped credential and plain http remote (2026-10-28, `schema_version` 37 -> 38, provisional; +2 rules):** **MCPCFG-004**
+> (high, 0.6) over `repo_mcp_config_unscoped_credential` (`ProjectConfigFacts.UnscopedMCPCredential`) and **MCPCFG-005** (medium, 0.6) over
+> `repo_mcp_config_remote_plain_http` (`PlainHTTPMCPServer`), both in `agent_config/mcp_client_config.yaml`; classifiers in
+> `internal/analysis/mcp_client_scope.go`. 004 judges a `github-mcp-server` launch with `GITHUB_PERSONAL_ACCESS_TOKEN` and no read-only or
+> toolset option, the deprecated npm GitHub package with that token, the Supabase server with neither `--read-only` nor `--project-ref`, and
+> any env key containing `SERVICE_ROLE` (ADMIN, ROOT, _SUPERUSER and GITHUB_TOKEN have no vendor source and are not judged). **Secrecy:** env
+> keys are read by name; the value of `GITHUB_READ_ONLY` / `GITHUB_TOOLSETS` is reduced to a state in the same function and never stored.
+> 005 does not judge a missing credential (four clients document OAuth with nothing in the file). Schema 37 is AGCFG-012 on main; 38 is provisional. The fixture holds **385** rules (383 + 2; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`.
+>
 > **Exec-capable pre-approved command prefix (2026-10-28, `schema_version` 36 → 37, provisional; +1 rule):** **AGCFG-012** (medium, 0.6, repo
 > scope, category `agent_config`, new pack file `agent_config/exec_capable_allow.yaml`) over the new predicate
 > `repo_settings_allow_exec_capable_prefix`, backed by `ProjectConfigFacts.ExecCapableAllow`. It flags a `Bash` rule in `permissions.allow`

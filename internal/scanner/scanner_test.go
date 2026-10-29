@@ -1379,6 +1379,43 @@ func TestScan_FetchPermissionsFixture(t *testing.T) {
 	}
 }
 
+// End to end: the credential-scope fixture pairs unscoped and scoped credentials
+// and plain http and safe remote URLs across six client config files. MCPCFG-004
+// and MCPCFG-005 each fire once, attributed to the first path-sorted file that
+// holds a hit, MCPCFG-002 stays silent (no entry launches repo-controlled code),
+// and no finding text echoes a host, package or key name from the fixture.
+func TestScan_MCPCredentialScopeFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "mcp-credential-scope-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string][]models.Finding{}
+	for _, f := range res.Findings {
+		switch f.RuleID {
+		case "MCPCFG-002":
+			t.Errorf("MCPCFG-002 fired on a package or url entry (%s:%d)", f.FilePath, f.StartLine)
+		case "MCPCFG-004", "MCPCFG-005":
+			got[f.RuleID] = append(got[f.RuleID], f)
+		}
+		for _, leak := range []string{"example.invalid", "example-project-ref", "EXAMPLE_SERVICE_ROLE_KEY", "GITHUB_PAT"} {
+			if strings.Contains(f.Explanation+f.Title, leak) {
+				t.Errorf("%s echoed %q", f.RuleID, leak)
+			}
+		}
+	}
+	for _, id := range []string{"MCPCFG-004", "MCPCFG-005"} {
+		fs := got[id]
+		if len(fs) != 1 {
+			t.Fatalf("%s fired %d times, want once; findings: %v", id, len(fs), res.Findings)
+		}
+		if !strings.HasSuffix(fs[0].FilePath, ".codex/config.toml") || fs[0].StartLine < 1 {
+			t.Errorf("%s attributed to %s:%d, want .codex/config.toml with a line", id, fs[0].FilePath, fs[0].StartLine)
+		}
+	}
+}
+
 // End to end: the exec-allow fixture pairs bare git, xargs and npx prefixes with
 // exact commands, a narrower git prefix, a find prefix and a same-folder deny.
 // AGCFG-012 fires on the git and xargs entries in the root file (the npx entry
@@ -1413,7 +1450,7 @@ func TestScan_PreTrustConfigSafeVariantsStaySilent(t *testing.T) {
 	dir := t.TempDir()
 	for rel, body := range map[string]string{
 		".claude/settings.json": `{"permissions": {"allow": ["Read", "WebFetch(domain:docs.example.invalid)"]}}`,
-		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "pinned-uv": {"command": "uvx", "args": ["example-mcp-git@0.6.2"]}, "pinned-img": {"command": "docker", "args": ["run", "-i", "--rm", "ghcr.io/example/mcp-server@sha256:` + strings.Repeat("0", 64) + `"]}, "remote": {"url": "https://mcp.example.invalid/sse"}}}`,
+		".mcp.json":             `{"mcpServers": {"pinned": {"command": "npx", "args": ["-y", "@example/mcp-server@1.2.3"]}, "pinned-uv": {"command": "uvx", "args": ["example-mcp-git@0.6.2"]}, "pinned-img": {"command": "docker", "args": ["run", "-i", "--rm", "ghcr.io/example/mcp-server@sha256:` + strings.Repeat("0", 64) + `"]}, "remote": {"url": "https://mcp.example.invalid/sse"}, "gh-read-only": {"command": "github-mcp-server", "args": ["stdio", "--read-only"], "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "${PAT}"}}, "gh-toolsets": {"command": "github-mcp-server", "args": ["stdio"], "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "${PAT}", "GITHUB_TOOLSETS": "repos", "GITHUB_READ_ONLY": "1"}}, "supabase": {"command": "npx", "args": ["-y", "@supabase/mcp-server-supabase@0.14.0", "--read-only", "--project-ref=example"]}, "loopback": {"url": "http://localhost:3000/mcp"}}}`,
 		".gemini/.env":          "PLAIN_SETTING=fake-value-not-real\n",
 		".env":                  "OPENAI_BASE_URL=https://api.example.invalid\nNODE_OPTIONS=--max-old-space-size=4096\n",
 		".vscode/settings.json": "{\n  // fixture only\n  \"chat.tools.autoApprove\": false,\n}\n",
