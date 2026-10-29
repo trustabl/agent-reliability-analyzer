@@ -1,0 +1,50 @@
+policy:
+  id: agent_config_guidance_hidden_text
+  name: Guidance file hidden text
+  category: agent_config
+  description: >
+    Repo-scoped rule for agent guidance files committed to a repository other than
+    AGENTS.md (CLAUDE.md, GEMINI.md, Cursor .mdc rules, Windsurf and Devin rules
+    files, .windsurfrules and the GitHub Copilot instruction files). An agent loads
+    these files as instructions while a reviewer reads rendered text or a diff, so
+    characters that are invisible or that reorder what a reviewer sees can carry
+    instructions the model reads and the reviewer does not. The rule is an objective
+    code-point test; it does not judge what the instructions say. It is separate
+    from AGCFG-009 (AGENTS.md) and AGCFG-010 (staged OpenCode guidance). The pack
+    loads for each scan (the files have no SDK import), so the rule's own predicate
+    does the gating. Fires once per scan, attributed to the first offending file.
+
+rules:
+  - id: AGCFG-013
+    title: Agent guidance file contains invisible or direction-overriding text
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_guidance_file_has_hidden_text: true
+    explanation: >
+      A committed agent guidance file (CLAUDE.md, GEMINI.md, a Cursor .mdc rule, a
+      Windsurf or Devin rules file, .windsurfrules, .github/copilot-instructions.md
+      or a .github/instructions file) contains zero-width characters, Unicode
+      Tags-block characters (U+E0000 to U+E007F), or bidirectional override
+      characters. These files are loaded into the agent's context as instructions
+      when the tool applies them, and a reviewer reading rendered text or a diff
+      does not see these characters, so any of them can carry an instruction the
+      model reads and the reviewer does not. Tags-block characters mirror ASCII
+      invisibly. A byte order mark at the start of the file, emoji joined by a
+      zero-width joiner, and subdivision-flag emoji are not flagged. Right-to-left
+      prose that uses bidirectional controls is flagged and is a known false
+      positive. The characters themselves are not echoed. Limits of this check: it
+      is a code-point test, so a visible instruction that steers the agent is not
+      flagged, and HTML comments, instruction-override phrases and encoded text are
+      not tested. AGENTS.md is covered by AGCFG-009, staged OpenCode guidance by
+      AGCFG-010 and SKILL.md by CSKILL-040. A .cursorrules file, a Cursor rule that
+      is not a .mdc file, and a guidance file in a location the scan does not
+      collect are not read. A file over the scan's per-file size cap (10 MiB) is not read.
+    fix: >
+      Remove the invisible or direction-overriding characters, and retype any line
+      that contained them, because they are easy to paste back in. Review changes
+      to guidance files with a tool that shows hidden characters, and keep
+      instructions in plain visible text.

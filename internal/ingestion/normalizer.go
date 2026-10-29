@@ -448,7 +448,21 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 			if isWorkflowFile(lower) {
 				manifest.WorkflowFiles = append(manifest.WorkflowFiles, rel)
 			}
+			if isCopilotInstructionFile(lower) {
+				manifest.GuidanceFiles = append(manifest.GuidanceFiles, rel)
+			}
 			return nil
+		}
+		// Windsurf and Devin keep rules under .windsurf/ and .devin/. Only the rules
+		// files are recorded; nothing else under those directories enters the manifest.
+		if isRootWindsurfDir(lower) {
+			if isWindsurfRuleFile(lower) {
+				manifest.GuidanceFiles = append(manifest.GuidanceFiles, rel)
+			}
+			return nil
+		}
+		if lower == ".windsurfrules" || (strings.HasPrefix(lower, ".cursor/rules/") && strings.HasSuffix(lower, ".mdc")) {
+			manifest.GuidanceFiles = append(manifest.GuidanceFiles, rel)
 		}
 		// Harness config the pre-trust rules read: any ".env" file and the Codex
 		// project config. Kept narrow on purpose (pyproject.toml etc. are not).
@@ -500,6 +514,7 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 	}
 	sort.Strings(manifest.ConfigFiles)
 	sort.Strings(manifest.WorkflowFiles)
+	sort.Strings(manifest.GuidanceFiles)
 
 	manifest.HasClaudeSDKDependency = detectClaudeSDKDependency(src.RootPath)
 	manifest.HasOpenShellArtifact = detectOpenShellArtifact(manifest.YAMLFiles, src.RootPath)
@@ -574,7 +589,9 @@ func inOpencodeDir(p string, names ...string) bool {
 // root .github, so the normal dot-directory rules apply.
 func githubDirDecision(rel string) (skip, handled bool) {
 	switch {
-	case rel == ".github" || rel == ".github/workflows":
+	case rel == ".github" || rel == ".github/workflows" || rel == ".github/instructions":
+		return false, true
+	case strings.HasPrefix(rel, ".github/instructions/"):
 		return false, true
 	case strings.HasPrefix(rel, ".github/"):
 		return true, true
@@ -592,6 +609,28 @@ func isWorkflowFile(lower string) bool {
 	return strings.HasSuffix(rest, ".yml") || strings.HasSuffix(rest, ".yaml")
 }
 
+// isCopilotInstructionFile reports whether lower is .github/copilot-instructions.md
+// or a *.instructions.md file under .github/instructions.
+func isCopilotInstructionFile(lower string) bool {
+	if lower == ".github/copilot-instructions.md" {
+		return true
+	}
+	return strings.HasPrefix(lower, ".github/instructions/") && strings.HasSuffix(lower, ".instructions.md")
+}
+
+// isRootWindsurfDir reports whether lower sits under the repo-root .windsurf/ or
+// .devin/ directory.
+func isRootWindsurfDir(lower string) bool {
+	return strings.HasPrefix(lower, ".windsurf/") || strings.HasPrefix(lower, ".devin/")
+}
+
+// isWindsurfRuleFile reports whether lower is a *.md file under .windsurf/rules/
+// or .devin/rules/.
+func isWindsurfRuleFile(lower string) bool {
+	return (strings.HasPrefix(lower, ".windsurf/rules/") || strings.HasPrefix(lower, ".devin/rules/")) &&
+		strings.HasSuffix(lower, ".md")
+}
+
 func shouldSkipDir(name string) bool {
 	switch name {
 	case ".git", ".venv", "venv", "node_modules", "__pycache__",
@@ -605,6 +644,10 @@ func shouldSkipDir(name string) bool {
 	case ".gemini", ".vscode", ".cursor", ".codex":
 		// Other harnesses' project config (settings, hooks, MCP, env) that takes
 		// effect when the folder is opened — read by the agent_config rules.
+		return false
+	case ".windsurf", ".devin":
+		// Windsurf and Devin rules files (see isWindsurfRuleFile). The walk records
+		// only those files; everything else in these directories is left out.
 		return false
 	case ".agents", ".opencode":
 		// Codex keeps project skills under .agents/ and OpenCode keeps plugins and
@@ -791,6 +834,23 @@ func discoverComponents(root string, m models.ScanManifest, onFile func(string))
 			out = append(out, models.AgentComponent{Kind: models.ComponentClaudeMd, Path: p})
 		case "AGENTS.md", "agents.md":
 			out = append(out, models.AgentComponent{Kind: models.ComponentAgentsMd, Path: p})
+		}
+		if strings.EqualFold(base, "GEMINI.md") {
+			out = append(out, models.AgentComponent{Kind: models.ComponentGeminiMd, Path: p})
+		}
+	}
+
+	// Other agent guidance files (category agent_config, rule AGCFG-013). Each gets
+	// its own component kind so no existing kind, and no rule matching one, changes.
+	for _, p := range m.GuidanceFiles {
+		lower := strings.ToLower(p)
+		switch {
+		case strings.HasPrefix(lower, ".cursor/rules/"):
+			out = append(out, models.AgentComponent{Kind: models.ComponentCursorRule, Path: p})
+		case lower == ".windsurfrules", isWindsurfRuleFile(lower):
+			out = append(out, models.AgentComponent{Kind: models.ComponentWindsurfRule, Path: p})
+		case isCopilotInstructionFile(lower):
+			out = append(out, models.AgentComponent{Kind: models.ComponentCopilotInstruction, Path: p})
 		}
 	}
 

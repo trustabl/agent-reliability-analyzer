@@ -808,6 +808,13 @@ rules:
 #       tool_descriptions/*.md; ProjectConfigFacts.HiddenHarnessText). Same
 #       exemptions, text never echoed. AGCFG-010. A separate predicate from
 #       repo_agents_md_has_hidden_text, which keeps its AGENTS.md-only meaning.
+#   repo_guidance_file_has_hidden_text: true | false
+#       The AGCFG-009 character test over guidance files that rule and AGCFG-010 do
+#       not read: CLAUDE.md, GEMINI.md, repo-root .cursor/rules/**/*.mdc,
+#       .windsurfrules, .windsurf/rules/*.md, .devin/rules/*.md,
+#       .github/copilot-instructions.md and .github/instructions/**/*.instructions.md
+#       (ProjectConfigFacts.HiddenGuidanceText). Same ranges and exemptions, text
+#       never echoed. AGCFG-013. AGENTS.md stays with repo_agents_md_has_hidden_text.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,

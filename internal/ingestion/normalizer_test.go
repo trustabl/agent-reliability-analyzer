@@ -3,6 +3,9 @@ package ingestion
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/trustabl/trustabl/internal/models"
@@ -712,5 +715,88 @@ func TestNormalize_GitHubWorkflowsRootOnly(t *testing.T) {
 	}
 	if kinds != 2 {
 		t.Fatalf("github_workflow components = %d, want 2: %+v", kinds, m.Components)
+	}
+}
+
+// Guidance files for AGCFG-013 get their own component kinds, and nothing else
+// under .windsurf/, .devin/ or .github/instructions/ enters any manifest list.
+func TestNormalize_GuidanceFilesDistinctKinds(t *testing.T) {
+	dir := t.TempDir()
+	files := []string{
+		"CLAUDE.md", "AGENTS.md", "GEMINI.md", "pkg/GEMINI.md",
+		".cursor/rules/a.mdc", ".cursor/rules/sub/b.mdc", ".cursor/rules/c.md", ".cursorrules",
+		"pkg/.cursor/rules/d.mdc",
+		".windsurfrules", "pkg/.windsurfrules", ".windsurf/rules/r.md", ".devin/rules/r.md",
+		".windsurf/notes.md", ".windsurf/tool.py", ".devin/data.yaml", ".devin/skills/x/SKILL.md",
+		".windsurf/rules/skip.txt",
+		".github/copilot-instructions.md", ".github/instructions/p.instructions.md",
+		".github/instructions/deep/q.instructions.md", ".github/instructions/plain.md",
+		".github/other.md", "pkg/.github/copilot-instructions.md",
+	}
+	for _, rel := range files {
+		full := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := Normalize(&Source{RootPath: dir}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.ComponentKind][]string{}
+	for _, c := range m.Components {
+		switch c.Kind {
+		case models.ComponentClaudeMd, models.ComponentAgentsMd, models.ComponentGeminiMd,
+			models.ComponentCursorRule, models.ComponentWindsurfRule, models.ComponentCopilotInstruction:
+			got[c.Kind] = append(got[c.Kind], c.Path)
+		}
+	}
+	want := map[models.ComponentKind][]string{
+		models.ComponentClaudeMd:     {"CLAUDE.md"},
+		models.ComponentAgentsMd:     {"AGENTS.md"},
+		models.ComponentGeminiMd:     {"GEMINI.md", "pkg/GEMINI.md"},
+		models.ComponentCursorRule:   {".cursor/rules/a.mdc", ".cursor/rules/sub/b.mdc"},
+		models.ComponentWindsurfRule: {".devin/rules/r.md", ".windsurf/rules/r.md", ".windsurfrules"},
+		models.ComponentCopilotInstruction: {
+			".github/copilot-instructions.md",
+			".github/instructions/deep/q.instructions.md",
+			".github/instructions/p.instructions.md",
+		},
+	}
+	for k, w := range want {
+		g := append([]string(nil), got[k]...)
+		sort.Strings(g)
+		sort.Strings(w)
+		if !reflect.DeepEqual(g, w) {
+			t.Errorf("%s: got %v, want %v", k, g, w)
+		}
+	}
+	wantGuidance := []string{
+		".cursor/rules/a.mdc", ".cursor/rules/sub/b.mdc", ".devin/rules/r.md",
+		".github/copilot-instructions.md", ".github/instructions/deep/q.instructions.md",
+		".github/instructions/p.instructions.md", ".windsurf/rules/r.md", ".windsurfrules",
+	}
+	if !reflect.DeepEqual(m.GuidanceFiles, wantGuidance) {
+		t.Errorf("GuidanceFiles = %v, want %v", m.GuidanceFiles, wantGuidance)
+	}
+	for _, l := range [][]string{m.PythonFiles, m.YAMLFiles, m.JSONFiles} {
+		for _, p := range l {
+			if strings.HasPrefix(p, ".windsurf/") || strings.HasPrefix(p, ".devin/") {
+				t.Errorf("%s leaked into a manifest list", p)
+			}
+		}
+	}
+	for _, p := range m.MarkdownFiles {
+		if strings.HasPrefix(p, ".windsurf/") || strings.HasPrefix(p, ".devin/") || strings.HasPrefix(p, ".github/") {
+			t.Errorf("%s leaked into MarkdownFiles", p)
+		}
+	}
+	for _, c := range m.Components {
+		if c.Kind == models.ComponentSkill {
+			t.Errorf("skill under .devin/ must not be discovered: %+v", c)
+		}
 	}
 }

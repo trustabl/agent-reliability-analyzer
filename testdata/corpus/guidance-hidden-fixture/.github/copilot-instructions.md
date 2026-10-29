@@ -1,0 +1,3 @@
+# Fixture guidance
+
+Write tests.󠁰󠁬󠁡󠁣󠁥󠁨󠁯󠁬󠁤󠁥󠁲

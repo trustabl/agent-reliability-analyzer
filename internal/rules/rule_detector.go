@@ -214,6 +214,8 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.HiddenAgentText
 	case m.RepoHarnessGuidanceHasHiddenText != nil:
 		hits = pc.HiddenHarnessText
+	case m.RepoGuidanceFileHasHiddenText != nil:
+		hits = pc.HiddenGuidanceText
 	case m.RepoSettingsPreapproveUserContentFetch != nil:
 		hits = pc.UserContentFetchAllow
 	case m.RepoSettingsAllowExecCapablePrefix != nil:

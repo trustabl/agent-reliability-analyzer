@@ -202,6 +202,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoHarnessGuidanceHasHiddenText != nil && (len(inv.ProjectConfig.HiddenHarnessText) > 0) != *e.RepoHarnessGuidanceHasHiddenText {
 		return false
 	}
+	if e.RepoGuidanceFileHasHiddenText != nil && (len(inv.ProjectConfig.HiddenGuidanceText) > 0) != *e.RepoGuidanceFileHasHiddenText {
+		return false
+	}
 	if e.RepoSettingsPreapproveUserContentFetch != nil && (len(inv.ProjectConfig.UserContentFetchAllow) > 0) != *e.RepoSettingsPreapproveUserContentFetch {
 		return false
 	}
@@ -608,6 +611,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_codex_hook_runs_repo_command":            true,
 		"repo_agents_md_has_hidden_text":               true,
 		"repo_harness_guidance_has_hidden_text":        true,
+		"repo_guidance_file_has_hidden_text":           true,
 		"repo_ci_agent_untrusted_trigger_ungated":      true,
 		"repo_ci_agent_untrusted_trigger_privileged":   true,
 		"repo_ci_agent_checkout_persists_credentials":  true,
@@ -716,6 +720,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoCodexHookRunsRepoCommand != nil, "repo_codex_hook_runs_repo_command")
 	add(e.RepoAgentsMdHasHiddenText != nil, "repo_agents_md_has_hidden_text")
 	add(e.RepoHarnessGuidanceHasHiddenText != nil, "repo_harness_guidance_has_hidden_text")
+	add(e.RepoGuidanceFileHasHiddenText != nil, "repo_guidance_file_has_hidden_text")
 	add(e.RepoCIAgentUntrustedTriggerUngated != nil, "repo_ci_agent_untrusted_trigger_ungated")
 	add(e.RepoCIAgentUntrustedTriggerPrivileged != nil, "repo_ci_agent_untrusted_trigger_privileged")
 	add(e.RepoCIAgentCheckoutPersistsCredentials != nil, "repo_ci_agent_checkout_persists_credentials")
