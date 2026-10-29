@@ -350,6 +350,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Model endpoint override in project settings (2026-10-29, `schema_version` 39 -> 40, provisional; +1 rule):** **AGCFG-014** (medium, 0.5, repo
+> scope, category `agent_config`, new pack file `agent_config/model_endpoint_override.yaml`) over the new predicate
+> `repo_settings_env_redirects_model_endpoint`, backed by `ProjectConfigFacts.ModelEndpointOverride`. It flags `ANTHROPIC_BASE_URL` in the `env`
+> block of `.claude/settings.json` / `settings.local.json` whose URL host is neither api.anthropic.com nor loopback. **Secrecy:** the value is
+> parsed inside `modelEndpointClass` and reduced at once to `first_party` / `loopback` / `other` / `unjudged`; the host, userinfo and query are
+> never stored, and the Reason names the key. Disjoint from AGCFG-006 by file: 006 reads `.gemini/.env`, root `.env` and `config.toml`, none of
+> the `.claude` settings. There is no approved-gateway list in the engine. The fixture holds **387** rules (386 + 1; re-derive). Rulebook doc:
+> `docs/Policy/agent_config/model_endpoint_override.md`.
+>
 > **Hidden text in agent guidance files (2026-10-29, `schema_version` 38 -> 39, provisional; +1 rule):** **AGCFG-013** (medium, 0.6, repo
 > scope, category `agent_config`, new pack file `agent_config/guidance_hidden_text.yaml`) over the new predicate
 > `repo_guidance_file_has_hidden_text`, backed by `ProjectConfigFacts.HiddenGuidanceText`. It reuses `hiddenTextHits` (the AGCFG-009 test and

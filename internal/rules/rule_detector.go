@@ -220,6 +220,8 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.UserContentFetchAllow
 	case m.RepoSettingsAllowExecCapablePrefix != nil:
 		hits = pc.ExecCapableAllow
+	case m.RepoSettingsEnvRedirectsModelEndpoint != nil:
+		hits = pc.ModelEndpointOverride
 	}
 	if len(hits) == 0 {
 		return "", 0

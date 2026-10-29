@@ -6,8 +6,8 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 39 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 386 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+Rule schema 31 → 40 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 387 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
 CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
 OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
 ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
@@ -15,6 +15,17 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Added
 
+- **Model endpoint override in project settings (rule schema 39 → 40, provisional).** New
+  repo-scope predicate `repo_settings_env_redirects_model_endpoint` and rule **AGCFG-014**
+  (medium, 0.5, pack file `agent_config/model_endpoint_override.yaml`) flag an
+  `ANTHROPIC_BASE_URL` entry in the `env` block of a committed `.claude/settings.json` or
+  `settings.local.json` whose host is neither api.anthropic.com nor a loopback address. The
+  host is reduced to a class inside `modelEndpointClass` and is never stored; the finding
+  names the file and the key, not the URL. A value that is empty, holds a `$` reference or
+  does not parse is not judged. Not read: other base-URL variables, `.env` files, workflow
+  `env`, `.codex` and `.gemini` config, user and managed settings, code-level `base_url`;
+  there is no list of approved gateways. AGCFG-006 is unchanged and reads none of these
+  files. Backed by `ProjectConfigFacts.ModelEndpointOverride`.
 - **Hidden text in agent guidance files (rule schema 38 → 39, provisional).** New
   repo-scope predicate `repo_guidance_file_has_hidden_text` and rule **AGCFG-013**
   (medium, 0.6, pack file `agent_config/guidance_hidden_text.yaml`) apply the AGCFG-009

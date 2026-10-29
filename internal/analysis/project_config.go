@@ -3,6 +3,8 @@ package analysis
 import (
 	"bytes"
 	"encoding/json"
+	"net"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -32,6 +34,11 @@ import (
 // mcp_client_scope.go and reduced at once to a state (true, false, restricting,
 // widening, unknown). Only that state leaves the function; the value is never
 // assigned to a struct field, a Reason or a log. MCPCFG-004 reads these.
+//
+// The settings env value of ANTHROPIC_BASE_URL is the third value read: it is
+// parsed inside modelEndpointClass, reduced at once to first_party, loopback,
+// other or unjudged, and only that class leaves the function. The host, path,
+// userinfo and query are never kept. AGCFG-014 reads the result.
 
 // DiscoverProjectConfig reads the pre-trust config components in the manifest
 // and returns the sorted, deduped facts. claude is the already-parsed
@@ -57,6 +64,9 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 
 	// AGCFG-012: Bash allow rules that pre-approve an exec-capable command prefix.
 	f.ExecCapableAllow = execCapableAllowHits(manifest.RepoRoot, claude)
+
+	// AGCFG-014: ANTHROPIC_BASE_URL in a settings env block pointing off-vendor.
+	f.ModelEndpointOverride = modelEndpointOverrideHits(manifest.RepoRoot, claude)
 
 	for _, c := range manifest.Components {
 		switch c.Kind {
@@ -102,6 +112,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.HiddenGuidanceText = sortHits(f.HiddenGuidanceText)
 	f.UserContentFetchAllow = sortHits(f.UserContentFetchAllow)
 	f.ExecCapableAllow = sortHits(f.ExecCapableAllow)
+	f.ModelEndpointOverride = sortHits(f.ModelEndpointOverride)
 	return f
 }
 
@@ -1014,4 +1025,61 @@ func execCapableAllowHits(root string, claude []models.ClaudeSettings) []models.
 		}
 	}
 	return out
+}
+
+// ── AGCFG-014: model endpoint override in a settings env block ─────────────
+
+const modelEndpointKey = "ANTHROPIC_BASE_URL"
+
+// modelEndpointOverrideHits flags an ANTHROPIC_BASE_URL entry in the env block
+// of a .claude/settings*.json whose host is outside api.anthropic.com and
+// loopback. A file that is not valid JSON, an env that is not an object and a
+// value that is not a string are skipped.
+func modelEndpointOverrideHits(root string, claude []models.ClaudeSettings) []models.ConfigHit {
+	var out []models.ConfigHit
+	for _, cs := range claude {
+		raw := readConfig(root, cs.FilePath)
+		var doc struct {
+			Env map[string]any `json:"env"`
+		}
+		if len(raw) == 0 || json.Unmarshal(raw, &doc) != nil {
+			continue
+		}
+		v, ok := doc.Env[modelEndpointKey].(string)
+		if !ok || modelEndpointClass(v) != "other" {
+			continue
+		}
+		out = append(out, hit(cs.FilePath, lineOfText(raw, `"`+modelEndpointKey+`"`),
+			"env key "+modelEndpointKey+" points Claude Code at a host outside api.anthropic.com and loopback"))
+	}
+	return out
+}
+
+// modelEndpointClass reduces an endpoint value to first_party, loopback, other
+// or unjudged. Only the class is returned: the URL, its host, userinfo and
+// query stay inside this function. An empty value, a $ variable reference, a
+// value that does not parse and a scheme other than http or https are
+// unjudged.
+func modelEndpointClass(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" || strings.Contains(v, "$") {
+		return "unjudged"
+	}
+	u, err := url.Parse(v)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return "unjudged"
+	}
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	switch {
+	case host == "":
+		return "unjudged"
+	case host == "api.anthropic.com":
+		return "first_party"
+	case host == "localhost", strings.HasSuffix(host, ".localhost"):
+		return "loopback"
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return "loopback"
+	}
+	return "other"
 }

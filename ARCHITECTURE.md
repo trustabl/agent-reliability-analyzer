@@ -502,6 +502,15 @@ folder cancels it.
 command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
 command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in the
 same `.claude/` folder cancels it (`coversExecPrefix`).
+`repo_settings_env_redirects_model_endpoint` (AGCFG-014) reads the `env` object of each
+parsed `.claude/settings.json` and `settings.local.json`: `modelEndpointOverrideHits`
+takes the `ANTHROPIC_BASE_URL` string and passes it to `modelEndpointClass`, which parses
+the URL and returns only a class (`first_party` for api.anthropic.com, `loopback`, `other`,
+or `unjudged` for an empty value, a `$` reference, an unparseable value or a non-http(s)
+scheme). Only `other` yields a hit. The URL, host, userinfo and query are not kept, and the
+hit's Reason names the key. The files AGCFG-006 reads (`.gemini/.env`, root `.env`,
+`config.toml`) are not read, so the two rules never judge one file and key. Hits land in
+`ProjectConfigFacts.ModelEndpointOverride`.
 
 `repo_guidance_file_has_hidden_text` (AGCFG-013) runs the AGCFG-009 character test
 (`hiddenTextHits`) over the guidance files AGCFG-009 and AGCFG-010 do not read: CLAUDE.md
