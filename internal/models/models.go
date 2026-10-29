@@ -285,6 +285,12 @@ const (
 	// ComponentGitHubWorkflow is a workflow file directly under the repo-root
 	// .github/workflows/ (category ci); parsed by DiscoverCIWorkflows.
 	ComponentGitHubWorkflow ComponentKind = "github_workflow"
+	// Agent guidance files read by the hidden-text rule AGCFG-013 (category
+	// agent_config). Each is a distinct kind; none reuses claude_md or agents_md.
+	ComponentGeminiMd           ComponentKind = "gemini_md"           // GEMINI.md at any depth
+	ComponentCursorRule         ComponentKind = "cursor_rule"         // .cursor/rules/**/*.mdc at the repo root
+	ComponentWindsurfRule       ComponentKind = "windsurf_rule"       // .windsurfrules, .windsurf/rules/*.md, .devin/rules/*.md at the repo root
+	ComponentCopilotInstruction ComponentKind = "copilot_instruction" // .github/copilot-instructions.md, .github/instructions/**/*.instructions.md
 )
 
 // AgentComponent is a non-tool agent-related artifact discovered during
@@ -389,7 +395,13 @@ type ScanManifest struct {
 	// WorkflowFiles holds the GitHub Actions workflow files directly under the
 	// repo-root .github/workflows/ (*.yml, *.yaml). Sorted. Kept apart from
 	// YAMLFiles so no existing YAMLFiles consumer sees them.
-	WorkflowFiles          []string         `json:"workflow_files,omitempty"`
+	WorkflowFiles []string `json:"workflow_files,omitempty"`
+	// GuidanceFiles holds the agent guidance files the walk keeps beyond the
+	// ordinary extension lists: .cursor/rules/**/*.mdc, .windsurfrules,
+	// .windsurf/rules and .devin/rules *.md, .github/copilot-instructions.md and
+	// .github/instructions/**/*.instructions.md, all at the repo root. Sorted.
+	// Kept apart from MarkdownFiles so no existing consumer sees them.
+	GuidanceFiles          []string         `json:"guidance_files,omitempty"`
 	HasClaudeSDKDependency bool             `json:"has_claude_sdk_dependency"`
 	HasOpenShellArtifact   bool             `json:"has_openshell_artifact"`
 	Components             []AgentComponent `json:"components,omitempty"`

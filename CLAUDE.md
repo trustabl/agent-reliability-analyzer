@@ -350,6 +350,16 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Hidden text in agent guidance files (2026-10-29, `schema_version` 38 -> 39, provisional; +1 rule):** **AGCFG-013** (medium, 0.6, repo
+> scope, category `agent_config`, new pack file `agent_config/guidance_hidden_text.yaml`) over the new predicate
+> `repo_guidance_file_has_hidden_text`, backed by `ProjectConfigFacts.HiddenGuidanceText`. It reuses `hiddenTextHits` (the AGCFG-009 test and
+> exemptions) over CLAUDE.md, GEMINI.md, repo-root `.cursor/rules/**/*.mdc`, `.windsurfrules`, `.windsurf/rules/*.md`, `.devin/rules/*.md`,
+> `.github/copilot-instructions.md` and `.github/instructions/**/*.instructions.md`. New component kinds `gemini_md`, `cursor_rule`,
+> `windsurf_rule`, `copilot_instruction` and `ScanManifest.GuidanceFiles`; the nine `repo_component_present` hygiene rules match only
+> `agents_md` and `claude_md`, so none changes. Not tested: HTML comments (Claude Code strips them from CLAUDE.md outside code blocks),
+> instruction phrases, encoded text, `.cursorrules`. The fixture holds **386** rules (385 + 1; re-derive). Rulebook doc:
+> `docs/Policy/agent_config/guidance_hidden_text.md`.
+>
 > **MCP client config: unscoped credential and plain http remote (2026-10-28, `schema_version` 37 -> 38, provisional; +2 rules):** **MCPCFG-004**
 > (high, 0.6) over `repo_mcp_config_unscoped_credential` (`ProjectConfigFacts.UnscopedMCPCredential`) and **MCPCFG-005** (medium, 0.6) over
 > `repo_mcp_config_remote_plain_http` (`PlainHTTPMCPServer`), both in `agent_config/mcp_client_config.yaml`; classifiers in

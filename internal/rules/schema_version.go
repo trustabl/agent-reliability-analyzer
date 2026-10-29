@@ -57,4 +57,6 @@ package rules
 //
 // Schema 38 adds the repo_mcp_config_unscoped_credential and
 // repo_mcp_config_remote_plain_http predicates (repo scope).
-const SupportedSchemaVersion = 38
+//
+// Schema 39 adds the repo_guidance_file_has_hidden_text predicate (repo scope).
+const SupportedSchemaVersion = 39

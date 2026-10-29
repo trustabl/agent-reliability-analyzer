@@ -405,6 +405,10 @@ type ProjectConfigFacts struct {
 	// that covers a host serving user-published content, not cancelled by a
 	// deny or ask rule in the same .claude/ folder. AGCFG-011 reads this list.
 	UserContentFetchAllow []ConfigHit `json:"user_content_fetch_allow,omitempty"`
+	// HiddenGuidanceText is the same check over the guidance files AGCFG-009 and
+	// AGCFG-010 do not read: CLAUDE.md, GEMINI.md, Cursor .mdc rules, Windsurf and
+	// Devin rules, and the GitHub Copilot instruction files (AGCFG-013).
+	HiddenGuidanceText []ConfigHit `json:"hidden_guidance_text,omitempty"`
 	// ExecCapableAllow is a Bash allow rule in .claude/settings*.json that ends
 	// in a trailing wildcard on a bare git, xargs or npx command, not cancelled by
 	// a bare-prefix deny or ask rule in the same .claude/ folder. AGCFG-012 reads

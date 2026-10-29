@@ -6,8 +6,8 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 38 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 385 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+Rule schema 31 → 39 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 386 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
 CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
 OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
 ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
@@ -15,6 +15,19 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Added
 
+- **Hidden text in agent guidance files (rule schema 38 → 39, provisional).** New
+  repo-scope predicate `repo_guidance_file_has_hidden_text` and rule **AGCFG-013**
+  (medium, 0.6, pack file `agent_config/guidance_hidden_text.yaml`) apply the AGCFG-009
+  character test (zero-width, Unicode Tags-block and bidirectional override characters,
+  with the same exemptions) to CLAUDE.md, GEMINI.md, repo-root `.cursor/rules/**/*.mdc`,
+  `.windsurfrules`, `.windsurf/rules/*.md`, `.devin/rules/*.md`,
+  `.github/copilot-instructions.md` and `.github/instructions/**/*.instructions.md`.
+  AGENTS.md (AGCFG-009), staged OpenCode guidance (AGCFG-010) and SKILL.md (CSKILL-040)
+  are not read by it. HTML comments, instruction phrases and encoded text are not tested;
+  `.cursorrules` is not read. The walk gains `ScanManifest.GuidanceFiles` and four new
+  component kinds (`gemini_md`, `cursor_rule`, `windsurf_rule`, `copilot_instruction`);
+  no existing component kind, rule match or manifest list changes. Backed by
+  `ProjectConfigFacts.HiddenGuidanceText`.
 - **MCP client config: unscoped credential and plain http remote (rule schema 37 → 38,
   provisional).** Two repo-scope predicates and two rules in
   `agent_config/mcp_client_config.yaml`. `repo_mcp_config_unscoped_credential` and

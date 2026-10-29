@@ -99,3 +99,41 @@ func TestProjectConfig_AgentsMdFeedsOnlyHiddenAgentText(t *testing.T) {
 		t.Errorf("plain AGENTS.md must be silent, got %+v", clean.HiddenAgentText)
 	}
 }
+
+// AGCFG-013 wiring: each guidance component kind feeds HiddenGuidanceText and no
+// other hidden-text list; AGENTS.md and harness guidance stay on their own lists.
+func TestProjectConfig_GuidanceKindsFeedOnlyHiddenGuidanceText(t *testing.T) {
+	cases := []struct {
+		rel  string
+		kind models.ComponentKind
+	}{
+		{"CLAUDE.md", models.ComponentClaudeMd},
+		{"GEMINI.md", models.ComponentGeminiMd},
+		{".cursor/rules/a.mdc", models.ComponentCursorRule},
+		{".windsurfrules", models.ComponentWindsurfRule},
+		{".windsurf/rules/r.md", models.ComponentWindsurfRule},
+		{".github/copilot-instructions.md", models.ComponentCopilotInstruction},
+		{".github/instructions/p.instructions.md", models.ComponentCopilotInstruction},
+	}
+	for _, c := range cases {
+		f := discoverWith(t, c.rel, "plain ​ text\n", c.kind)
+		if len(f.HiddenGuidanceText) != 1 || f.HiddenGuidanceText[0].FilePath != c.rel {
+			t.Errorf("%s: want one hit at the file, got %+v", c.rel, f.HiddenGuidanceText)
+		}
+		if len(f.HiddenAgentText)+len(f.HiddenHarnessText) != 0 {
+			t.Errorf("%s leaked into another hidden-text list: %+v", c.rel, f)
+		}
+		clean := discoverWith(t, c.rel, "# plain guidance\n", c.kind)
+		if len(clean.HiddenGuidanceText) != 0 {
+			t.Errorf("%s: plain file must be silent, got %+v", c.rel, clean.HiddenGuidanceText)
+		}
+	}
+	for _, k := range []struct {
+		rel  string
+		kind models.ComponentKind
+	}{{"AGENTS.md", models.ComponentAgentsMd}, {"systemprompt.md", models.ComponentHarnessGuidance}} {
+		if f := discoverWith(t, k.rel, "x ​ y\n", k.kind); len(f.HiddenGuidanceText) != 0 {
+			t.Errorf("%s must not feed HiddenGuidanceText: %+v", k.rel, f.HiddenGuidanceText)
+		}
+	}
+}

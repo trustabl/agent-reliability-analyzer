@@ -502,6 +502,16 @@ folder cancels it.
 command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
 command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in the
 same `.claude/` folder cancels it (`coversExecPrefix`).
+
+`repo_guidance_file_has_hidden_text` (AGCFG-013) runs the AGCFG-009 character test
+(`hiddenTextHits`) over the guidance files AGCFG-009 and AGCFG-010 do not read: CLAUDE.md
+(existing `claude_md` component), GEMINI.md (`gemini_md`), repo-root `.cursor/rules/**/*.mdc`
+(`cursor_rule`), `.windsurfrules`, `.windsurf/rules/*.md` and `.devin/rules/*.md`
+(`windsurf_rule`), and `.github/copilot-instructions.md` and
+`.github/instructions/**/*.instructions.md` (`copilot_instruction`). The walk records the
+non-CLAUDE.md files in `ScanManifest.GuidanceFiles`; it enters `.windsurf/`, `.devin/` and
+`.github/instructions/` for those files alone, so nothing else under them reaches another
+manifest list. Hits land in `ProjectConfigFacts.HiddenGuidanceText`.
 Settings files are parsed as JSONC (comments and trailing commas stripped), Codex
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set

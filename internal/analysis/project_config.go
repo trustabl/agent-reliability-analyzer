@@ -76,6 +76,9 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 			f.HiddenHarnessText = append(f.HiddenHarnessText, hiddenTextHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentAgentsMd:
 			f.HiddenAgentText = append(f.HiddenAgentText, hiddenTextHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
+		case models.ComponentClaudeMd, models.ComponentGeminiMd, models.ComponentCursorRule,
+			models.ComponentWindsurfRule, models.ComponentCopilotInstruction:
+			f.HiddenGuidanceText = append(f.HiddenGuidanceText, hiddenTextHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentCodexHooks:
 			f.CodexRiskyHooks = append(f.CodexRiskyHooks, codexHooksHits(c.Path, readConfig(manifest.RepoRoot, c.Path))...)
 		case models.ComponentCodexConfig:
@@ -96,6 +99,7 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.CodexRiskyHooks = sortHits(f.CodexRiskyHooks)
 	f.HiddenAgentText = sortHits(f.HiddenAgentText)
 	f.HiddenHarnessText = sortHits(f.HiddenHarnessText)
+	f.HiddenGuidanceText = sortHits(f.HiddenGuidanceText)
 	f.UserContentFetchAllow = sortHits(f.UserContentFetchAllow)
 	f.ExecCapableAllow = sortHits(f.ExecCapableAllow)
 	return f

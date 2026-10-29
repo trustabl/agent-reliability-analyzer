@@ -159,6 +159,7 @@ type MatchExpr struct {
 	RepoCodexHookRunsRepoCommand         *bool `yaml:"repo_codex_hook_runs_repo_command,omitempty"`
 	RepoAgentsMdHasHiddenText            *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
 	RepoHarnessGuidanceHasHiddenText     *bool `yaml:"repo_harness_guidance_has_hidden_text,omitempty"`
+	RepoGuidanceFileHasHiddenText        *bool `yaml:"repo_guidance_file_has_hidden_text,omitempty"`
 
 	// CI workflow predicates (category ci). Each is true when the corresponding
 	// CIWorkflowFacts slice is non-empty (one hit per agent step; per checkout step for CI-003).
