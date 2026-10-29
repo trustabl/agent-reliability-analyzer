@@ -497,6 +497,11 @@ Server `env` maps and docker `-e` arguments are read by key name; the value of
 matches each WebFetch allow entry against a fixed host list using the documented
 `domain:` rules (`webFetchCovers`), and a deny or ask rule in the same `.claude/`
 folder cancels it.
+`repo_settings_allow_exec_capable_prefix` (AGCFG-012) reads the same parsed rules:
+`execCapableAllowHits` flags a `Bash` allow entry that is a bare `git`, `xargs` or `npx`
+command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
+command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in the
+same `.claude/` folder cancels it (`coversExecPrefix`).
 Settings files are parsed as JSONC (comments and trailing commas stripped), Codex
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set

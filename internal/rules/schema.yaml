@@ -846,6 +846,13 @@ rules:
 #       Bare WebFetch and domain:* count. A deny or ask rule in the same .claude/
 #       folder covering the host cancels it (ProjectConfigFacts.UserContentFetchAllow).
 #       The entry is named in the hit's Reason, never in the finding text. AGCFG-011.
+#   repo_settings_allow_exec_capable_prefix: true | false
+#       A Bash rule in permissions.allow of .claude/settings.json or
+#       settings.local.json is a bare git, xargs or npx command followed by a
+#       trailing wildcard ("git:*" or "git *"). A narrower prefix and an exact
+#       command are not matched. A bare Bash, Bash(*) or same-prefix deny or ask
+#       rule in the same .claude/ folder cancels it (ProjectConfigFacts.ExecCapableAllow).
+#       The entry is named in the hit's Reason, never in the finding text. AGCFG-012.
 #   repo_claude_default_mode_is: [bypassPermissions, acceptEdits, ...]
 #       Fires when any discovered .claude/settings.json (or settings.local.json)
 #       declares a defaultMode equal to one of the listed modes. Reads

@@ -1,0 +1,49 @@
+policy:
+  id: agent_config_exec_capable_allow
+  name: Exec-capable pre-approved command prefix
+  category: agent_config
+  description: >
+    Repo-scoped rule for Claude Code allow rules committed to a repository
+    that approve a command prefix whose program can run another program.
+    Claude Code applies a project's allow rules after the user accepts the
+    workspace trust dialog, so this is not a pre-trust rule like AGCFG-004 and
+    AGCFG-005. The pack loads for each scan (the files it reads have no SDK
+    import), so the rule's own predicate does the gating. Fires once per scan,
+    attributed to the first offending allow entry.
+
+rules:
+  - id: AGCFG-012
+    title: Project settings pre-approve a command prefix that can run other programs
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_settings_allow_exec_capable_prefix: true
+    explanation: >
+      A committed .claude/settings.json or .claude/settings.local.json lists a
+      Bash rule in permissions.allow that is a bare git, xargs or npx command
+      followed by a trailing wildcard, such as Bash(git:*) or Bash(npx *).
+      Claude Code's permissions page states that a wildcard in place of a git
+      subcommand matches the git options before it, including -c, which makes
+      git run a program you name; that an xargs invocation with flags is matched
+      as an xargs command; and that npx executes its arguments as a command and
+      is not one of the wrappers Claude Code strips before matching. A prefix
+      rule on one of these commands therefore approves more than the command the
+      author had in mind, and no prompt lets the developer stop the call. Claude
+      Code applies these allow rules once the user accepts the workspace trust
+      dialog. Limits of this check: it reads the permissions block of the
+      .claude/ settings files in the repo. A bare Bash, Bash(*) or same-prefix
+      deny or ask rule in a settings file in the same .claude/ folder cancels
+      the finding; deny and ask rules in user or managed settings, hooks and
+      prompt-time approvals are not seen. A narrower prefix such as
+      Bash(git status *) and an exact command such as Bash(git status) are not
+      flagged. A bare Bash or Bash(*) allow rule, and other programs that can run
+      commands, are not judged. The command list is fixed.
+    fix: >
+      Replace the wildcard with exact commands that name the subcommand and
+      arguments, such as Bash(git status) and Bash(git diff --stat). To make the
+      prefix prompt or be refused for the whole team, add it to permissions.ask
+      or permissions.deny in the committed settings; deny rules win over allow
+      rules from any scope, and ask rules are evaluated before allow rules.

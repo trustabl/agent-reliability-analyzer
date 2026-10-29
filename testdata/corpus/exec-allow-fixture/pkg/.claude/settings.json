@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash(npx:*)", "Bash(git status *)", "Bash(find:*)"],
+    "deny": ["Bash(npx *)"]
+  }
+}

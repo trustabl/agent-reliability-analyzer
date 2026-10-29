@@ -29,6 +29,7 @@ These were authored in this repository as test fixtures.
 | `mcp-unpinned-launch-fixture/` | Synthetic MCP client configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`) pairing unpinned and pinned package launches (npx, bunx, uvx, pipx, docker) for MCPCFG-003. All package and image names are fake placeholders |
 | `mcp-credential-scope-fixture/` | Synthetic MCP client configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, `.codex/config.toml`, `claude_desktop_config.json`) pairing unscoped and scoped credentials for MCPCFG-004 and plain http and https or loopback remote URLs for MCPCFG-005. All host, package and project names are fake placeholders; tokens appear only as `${VAR}` references |
 | `fetch-permissions-fixture/` | Synthetic `.claude/settings.json` and `settings.local.json` pairing WebFetch allow rules for user-content hosts with a non-listed host, a single-account site and a same-folder deny, for AGCFG-011. All values are placeholders |
+| `exec-allow-fixture/` | Synthetic `.claude/settings.json` files pairing Bash allow rules on a bare git, xargs and npx prefix with exact commands, a narrower git prefix, a find prefix and a same-folder deny, for AGCFG-012. All values are placeholders |
 
 ## Vendored from `openai/openai-agents-python` (MIT)
 
