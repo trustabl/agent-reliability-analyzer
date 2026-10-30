@@ -447,6 +447,71 @@ func TestScan_LangChainDemoFiresExpectedRules(t *testing.T) {
 	}
 }
 
+// The Strands demo has two agents whose tools=[...] lists mix @tool functions,
+// strands_tools tools and an MCPClient. Strands ships no rule pack yet, so the
+// scan says so (META-001) instead of reading as a clean bill of health, and the
+// declared strands-agents dependency is not reported as unused (META-002).
+func TestScan_StrandsDemoDiscovered(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "strands-demo")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+
+	var sawStrands bool
+	for _, s := range res.SDKs {
+		if s == models.SDKStrands {
+			sawStrands = true
+		}
+	}
+	if !sawStrands {
+		t.Errorf("expected strands in ScanResult.SDKs, got %+v", res.SDKs)
+	}
+
+	agents := map[string]models.AgentDef{}
+	for _, a := range res.Agents {
+		if a.SDK == models.SDKStrands {
+			agents[a.Name] = a
+		}
+	}
+	if len(agents) != 2 {
+		t.Fatalf("got Strands agents %+v, want weather and ops", agents)
+	}
+	if got := len(agents["weather"].HostedToolRefs); got != 1 {
+		t.Errorf("weather: %d hosted tools, want 1 (http_request)", got)
+	}
+	if got := len(agents["ops"].HostedToolRefs); got != 2 {
+		t.Errorf("ops: %d hosted tools, want 2 (shell, file_write)", got)
+	}
+	if got := len(agents["ops"].MCPServerRefs); got != 1 {
+		t.Errorf("ops: %d MCP servers, want 1", got)
+	}
+
+	var tools int
+	for _, td := range res.Tools {
+		if td.Kind == models.KindStrandsTool {
+			tools++
+		}
+	}
+	if tools != 2 {
+		t.Errorf("got %d Strands tools, want 2 (get_weather, save_note)", tools)
+	}
+
+	var meta001 bool
+	for _, f := range res.Findings {
+		if f.RuleID == "META-001" && strings.Contains(f.Explanation, `"strands"`) {
+			meta001 = true
+		}
+		if f.RuleID == "META-002" && strings.Contains(f.Explanation, "strands-agents") {
+			t.Errorf("strands-agents reported as unused: %s", f.Explanation)
+		}
+	}
+	if !meta001 {
+		t.Errorf("expected META-001 naming strands")
+	}
+}
+
 func TestScan_SkillMissingDescription(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "skill-missing-description")

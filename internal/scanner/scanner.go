@@ -219,6 +219,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 	agents = append(agents, analysis.DiscoverCrewAIAgents(parsed)...)
 	agents = append(agents, analysis.DiscoverAutoGenAgents(parsed)...)
 	agents = append(agents, analysis.DiscoverPydanticAIAgents(parsed)...)
+	agents = append(agents, analysis.DiscoverStrandsAgents(parsed)...)
 	tools = append(tools, analysis.DiscoverADKTools(parsed)...)
 	tools = append(tools, analysis.DiscoverLangChainTools(parsed)...)
 	tools = append(tools, analysis.DiscoverLangGraphNodes(parsed)...)
@@ -709,6 +710,8 @@ func deriveSDKsDetected(tools []models.ToolDef, agents []models.AgentDef, subage
 			seen[models.SDKCrewAI] = true
 		case models.KindPydanticAITool:
 			seen[models.SDKPydanticAI] = true
+		case models.KindStrandsTool:
+			seen[models.SDKStrands] = true
 		case models.KindVercelAITool:
 			seen[models.SDKVercelAI] = true
 		case models.KindAutoGenTool:

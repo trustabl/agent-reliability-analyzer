@@ -1826,6 +1826,7 @@ var toolSpanKinds = map[models.ToolKind]bool{
 	models.KindPydanticAITool:  true,
 	models.KindVercelAITool:    true,
 	models.KindAutoGenTool:     true,
+	models.KindStrandsTool:     true,
 }
 
 // PredRepoOtelLabelsImplemented reports whether the labels a started run

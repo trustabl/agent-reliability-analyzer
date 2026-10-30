@@ -104,6 +104,12 @@ func ResolveEdges(inv *models.RepoInventory, parsed []ParsedFile) {
 	}
 
 	importsByFile := buildImportsByFile(parsed)
+	strandsMCPByFile := make(map[string]map[string]models.MCPServerDef)
+	for _, pf := range parsed {
+		if m := strandsMCPClients(pf); len(m) > 0 {
+			strandsMCPByFile[pf.RelPath] = m
+		}
+	}
 
 	mcpAliasesByFile := make(map[string]map[string]models.MCPServerDef)
 	for _, pf := range parsed {
@@ -142,6 +148,31 @@ func ResolveEdges(inv *models.RepoInventory, parsed []ParsedFile) {
 			toolsKwarg := agentKwarg(a, "tools")
 			if toolsKwarg != nil && toolsKwarg.Value != nil && toolsKwarg.Value.Kind == models.ExprList {
 				for _, item := range toolsKwarg.Value.List {
+					// Strands takes its ready-made tools and MCP servers in the same
+					// tools=[...] list as its @tool functions: a strands_tools name
+					// becomes a HostedToolRef and an MCPClient an MCPServerRef.
+					if a.SDK == models.SDKStrands {
+						if h, ok := classifyStrandsHostedTool(item, a.FilePath, importsByFile[a.FilePath]); ok {
+							inv.HostedTools = append(inv.HostedTools, h)
+							a.HostedToolRefs = append(a.HostedToolRefs, models.HostedToolRef{
+								Class:    h.Class,
+								DefIndex: len(inv.HostedTools) - 1,
+							})
+							continue
+						}
+						m, ok := classifyStrandsMCPClientCall(item, a.FilePath)
+						if !ok && item.Kind == models.ExprNameRef {
+							m, ok = strandsMCPByFile[a.FilePath][item.Text]
+						}
+						if ok {
+							inv.MCPServers = append(inv.MCPServers, m)
+							a.MCPServerRefs = append(a.MCPServerRefs, models.MCPServerRef{
+								Class:    m.Class,
+								DefIndex: len(inv.MCPServers) - 1,
+							})
+							continue
+						}
+					}
 					// Hosted-tool call (e.g. WebSearchTool(), BashTool()) — emit a
 					// HostedToolDef and a HostedToolRef. These never resolve to a
 					// ToolDef. Classification is dispatched by the agent's SDK: each
@@ -203,7 +234,18 @@ func ResolveEdges(inv *models.RepoInventory, parsed []ParsedFile) {
 					a.ToolRefs = append(a.ToolRefs, ref)
 				}
 			} else if toolsKwarg != nil {
-				a.Opaque = true
+				// Strands' documented MCP shape hands the agent a client's tool
+				// list: tools=client.list_tools_sync(). The tools are the server's,
+				// so record the server rather than give up on the agent.
+				if m, ok := strandsListToolsClient(a, toolsKwarg.Value, strandsMCPByFile[a.FilePath]); ok {
+					inv.MCPServers = append(inv.MCPServers, m)
+					a.MCPServerRefs = append(a.MCPServerRefs, models.MCPServerRef{
+						Class:    m.Class,
+						DefIndex: len(inv.MCPServers) - 1,
+					})
+				} else {
+					a.Opaque = true
+				}
 			}
 
 			// Pydantic AI native (built-in) tools live under capabilities= and

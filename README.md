@@ -122,7 +122,8 @@ CI-friendly exit codes · also runs as a local stdio MCP server (`trustabl mcp`)
 
 Deepest coverage for **Claude Agent SDK**, **OpenAI Agents SDK**, **Google ADK**,
 and **MCP servers**. Also scans LangChain / LangGraph, CrewAI, AutoGen / AG2,
-Pydantic AI, and the Vercel AI SDK — see [COVERAGE.md](COVERAGE.md) for the full
+Pydantic AI, and the Vercel AI SDK. Strands Agents is discovered (agents, tools,
+MCP servers) but has no rules yet — see [COVERAGE.md](COVERAGE.md) for the full
 matrix.
 
 Scanning needs no key and no network. Applying fixes uses your own Anthropic,
@@ -360,10 +361,11 @@ diagram with typed inputs at each step.
 Tool/agent AST discovery is wired for:
 
 - **Python** — Claude Agent SDK (decorators), OpenAI Agents SDK, Google
-  ADK, LangChain / LangGraph, CrewAI, AutoGen / AG2, and Pydantic AI.
+  ADK, LangChain / LangGraph, CrewAI, AutoGen / AG2, Pydantic AI, and
+  Strands Agents (discovery only; no Strands rules yet).
   Discovery extracts tool definitions, agent constructors, hosted
   tools, MCP servers, guardrails, sessions. The bare `Agent(...)`
-  constructor shared by OpenAI / ADK / CrewAI / Pydantic AI is
+  constructor shared by OpenAI / ADK / CrewAI / Pydantic AI / Strands is
   import-gated per SDK so the classes never cross-match, and the
   shared `@tool` decorator is routed to the owning SDK by its import
   binding.
@@ -1529,7 +1531,7 @@ No. Those tools observe and evaluate agents at runtime; Agent Reliability Analyz
 No. Scanning is local and deterministic — no LLM, no code upload. By default it downloads the latest rules and vulnerability data; `--no-rules-update` runs fully offline from the local cache. `trustabl enrich` is opt-in and uses your own LLM key. Telemetry is off by default.
 
 **Which agent frameworks does it support?**
-Nine SDKs, including Claude Agent SDK, OpenAI Agents SDK, Google ADK, LangChain / LangGraph, CrewAI, AutoGen / AG2 and Pydantic AI. Full list: [COVERAGE.md](COVERAGE.md).
+Nine SDKs, including Claude Agent SDK, OpenAI Agents SDK, Google ADK, LangChain / LangGraph, CrewAI, AutoGen / AG2 and Pydantic AI. Strands Agents is discovered but not yet audited. Full list: [COVERAGE.md](COVERAGE.md).
 
 ## Part of Trustabl's open-source agent reliability tooling
 
