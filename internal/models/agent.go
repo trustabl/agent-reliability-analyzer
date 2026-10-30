@@ -173,7 +173,7 @@ type HostedToolRef struct {
 type MCPServerDef struct {
 	Class     string     `json:"class"`
 	VarName   string     `json:"var_name,omitempty"` // const-binding name (TS); empty for Python
-	Transport string     `json:"transport"`          // "stdio" | "sse" | "streamable_http" | "http" | "sdk"
+	Transport string     `json:"transport"`          // "stdio" | "sse" | "streamable_http" | "http" | "sdk" | "unknown" (a Strands MCPClient whose transport is built elsewhere)
 	SDK       SDK        `json:"sdk"`
 	Language  Language   `json:"language"` // populated by every discovery path
 	Location             // file_path / start_line / end_line (flat in JSON via anonymous embed)
