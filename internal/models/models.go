@@ -142,6 +142,10 @@ const (
 	KindPydanticAITool ToolKind = "pydantic_ai_tool"
 	KindVercelAITool   ToolKind = "vercel_ai_tool"
 	KindAutoGenTool    ToolKind = "autogen_tool"
+	// KindStrandsTool is a Strands Agents SDK tool: a function decorated with
+	// the `tool` the `strands` package exports. Import-gated like the other
+	// `@tool` SDKs.
+	KindStrandsTool ToolKind = "strands_tool"
 	// KindLangGraphNode is a plain function registered as a LangGraph graph node
 	// via <builder>.add_node(name, func) / add_node(func). It is not a @tool —
 	// no tool-discovery pass sees it — but it runs automatically on every graph
@@ -430,6 +434,7 @@ const (
 	SDKPydanticAI     SDK = "pydantic_ai"
 	SDKVercelAI       SDK = "vercel_ai"
 	SDKAutoGen        SDK = "autogen"
+	SDKStrands        SDK = "strands"
 )
 
 // "openshell" is intentionally NOT in the SDK enum: it is not a library

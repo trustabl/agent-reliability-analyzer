@@ -34,7 +34,7 @@ added or changed without rebuilding or redistributing the scanner.
 
 Trustabl ships with **Python and TypeScript tool/agent discovery** wired
 in. Python covers the OpenAI Agents SDK, Google ADK, Claude Agent SDK
-(via decorators), CrewAI, AutoGen / AG2, and Pydantic AI. TypeScript covers the Claude Agent SDK (via `tool()` /
+(via decorators), CrewAI, AutoGen / AG2, Pydantic AI, and Strands Agents (discovery only; no Strands rule pack yet). TypeScript covers the Claude Agent SDK (via `tool()` /
 `query()` / `createSdkMcpServer()` / typed-const `AgentDefinition` shapes
 in `.ts`/`.tsx`/`.mts`/`.cts`) and the OpenAI Agents SDK (via `tool({...})`
 / `new Agent({...})` / `Agent.create({...})` / 9 hosted-tool factories
@@ -1184,6 +1184,21 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   (`agent_run_call_usage_limits_missing`) reads `RepoInventory.AgentRunCalls`
   for this agent's `usage_limits`, not the constructor. The bare-`tools=[fn]` ToolDef
   shape and the `RunContext` param-strip for PYD-002 remain v1 gaps.
+- **DiscoverStrandsAgents** (`strands_agents.go`) — Python Strands Agents.
+  Import-bound rather than import-gated: only a callee bound to the `Agent` the
+  `strands` package exports (`from strands import Agent [as X]`, or
+  `strands.Agent` / `<alias>.Agent` after `import strands [as alias]`) is an
+  agent, normalized to Class `StrandsAgent`, so a Pydantic or OpenAI `Agent` in
+  the same file is never claimed. Tools: `@tool` bound to `strands` (or
+  `@strands.tool`) routes to `KindStrandsTool` in `kindFromDecorators`. Strands
+  takes everything else through the one `tools=[...]` list, which `ResolveEdges`
+  reads for Strands agents before the generic handling: a name bound to the
+  `strands_tools` package in `StrandsHostedToolClasses` (11 risky tools) becomes a
+  `HostedToolDef`, and an inline `MCPClient(...)`, a same-file `MCPClient`
+  variable, or a `tools=<client>.list_tools_sync()` value becomes an
+  `MCPServerDef` (transport from the transport factory or `url=`). Strands has no
+  rule pack, so `SDKStrands` is not in `shippedPolicySDKs` and a Strands repo
+  gets META-001. `strands-agents` is a dep needle for META-002.
 - **DiscoverTSVercelTools / DiscoverTSVercelAgents** (`ts_vercel_tools.go`,
   `ts_vercel_agents.go`, `ts_vercel_hosted_tools.go`) — TS Vercel AI SDK,
   import-gated to the bare `ai` core module (the disambiguator from the
@@ -1342,7 +1357,7 @@ than just text matching.
    | Decorator callee                  | ToolKind              | Notes                       |
    | --------------------------------- | --------------------- | --------------------------- |
    | `function_tool` (any args)        | `KindOpenAITool`      | OpenAI Agents SDK           |
-   | bare `tool` / `claude_tool` bound by import | resolved SDK | The unqualified `@tool` is shared by the Claude SDK, LangChain, and CrewAI; `collectToolImports` resolves it to `KindClaudeSDKTool` / `KindLangChainTool` / `KindCrewAITool` by the **import binding** of the `tool` symbol (last-binding-wins), with a file-level import-presence fallback for a star-import / locally defined `tool` |
+   | bare `tool` / `claude_tool` bound by import | resolved SDK | The unqualified `@tool` is shared by the Claude SDK, LangChain, and CrewAI; `collectToolImports` resolves it to `KindClaudeSDKTool` / `KindLangChainTool` / `KindCrewAITool` / `KindStrandsTool` by the **import binding** of the `tool` symbol (last-binding-wins), with a file-level import-presence fallback for a star-import / locally defined `tool` |
    | `<agentvar>.tool`, `<agentvar>.tool_plain` (attribute) | `KindPydanticAITool` | Pydantic AI context tools — routed ONLY when the file imports `pydantic_ai` AND does NOT import the Claude SDK (the `&& !claudeImport` guard is load-bearing: the Claude SDK also exposes `@agent.tool`, so a Claude-only file and a both-importing file fall through to the `agent.tool` → Claude case below) |
    | `agent.tool`, or a callee containing `claude_agent_sdk` | `KindClaudeSDKTool` | Claude Agent SDK (pre-1.0 — names still in flux); wins the `@agent.tool` collision with Pydantic |
    | `server.tool`, `mcp.tool`, `*.register_tool` | `KindMCPTool`  | MCP server registrations    |

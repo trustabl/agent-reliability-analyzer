@@ -33,6 +33,7 @@ var depNameToSDK = map[string]models.SDK{
 	"crewai":           models.SDKCrewAI,
 	"autogen":          models.SDKAutoGen,
 	"pydantic-ai":      models.SDKPydanticAI,
+	"strands-agents":   models.SDKStrands,
 	"vercel-ai":        models.SDKVercelAI,
 }
 

@@ -104,6 +104,7 @@ func toolsInFile(pf ParsedFile) []models.ToolDef {
 	claudeImport := fileImportsClaudeSDK(pf)
 	crewaiImport := fileImportsCrewAI(pf)
 	pydanticImport := fileImportsPydanticAI(pf)
+	strandsImport := fileImportsStrands(pf)
 
 	// Pass 1: decorated functions.
 	for _, dec := range astutil.FindAll(root, "decorated_definition") {
@@ -111,7 +112,7 @@ func toolsInFile(pf ParsedFile) []models.ToolDef {
 		if fn == nil {
 			continue
 		}
-		kind := kindFromDecorators(astutil.Decorators(dec), pf.Source, toolImports, lcImport, claudeImport, crewaiImport, pydanticImport)
+		kind := kindFromDecorators(astutil.Decorators(dec), pf.Source, toolImports, lcImport, claudeImport, crewaiImport, pydanticImport, strandsImport)
 		if kind == models.KindUnknown {
 			continue
 		}
@@ -158,7 +159,7 @@ func toolsInFile(pf ParsedFile) []models.ToolDef {
 
 // kindFromDecorators inspects decorator nodes and decides which SDK's tool this
 // looks like — Claude Agent SDK, OpenAI Agents SDK, MCP, Pydantic AI, LangChain,
-// or CrewAI — or neither. Conservative: when in doubt, return Unknown — a false
+// CrewAI, or Strands — or neither. Conservative: when in doubt, return Unknown — a false
 // negative is fixable by adding a recognizer; a false positive triggers detectors
 // on user code that isn't even a tool. Precedence is order-sensitive: the
 // Pydantic `.tool` / `.tool_plain` attribute shape is handled first (and excludes
@@ -168,7 +169,7 @@ func toolsInFile(pf ParsedFile) []models.ToolDef {
 // Order matters: @function_tool is OpenAI Agents SDK and is checked before
 // the more permissive "@tool" Claude SDK match (which would otherwise swallow
 // "@function_tool" via substring).
-func kindFromDecorators(decs []*sitter.Node, src []byte, toolImports map[string]models.ToolKind, lcImport, claudeImport, crewaiImport, pydanticImport bool) models.ToolKind {
+func kindFromDecorators(decs []*sitter.Node, src []byte, toolImports map[string]models.ToolKind, lcImport, claudeImport, crewaiImport, pydanticImport, strandsImport bool) models.ToolKind {
 	for _, d := range decs {
 		// Match on the decorator's resolved callee path (e.g. "function_tool",
 		// "agent.tool", "server.tool", "app.register_tool"), not a substring of
@@ -230,13 +231,19 @@ func kindFromDecorators(decs []*sitter.Node, src []byte, toolImports map[string]
 			// are present. The extra !crewaiImport / !lcImport guards are no-ops
 			// for existing repos (those flags were always false before CrewAI),
 			// so this only adds the new CrewAI arm without changing prior routing.
-			if lcImport && !claudeImport && !crewaiImport {
+			if lcImport && !claudeImport && !crewaiImport && !strandsImport {
 				return models.KindLangChainTool
 			}
-			if crewaiImport && !claudeImport && !lcImport {
+			if crewaiImport && !claudeImport && !lcImport && !strandsImport {
 				return models.KindCrewAITool
 			}
+			if strandsImport && !claudeImport && !lcImport && !crewaiImport {
+				return models.KindStrandsTool
+			}
 			return models.KindClaudeSDKTool
+		// Strands, module-qualified after `import strands`.
+		case callee == "strands.tool":
+			return models.KindStrandsTool
 		case callee == "claude_tool" || last == "claude_tool",
 			callee == "agent.tool",
 			strings.HasPrefix(callee, "claude_agent_sdk."):
@@ -278,6 +285,8 @@ func collectToolImports(pf ParsedFile) map[string]models.ToolKind {
 			sdk = models.KindCrewAITool
 		case module == "claude_agent_sdk" || strings.HasPrefix(module, "claude_agent_sdk."):
 			sdk = models.KindClaudeSDKTool
+		case isStrandsModule(module):
+			sdk = models.KindStrandsTool
 		default:
 			return true
 		}

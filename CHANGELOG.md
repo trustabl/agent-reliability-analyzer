@@ -15,6 +15,15 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Added
 
+- **Strands Agents discovery (Python).** The scanner now finds Strands agents
+  (`Agent(...)` bound to the `strands` package, Class `StrandsAgent`), their
+  `@tool` functions (`strands_tool`), the risky ready-made tools from
+  `strands_tools` (`shell`, `python_repl`, `use_computer`, `load_tool`, `cron`,
+  `file_write`, `editor`, `http_request`, `mcp_client`, `use_aws`,
+  `environment`) as hosted tools, and MCP servers wired as `MCPClient` tool
+  providers, including `tools=client.list_tools_sync()`. `strands-agents` is a
+  new dependency needle. No Strands rule pack ships yet, so a Strands repo gets
+  META-001 rather than a clean result.
 - **Model endpoint override in project settings (rule schema 39 → 40, provisional).** New
   repo-scope predicate `repo_settings_env_redirects_model_endpoint` and rule **AGCFG-014**
   (medium, 0.5, pack file `agent_config/model_endpoint_override.yaml`) flag an

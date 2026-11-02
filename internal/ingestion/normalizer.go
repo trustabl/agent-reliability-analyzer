@@ -295,6 +295,11 @@ func detectSDKDeps(root string) []models.SDKDep {
 		// and would over-match nearly every FastAPI project.
 		{Name: "pydantic-ai", Pattern: "pydantic-ai",
 			Manifests: []string{"pyproject.toml", "requirements.txt", "Pipfile", "poetry.lock"}},
+		// Strands Agents SDK (Python). "strands-agents" also matches the
+		// separate strands-agents-tools package, which is only ever installed
+		// beside the SDK.
+		{Name: "strands-agents", Pattern: "strands-agents",
+			Manifests: []string{"pyproject.toml", "requirements.txt", "Pipfile", "poetry.lock"}},
 		// AutoGen / AG2 (Python). Two upstream lines: the AG2 fork (pyautogen / ag2)
 		// and Microsoft's autogen-agentchat / autogen-core / autogen-ext.
 		{Name: "autogen", Pattern: "pyautogen",

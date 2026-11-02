@@ -52,3 +52,16 @@ func TestDeriveSDKsDetected_NoSettingsNoClaude(t *testing.T) {
 		t.Errorf("OpenAI-only repo: SDKsDetected = %v, want %q", got, models.SDKOpenAIAgents)
 	}
 }
+
+// A Strands @tool function, or a Strands agent with no tools of its own, marks
+// the repo as using Strands.
+func TestDeriveSDKsDetected_Strands(t *testing.T) {
+	tools := []models.ToolDef{{Kind: models.KindStrandsTool}}
+	if got := deriveSDKsDetected(tools, nil, nil, nil, nil); !hasSDK(got, models.SDKStrands) {
+		t.Errorf("Strands tool: SDKsDetected = %v, want %q", got, models.SDKStrands)
+	}
+	agents := []models.AgentDef{{SDK: models.SDKStrands}}
+	if got := deriveSDKsDetected(nil, agents, nil, nil, nil); !hasSDK(got, models.SDKStrands) {
+		t.Errorf("Strands agent: SDKsDetected = %v, want %q", got, models.SDKStrands)
+	}
+}
