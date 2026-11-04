@@ -39,8 +39,8 @@ rules:
       the finding; deny and ask rules in user or managed settings, hooks and
       prompt-time approvals are not seen. A narrower prefix such as
       Bash(git status *) and an exact command such as Bash(git status) are not
-      flagged. A bare Bash or Bash(*) allow rule, and other programs that can run
-      commands, are not judged. The command list is fixed.
+      flagged. A bare Bash or Bash(*) allow rule is AGCFG-016's concern; other
+      programs that can run commands are not judged. The command list is fixed.
     fix: >
       Replace the wildcard with exact commands that name the subcommand and
       arguments, such as Bash(git status) and Bash(git diff --stat). To make the

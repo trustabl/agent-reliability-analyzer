@@ -172,6 +172,8 @@ type MatchExpr struct {
 	RepoSettingsPreapproveUserContentFetch *bool `yaml:"repo_settings_preapprove_user_content_fetch,omitempty"`
 	RepoSettingsAllowExecCapablePrefix     *bool `yaml:"repo_settings_allow_exec_capable_prefix,omitempty"`
 	RepoSettingsEnvRedirectsModelEndpoint  *bool `yaml:"repo_settings_env_redirects_model_endpoint,omitempty"`
+	RepoSettingsAllowAllBash               *bool `yaml:"repo_settings_allow_all_bash,omitempty"`
+	RepoScriptRunsAgentCliWithBypassFlag   *bool `yaml:"repo_script_runs_agent_cli_with_bypass_flag,omitempty"`
 
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.

@@ -1,0 +1,8 @@
+{
+  "name": "agcfg-bypass-fixture",
+  "private": true,
+  "scripts": {
+    "lint": "claude -p lint --dangerously-skip-permissions",
+    "postinstall": "node scripts/telemetry.js"
+  }
+}

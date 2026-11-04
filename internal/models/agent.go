@@ -419,6 +419,15 @@ type ProjectConfigFacts struct {
 	// loopback address. The host is reduced to that class inside
 	// modelEndpointClass and never stored. AGCFG-014 reads this list.
 	ModelEndpointOverride []ConfigHit `json:"model_endpoint_override,omitempty"`
+	// ScriptAgentBypass is a package.json lifecycle script, a .husky hook line or a
+	// JS/TS process-spawn call that starts claude, gemini, codex, aider or "q chat"
+	// with a flag its vendor documents as turning off approvals or the sandbox. The
+	// Reason names the binary and flag only. AGCFG-015 reads this list.
+	ScriptAgentBypass []ConfigHit `json:"script_agent_bypass,omitempty"`
+	// AllowAllBash is a bare Bash or Bash(*) entry in permissions.allow of
+	// .claude/settings*.json that no bare Bash or Bash(*) deny or ask rule in the
+	// same .claude/ folder cancels. AGCFG-016 reads this list.
+	AllowAllBash []ConfigHit `json:"allow_all_bash,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

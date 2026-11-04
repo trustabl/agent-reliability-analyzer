@@ -396,6 +396,10 @@ type ScanManifest struct {
 	// repo-root .github/workflows/ (*.yml, *.yaml). Sorted. Kept apart from
 	// YAMLFiles so no existing YAMLFiles consumer sees them.
 	WorkflowFiles []string `json:"workflow_files,omitempty"`
+	// HuskyFiles holds the hook files directly under a .husky/ directory (any
+	// depth; the generated .husky/_ helper directory is left out). Sorted. Read by
+	// AGCFG-015 only.
+	HuskyFiles []string `json:"husky_files,omitempty"`
 	// GuidanceFiles holds the agent guidance files the walk keeps beyond the
 	// ordinary extension lists: .cursor/rules/**/*.mdc, .windsurfrules,
 	// .windsurf/rules and .devin/rules *.md, .github/copilot-instructions.md and

@@ -1,0 +1,54 @@
+policy:
+  id: agent_config_script_agent_bypass
+  name: Agent CLI started with approvals or sandbox disabled by a committed script
+  category: agent_config
+  description: >
+    Repo-scoped rule for scripts committed to a repository that start a
+    coding-agent command line with a flag that turns off approval prompts or the
+    sandbox. It reads package.json lifecycle scripts, .husky hook files and
+    JavaScript or TypeScript process-spawn calls. The pack loads for each scan
+    (the files it reads have no SDK import), so the rule's own predicate does the
+    gating. Fires once per scan, attributed to the first offending script.
+
+rules:
+  - id: AGCFG-015
+    title: Committed script runs an agent CLI with approvals or sandbox disabled
+    severity: high
+    confidence: 0.6
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_script_runs_agent_cli_with_bypass_flag: true
+    explanation: >
+      A package.json lifecycle script (preinstall, install, postinstall or
+      prepare), a .husky hook file, or a JavaScript or TypeScript process-spawn
+      call (spawn, spawnSync, exec, execSync, execFile, execFileSync or Bun.spawn)
+      starts claude, gemini, codex or aider together with a flag its vendor
+      documents as turning off permission prompts or the sandbox:
+      --dangerously-skip-permissions or --permission-mode bypassPermissions for
+      claude; --yolo or --approval-mode yolo for gemini;
+      --dangerously-bypass-approvals-and-sandbox or --yolo for codex;
+      --yes-always for aider. The form "q chat" with --trust-all-tools is also
+      matched. The agent then runs with the developer's own logged-in session and
+      no prompt. Snyk's analysis of the compromised nx packages shows a script run
+      from a postinstall hook whose configuration launches claude with
+      --dangerously-skip-permissions, gemini with --yolo and q with chat and
+      --trust-all-tools. Limits of this check: it reads package.json lifecycle
+      scripts, .husky files and JavaScript and TypeScript files outside test
+      paths. In a spawn call the binary and the flag must both be string literals
+      in the same call; a value held in a variable, a command built at run time,
+      and a call through another helper are not seen. A spawn call that takes the
+      binary or the flags from an object or array defined elsewhere, as in the
+      configuration entries the Snyk post shows, is not matched. Named package.json
+      scripts,
+      Makefiles, shell scripts, workflow run steps (the CI rules read those),
+      README text and a command split over several lines are not judged. A
+      binary other than the ones listed is not judged. The check cannot tell a
+      script written by the project's own developers for their use from one added
+      to attack them.
+    fix: >
+      Remove the flag and grant the agent the specific tools the task needs, for
+      example claude -p "summarize" --allowedTools Read. If the script must run
+      unattended, run it in a container or CI job that holds no credentials, not in
+      the developer's login session.

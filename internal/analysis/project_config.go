@@ -68,6 +68,12 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	// AGCFG-014: ANTHROPIC_BASE_URL in a settings env block pointing off-vendor.
 	f.ModelEndpointOverride = modelEndpointOverrideHits(manifest.RepoRoot, claude)
 
+	// AGCFG-016: a bare Bash or Bash(*) allow entry.
+	f.AllowAllBash = allowAllBashHits(manifest.RepoRoot, claude)
+
+	// AGCFG-015: committed scripts that start an agent CLI with approvals disabled.
+	f.ScriptAgentBypass = scriptAgentBypassHits(manifest)
+
 	for _, c := range manifest.Components {
 		switch c.Kind {
 		case models.ComponentClaudeSettings, models.ComponentGeminiSettings:
@@ -113,6 +119,8 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.UserContentFetchAllow = sortHits(f.UserContentFetchAllow)
 	f.ExecCapableAllow = sortHits(f.ExecCapableAllow)
 	f.ModelEndpointOverride = sortHits(f.ModelEndpointOverride)
+	f.AllowAllBash = sortHits(f.AllowAllBash)
+	f.ScriptAgentBypass = sortHits(f.ScriptAgentBypass)
 	return f
 }
 
@@ -1022,6 +1030,50 @@ func execCapableAllowHits(root string, claude []models.ClaudeSettings) []models.
 				line = lineOfText(readConfig(root, cs.FilePath), string(enc))
 			}
 			out = append(out, hit(cs.FilePath, line, "permissions.allow entry "+r.Raw+" pre-approves "+execCapablePrefixes[word]))
+		}
+	}
+	return out
+}
+
+// ── AGCFG-016: bare Bash or Bash(*) in permissions.allow ───────────────────
+
+// isAllBash reports whether r is a bare Bash or Bash(*) rule, the two forms the
+// permissions page documents as matching all Bash commands. Bash() is not
+// documented and is not judged, so Raw is read, not the parsed Pattern.
+func isAllBash(r models.PermissionRule) bool {
+	raw := strings.TrimSpace(r.Raw)
+	return r.Tool == "Bash" && (raw == "Bash" || raw == "Bash(*)")
+}
+
+// allowAllBashHits flags a bare Bash or Bash(*) allow entry in a .claude/
+// settings file. A bare Bash or Bash(*) deny or ask rule in a settings file in
+// the same .claude/ folder cancels it; a narrower deny or ask rule does not,
+// because the allow entry still matches every other command. Settings files in
+// test-fixture folders are judged like any other.
+func allowAllBashHits(root string, claude []models.ClaudeSettings) []models.ConfigHit {
+	restrict := map[string]bool{}
+	for _, cs := range claude {
+		for _, r := range append(append([]models.PermissionRule{}, cs.Permissions.Deny...), cs.Permissions.Ask...) {
+			if isAllBash(r) {
+				restrict[path.Dir(cs.FilePath)] = true
+			}
+		}
+	}
+	var out []models.ConfigHit
+	for _, cs := range claude {
+		if restrict[path.Dir(cs.FilePath)] {
+			continue
+		}
+		for _, r := range cs.Permissions.Allow {
+			if !isAllBash(r) {
+				continue
+			}
+			line := r.Line
+			if line < 1 {
+				enc, _ := json.Marshal(r.Raw)
+				line = lineOfText(readConfig(root, cs.FilePath), string(enc))
+			}
+			out = append(out, hit(cs.FilePath, line, "permissions.allow entry "+strings.TrimSpace(r.Raw)+" approves all Bash commands"))
 		}
 	}
 	return out

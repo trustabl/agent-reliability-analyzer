@@ -465,7 +465,7 @@ remote repos). `ingestion.Recon` then walks the source tree and returns a
 Recon must stay cheap. No tree-sitter parses here.
 
 **Pre-trust harness config (category `agent_config`, `schema_version` 23).**
-The walk descends into `.gemini/`, `.vscode/`, `.cursor/` and `.codex/` (it
+The walk descends into `.gemini/`, `.vscode/`, `.cursor/`, `.codex/` and `.husky/` (it
 skips every other dot-directory), keeps any file named `.env` and
 `.codex/config.toml` in `ScanManifest.ConfigFiles`, and classifies the results as
 components: `mcp_config` (now also `.mcp.json`, `.cursor/mcp.json`,
@@ -502,6 +502,32 @@ folder cancels it.
 command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
 command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in the
 same `.claude/` folder cancels it (`coversExecPrefix`).
+`repo_settings_allow_all_bash` (AGCFG-016) reads the parsed `permissions` of each
+`.claude/settings.json` and `settings.local.json` at any depth: `allowAllBashHits` flags an
+allow entry whose Raw text is `Bash` or `Bash(*)`, the two forms the permissions page documents
+as matching all Bash commands (`Bash()`, `Bash(:*)` and `Bash( *)` are not judged). A bare
+`Bash` or `Bash(*)` deny or ask rule in a settings file in the same `.claude/` folder cancels
+the hit; a narrower rule does not. Files in test-fixture folders are judged. AGCFG-012 keeps
+the git, xargs and npx prefix entries, so no entry fires both. Hits land in
+`ProjectConfigFacts.AllowAllBash`.
+
+`repo_script_runs_agent_cli_with_bypass_flag` (AGCFG-015) reads three surfaces through
+`scriptAgentBypassHits`: the `preinstall`, `install`, `postinstall` and `prepare` entries of
+each `package.json` in `ScanManifest.JSONFiles`; each line of the files in the new
+`ScanManifest.HuskyFiles` (files directly inside a `.husky/` directory at any depth, not the
+generated `.husky/_`); and process-spawn calls (`spawn`, `spawnSync`, `exec`, `execSync`,
+`execFile`, `execFileSync`, `Bun.spawn`, `Bun.spawnSync`) in the manifest's JS and TS files
+outside `pathclass` test paths. A shell string is split with the CI parser's segment regexp and
+`shellFields`; the command word must start a segment (after env assignments, `env`, `exec`,
+`time`, `sudo` or `npx`/`bunx`/`dlx` with a known package). A spawn call matches only when the
+binary and the flag are string literals in the same call (a command string, an args array after
+a literal binary, or a `Bun.spawn` command array). The binaries and flags are fixed in
+`agentBypassFlag`: claude, gemini, codex, aider and the exact form `q chat` with
+`--trust-all-tools`. Named scripts, Makefiles, shell scripts and workflow run steps are not
+read (CI-004 reads workflow steps on untrusted triggers only). The Reason names the surface, the
+binary and the flag; no other script text is kept. Hits land in
+`ProjectConfigFacts.ScriptAgentBypass`.
+
 `repo_settings_env_redirects_model_endpoint` (AGCFG-014) reads the `env` object of each
 parsed `.claude/settings.json` and `settings.local.json`: `modelEndpointOverrideHits`
 takes the `ANTHROPIC_BASE_URL` string and passes it to `modelEndpointClass`, which parses
