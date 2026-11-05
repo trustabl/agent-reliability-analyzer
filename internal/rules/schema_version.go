@@ -65,4 +65,8 @@ package rules
 //
 // Schema 41 adds the repo_settings_allow_all_bash and
 // repo_script_runs_agent_cli_with_bypass_flag predicates (repo scope).
-const SupportedSchemaVersion = 41
+//
+// Schema 42 adds the repo_otel_labels_reasoning_unhashed,
+// repo_otel_labels_reasoning_labelled and repo_model_reasoning_enabled predicates
+// (repo scope), read by the reasoning-label rules OBS-013..014.
+const SupportedSchemaVersion = 42

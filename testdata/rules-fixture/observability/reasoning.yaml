@@ -1,0 +1,90 @@
+policy:
+  id: observability_reasoning
+  name: Agent reasoning labels
+  category: observability
+  description: >
+    Cross-SDK rules for the trustabl.cot.* reasoning labels that
+    agent-reliability-otel-labels writes: whether a reasoning label could be
+    carrying the reasoning itself, and whether a model set to reason leaves any
+    content-free record that it did. Like observability/quality.yaml these are
+    framed around the library rather than the agent SDK, so they list every SDK
+    token in applies_to instead of shipping nine byte-identical copies. See the
+    rulebook rationale doc for the defense of that widening.
+
+rules:
+  - id: OBS-013
+    title: A reasoning label may be carrying the reasoning text itself
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      repo_otel_labels_reasoning_unhashed: true
+    explanation: >
+      This repo writes a trustabl.cot.* key to a span by hand, and the value
+      passed is not visibly a fingerprint. Those keys promise every reader that
+      they carry a hash, an enum or a flag, never the reasoning itself, and
+      mark_reasoning is what keeps that promise: it hashes the text and drops it.
+      Written by hand, nothing stops the text from going straight onto the span.
+      A chain of thought routinely quotes user input, retrieved documents and
+      tool results, so it would reach the tracing backend verbatim, under a key
+      that every consumer treats as content-free and no content filter looks at.
+    fix: >
+      Replace the hand-written attribute with mark_reasoning(span, text=...,
+      mode=..., reasoning_tokens=...) (markReasoning(span, { text, mode,
+      reasoningTokens }) in TypeScript), which writes only the fingerprint. Do
+      not invent other trustabl.cot.* keys: the token count is
+      gen_ai.usage.reasoning.output_tokens. Verify by exporting one run and
+      checking that trustabl.cot.text_fp is 16 hex characters and that no span
+      attribute contains the reasoning text.
+
+  # Gated where the run's own labels are already written, so a repo that has not
+  # labelled its tool spans is told that first. Deliberately not gated on
+  # repo_observability_initialized like the rungs in quality.yaml: a labelled run
+  # already shows the team expects spans, and tracing started outside the parsed
+  # source (opentelemetry-instrument, an environment switch) should not silence
+  # this.
+  - id: OBS-014
+    title: A model is set to reason, but no span records that it did
+    severity: low
+    confidence: 0.6
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_otel_labels_implemented: true
+        - repo_model_reasoning_enabled: true
+        - repo_otel_labels_reasoning_labelled: false
+    explanation: >
+      This repo labels its runs with agent-reliability-otel-labels and sets a
+      model option that turns on reasoning (thinking, reasoning_effort or the
+      like), but no mark_reasoning call labels a model span. The tool calls are
+      labelled and the step that decided them is not, so a trace cannot say which
+      calls reasoned, whether two runs reasoned alike, or which span a reasoning
+      text captured under an opt-in belongs to. Anyone asked to explain a decision
+      later has the actions and no record of the reasoning behind them.
+    fix: >
+      Call mark_reasoning(span, text=..., mode=..., reasoning_tokens=...)
+      (markReasoning(span, { text, mode, reasoningTokens }) in TypeScript) on the
+      span of each model call. Only a fingerprint of the text leaves the process,
+      and every argument is optional: when the provider hides its reasoning, pass
+      the token count alone. Verify by exporting one run and checking that the
+      model span carries trustabl.cot.present.
