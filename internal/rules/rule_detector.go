@@ -222,6 +222,10 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.ExecCapableAllow
 	case m.RepoSettingsEnvRedirectsModelEndpoint != nil:
 		hits = pc.ModelEndpointOverride
+	case m.RepoSettingsAllowAllBash != nil:
+		hits = pc.AllowAllBash
+	case m.RepoScriptRunsAgentCliWithBypassFlag != nil:
+		hits = pc.ScriptAgentBypass
 	}
 	if len(hits) == 0 {
 		return "", 0

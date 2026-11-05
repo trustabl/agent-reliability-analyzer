@@ -62,4 +62,7 @@ package rules
 //
 // Schema 40 adds the repo_settings_env_redirects_model_endpoint predicate (repo
 // scope).
-const SupportedSchemaVersion = 40
+//
+// Schema 41 adds the repo_settings_allow_all_bash and
+// repo_script_runs_agent_cli_with_bypass_flag predicates (repo scope).
+const SupportedSchemaVersion = 41

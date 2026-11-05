@@ -350,6 +350,16 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
+> scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
+> `ProjectConfigFacts.ScriptAgentBypass`, and **AGCFG-016** (high, 0.7, pack file `agent_config/allow_all_bash.yaml`) over
+> `repo_settings_allow_all_bash`, backed by `ProjectConfigFacts.AllowAllBash`. 015 reads package.json preinstall/install/postinstall/prepare, `.husky`
+> hook files (new `ScanManifest.HuskyFiles`) and JS/TS spawn calls outside test paths (binary and flag both string literals in one call); claude, gemini,
+> codex, aider and the exact form `q chat --trust-all-tools`. **Secrecy:** the Reason names the surface, binary and flag only. Not read: named
+> scripts, Makefiles, `*.sh`, workflow run steps (CI-004 reads those on untrusted triggers only; a trusted-trigger run step is a known gap). 016 fires on bare `Bash` or `Bash(*)`
+> only, cancelled by a same-folder bare deny or ask, and judges settings files in test-fixture folders. The fixture holds **389** rules (387 + 2; re-derive).
+> Rulebook docs: `docs/Policy/agent_config/script_agent_bypass.md`, `allow_all_bash.md`.
+>
 > **Model endpoint override in project settings (2026-10-29, `schema_version` 39 -> 40, provisional; +1 rule):** **AGCFG-014** (medium, 0.5, repo
 > scope, category `agent_config`, new pack file `agent_config/model_endpoint_override.yaml`) over the new predicate
 > `repo_settings_env_redirects_model_endpoint`, backed by `ProjectConfigFacts.ModelEndpointOverride`. It flags `ANTHROPIC_BASE_URL` in the `env`

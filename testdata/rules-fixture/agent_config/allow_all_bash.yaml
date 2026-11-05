@@ -1,0 +1,48 @@
+policy:
+  id: agent_config_allow_all_bash
+  name: Committed allow rule that approves all Bash commands
+  category: agent_config
+  description: >
+    Repo-scoped rule for Claude Code allow rules committed to a repository that
+    approve all Bash commands. Claude Code applies a project's allow rules after
+    the user accepts the workspace trust dialog, and in claude -p and SDK runs,
+    which count as accepted. The pack loads for each scan (the files it reads have
+    no SDK import), so the rule's own predicate does the gating. Fires once per
+    scan, attributed to the first offending allow entry.
+
+rules:
+  - id: AGCFG-016
+    title: Project settings auto-approve all Bash commands
+    severity: high
+    confidence: 0.7
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_settings_allow_all_bash: true
+    explanation: >
+      A committed .claude/settings.json or .claude/settings.local.json lists a bare
+      Bash or Bash(*) rule in permissions.allow. Claude Code's permissions page
+      states that Bash(*) is equivalent to Bash and matches all Bash commands,
+      that rules are evaluated deny, then ask, then allow, and that an allow rule
+      cannot carve an exception out of a deny rule. No prompt lets the developer
+      stop a shell command that no deny or ask rule matches. Claude Code applies
+      these allow rules once the user accepts the workspace trust dialog; a
+      settings.local.json that is tracked in git is treated as repository-supplied.
+      Limits of this check: it reads the permissions block of the .claude/
+      settings files in the repo, at any depth, and judges files in test-fixture
+      folders like any other. A bare Bash or Bash(*) deny or ask rule in a
+      settings file in the same .claude/ folder cancels the finding; a narrower
+      deny or ask rule does not. Deny and ask rules in user or managed settings,
+      hooks, sandbox auto-approval and prompt-time approvals are not seen.
+      Bash(), Bash(:*) and Bash( *) are not judged because the page does not
+      document them. A prefix rule such as Bash(git *) is AGCFG-012's concern.
+    fix: >
+      Replace the entry with exact commands that name the subcommand and
+      arguments, such as Bash(git status) and Bash(npm test). To make shell
+      commands prompt for the whole team, add Bash to permissions.ask in the
+      committed settings; deny rules win over allow rules and ask rules are
+      evaluated before allow rules. With sandboxing enabled and
+      autoAllowBashIfSandboxed at its default of true, sandboxed Bash commands
+      still run without a prompt even with a bare Bash ask rule, per Claude
+      Code's permissions page.

@@ -3,6 +3,7 @@ package ingestion
 import (
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -464,6 +465,9 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 		if lower == ".windsurfrules" || (strings.HasPrefix(lower, ".cursor/rules/") && strings.HasSuffix(lower, ".mdc")) {
 			manifest.GuidanceFiles = append(manifest.GuidanceFiles, rel)
 		}
+		if isHuskyHookFile(lower) {
+			manifest.HuskyFiles = append(manifest.HuskyFiles, rel)
+		}
 		// Harness config the pre-trust rules read: any ".env" file and the Codex
 		// project config. Kept narrow on purpose (pyproject.toml etc. are not).
 		if filepath.Base(lower) == ".env" || lower == ".codex/config.toml" || strings.HasSuffix(lower, "/.codex/config.toml") {
@@ -515,6 +519,7 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 	sort.Strings(manifest.ConfigFiles)
 	sort.Strings(manifest.WorkflowFiles)
 	sort.Strings(manifest.GuidanceFiles)
+	sort.Strings(manifest.HuskyFiles)
 
 	manifest.HasClaudeSDKDependency = detectClaudeSDKDependency(src.RootPath)
 	manifest.HasOpenShellArtifact = detectOpenShellArtifact(manifest.YAMLFiles, src.RootPath)
@@ -631,6 +636,14 @@ func isWindsurfRuleFile(lower string) bool {
 		strings.HasSuffix(lower, ".md")
 }
 
+// isHuskyHookFile reports whether lower is a file directly inside a .husky
+// directory at any depth. Husky writes its own helper files to .husky/_, which
+// is a subdirectory and so never matches.
+func isHuskyHookFile(lower string) bool {
+	dir, _ := path.Split(lower)
+	return strings.HasSuffix(dir, "/.husky/") || dir == ".husky/"
+}
+
 func shouldSkipDir(name string) bool {
 	switch name {
 	case ".git", ".venv", "venv", "node_modules", "__pycache__",
@@ -644,6 +657,9 @@ func shouldSkipDir(name string) bool {
 	case ".gemini", ".vscode", ".cursor", ".codex":
 		// Other harnesses' project config (settings, hooks, MCP, env) that takes
 		// effect when the folder is opened — read by the agent_config rules.
+		return false
+	case ".husky":
+		// Git hook files (see isHuskyHookFile); read by the script-bypass rule.
 		return false
 	case ".windsurf", ".devin":
 		// Windsurf and Devin rules files (see isWindsurfRuleFile). The walk records

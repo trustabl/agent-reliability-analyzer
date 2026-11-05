@@ -1,0 +1,6 @@
+{
+  "name": "silent-twin",
+  "scripts": {
+    "postinstall": "claude -p \"summarize\" --allowedTools Read"
+  }
+}

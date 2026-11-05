@@ -6,14 +6,30 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 40 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 387 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+Rule schema 31 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 355 to 389 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
 CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
 OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
 ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
 side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
+
+- **Permission bypass committed in the repo (rule schema 40 → 41, provisional).** Two new
+  repo-scope predicates and rules. **AGCFG-015** (high, 0.6, pack file
+  `agent_config/script_agent_bypass.yaml`, predicate
+  `repo_script_runs_agent_cli_with_bypass_flag`) flags a `package.json` lifecycle script
+  (preinstall, install, postinstall, prepare), a `.husky` hook line, or a JS/TS process-spawn
+  call that starts claude, gemini, codex or aider (or `q chat`) with a flag its vendor
+  documents as turning off approvals or the sandbox. In a spawn call the binary and flag must
+  both be string literals in the same call. Named scripts, Makefiles, shell scripts and
+  workflow run steps are not read. **AGCFG-016** (high, 0.7, pack file
+  `agent_config/allow_all_bash.yaml`, predicate `repo_settings_allow_all_bash`) flags a bare
+  `Bash` or `Bash(*)` entry in `permissions.allow` of a committed `.claude/settings*.json`,
+  cancelled by a bare `Bash` or `Bash(*)` deny or ask rule in the same `.claude/` folder; files
+  in test-fixture folders are judged. The ingestion walk now enters `.husky/`
+  (`ScanManifest.HuskyFiles`). Findings name the surface, binary and flag, never other script
+  text. Backed by `ProjectConfigFacts.ScriptAgentBypass` and `ProjectConfigFacts.AllowAllBash`.
 
 - **Model endpoint override in project settings (rule schema 39 → 40, provisional).** New
   repo-scope predicate `repo_settings_env_redirects_model_endpoint` and rule **AGCFG-014**

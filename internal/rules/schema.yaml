@@ -823,6 +823,28 @@ rules:
 #       http or https is not judged. The host is reduced to a class at once and is
 #       never stored; the hit's Reason names the key, never the URL
 #       (ProjectConfigFacts.ModelEndpointOverride). AGCFG-014.
+#   repo_settings_allow_all_bash: true | false
+#       permissions.allow of .claude/settings.json or settings.local.json (any depth)
+#       lists a bare Bash or Bash(*) entry, the two forms Claude Code's permissions
+#       page documents as matching all Bash commands. Bash(), Bash(:*) and Bash( *)
+#       are not judged. A bare Bash or Bash(*) deny or ask rule in a settings file
+#       in the same .claude/ folder cancels the hit; a narrower deny or ask rule does
+#       not. Files in test-fixture folders are judged
+#       (ProjectConfigFacts.AllowAllBash). AGCFG-016. AGCFG-012 keeps the git, xargs
+#       and npx prefix entries.
+#   repo_script_runs_agent_cli_with_bypass_flag: true | false
+#       A package.json lifecycle script (preinstall, install, postinstall, prepare), a
+#       .husky hook file line, or a JS/TS process-spawn call (spawn, spawnSync, exec,
+#       execSync, execFile, execFileSync, Bun.spawn, Bun.spawnSync; files outside test
+#       paths) starts claude, gemini, codex or aider, or "q chat", together with a
+#       documented bypass flag: claude --dangerously-skip-permissions or
+#       --permission-mode bypassPermissions; gemini --yolo or --approval-mode yolo;
+#       codex --dangerously-bypass-approvals-and-sandbox or --yolo; aider --yes-always;
+#       q chat --trust-all-tools. In a spawn call the binary and the flag must be string
+#       literals in the same call. Named package.json scripts, Makefiles, shell scripts
+#       and workflow run steps are not read. A hit's Reason names the surface, binary
+#       and flag, never other script text (ProjectConfigFacts.ScriptAgentBypass).
+#       AGCFG-015.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,

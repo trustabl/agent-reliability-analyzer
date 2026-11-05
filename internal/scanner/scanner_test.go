@@ -1472,6 +1472,74 @@ func TestScan_ModelEndpointOverrideFixture(t *testing.T) {
 	}
 }
 
+// End to end: the bypass fixture has a postinstall script that runs a JS file
+// whose spawnSync call starts claude with a bypass flag, and a settings file that
+// allows Bash(*). AGCFG-015 and AGCFG-016 each fire once. The named lint script, the
+// husky hook and nested package.json that use an allow-list, and the exact Bash
+// command in safe/ stay silent.
+func TestScan_PermissionBypassFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "agcfg-bypass-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string][]models.Finding{}
+	for _, f := range res.Findings {
+		switch {
+		case f.RuleID == "AGCFG-015" || f.RuleID == "AGCFG-016":
+			got[f.RuleID] = append(got[f.RuleID], f)
+		case strings.HasPrefix(f.RuleID, "AGCFG-") || strings.HasPrefix(f.RuleID, "MCPCFG-"):
+			t.Errorf("%s fired on the bypass fixture (%s:%d)", f.RuleID, f.FilePath, f.StartLine)
+		}
+	}
+	for id, want := range map[string]struct {
+		file string
+		line int
+	}{
+		"AGCFG-015": {"scripts/telemetry.js", 3},
+		"AGCFG-016": {".claude/settings.json", 5},
+	} {
+		if len(got[id]) != 1 {
+			t.Fatalf("%s fired %d times, want once; findings: %v", id, len(got[id]), res.Findings)
+		}
+		if !strings.HasSuffix(got[id][0].FilePath, want.file) || got[id][0].StartLine != want.line {
+			t.Errorf("%s attributed to %s:%d, want %s:%d", id, got[id][0].FilePath, got[id][0].StartLine, want.file, want.line)
+		}
+	}
+}
+
+// A husky hook file is read: the generated .husky/_ helper directory is not.
+func TestScan_PermissionBypassHuskyHook(t *testing.T) {
+	dir := t.TempDir()
+	for rel, body := range map[string]string{
+		".husky/pre-commit":   "#!/bin/sh\nclaude -p x --dangerously-skip-permissions\n",
+		".husky/_/husky.sh":   "claude --dangerously-skip-permissions\n",
+		"sub/.husky/pre-push": "#!/bin/sh\nnpm test\n",
+	} {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var hits []models.Finding
+	for _, f := range res.Findings {
+		if f.RuleID == "AGCFG-015" {
+			hits = append(hits, f)
+		}
+	}
+	if len(hits) != 1 || !strings.HasSuffix(hits[0].FilePath, ".husky/pre-commit") || hits[0].StartLine != 2 {
+		t.Fatalf("want one AGCFG-015 hit at .husky/pre-commit:2, got %v", hits)
+	}
+}
+
 // A URL with userinfo and a query key is judged by host. The finding fires and
 // the report JSON holds none of the URL.
 func TestScan_ModelEndpointOverrideDoesNotEchoURL(t *testing.T) {

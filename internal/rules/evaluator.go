@@ -214,6 +214,12 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoSettingsEnvRedirectsModelEndpoint != nil && (len(inv.ProjectConfig.ModelEndpointOverride) > 0) != *e.RepoSettingsEnvRedirectsModelEndpoint {
 		return false
 	}
+	if e.RepoSettingsAllowAllBash != nil && (len(inv.ProjectConfig.AllowAllBash) > 0) != *e.RepoSettingsAllowAllBash {
+		return false
+	}
+	if e.RepoScriptRunsAgentCliWithBypassFlag != nil && (len(inv.ProjectConfig.ScriptAgentBypass) > 0) != *e.RepoScriptRunsAgentCliWithBypassFlag {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -623,6 +629,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_settings_preapprove_user_content_fetch":  true,
 		"repo_settings_allow_exec_capable_prefix":      true,
 		"repo_settings_env_redirects_model_endpoint":   true,
+		"repo_settings_allow_all_bash":                 true,
+		"repo_script_runs_agent_cli_with_bypass_flag":  true,
 	},
 }
 
@@ -733,6 +741,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoSettingsPreapproveUserContentFetch != nil, "repo_settings_preapprove_user_content_fetch")
 	add(e.RepoSettingsAllowExecCapablePrefix != nil, "repo_settings_allow_exec_capable_prefix")
 	add(e.RepoSettingsEnvRedirectsModelEndpoint != nil, "repo_settings_env_redirects_model_endpoint")
+	add(e.RepoSettingsAllowAllBash != nil, "repo_settings_allow_all_bash")
+	add(e.RepoScriptRunsAgentCliWithBypassFlag != nil, "repo_script_runs_agent_cli_with_bypass_flag")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")
