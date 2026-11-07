@@ -32,17 +32,21 @@ var otelLabelsPyCallees = []otelLabelsCallee{
 	{"mark_start", models.OtelLabelsRunStart, true},
 	{"mark_tool_span", models.OtelLabelsToolSpan, false},
 	{"mark_run_end", models.OtelLabelsRunEnd, false},
+	{"mark_reasoning", models.OtelLabelsReasoning, false},
 }
 
 var otelLabelsTSCallees = []otelLabelsCallee{
 	{"markStart", models.OtelLabelsRunStart, true},
 	{"markToolSpan", models.OtelLabelsToolSpan, false},
 	{"markRunEnd", models.OtelLabelsRunEnd, false},
+	{"markReasoning", models.OtelLabelsReasoning, false},
 }
 
 // DiscoverOtelLabels extracts every agent-reliability-otel-labels signal from
 // the parsed files: where the library is imported, where a run is started,
-// where a tool span is labelled, and where a run's end is recorded.
+// where a tool span is labelled, where a run's end is recorded, where a model
+// span's reasoning is labelled, and, once the repo carries any of that, where a
+// model option turns reasoning on.
 //
 // The call names are plausible names for a project's own helpers, so they
 // count only when the library is imported somewhere in the repo. The gate is
@@ -94,6 +98,9 @@ func DiscoverOtelLabels(parsed []ParsedFile) []models.OtelLabelsSignal {
 	}
 	if len(out) == 0 {
 		return nil
+	}
+	for _, f := range files {
+		out = append(out, otelLabelsReasoningConfigSignals(f.pf, f.lang, f.test)...)
 	}
 	sortOtelLabels(out)
 	return out
