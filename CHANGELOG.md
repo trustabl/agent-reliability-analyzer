@@ -6,8 +6,13 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 31 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 355 to 389 rules. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
+## [0.1.16] - 2026-11-09
+
+Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 343 to 389 rules. `ScanID` changes, as with every schema bump, because it
+folds the engine's supported schema version. Engines older than 0.1.16 skip the
+rules that need the new predicates and report a degraded scan ("rules skipped")
+until they are upgraded. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
 CSDK-026 / ADK-024 / AG2-023 fire at **info** on every side-effecting Python
 OpenAI Agents, MCP, LangChain, CrewAI, Pydantic AI, Claude Agent SDK, Google
 ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
@@ -196,6 +201,11 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Fixed
 
+- **Rules download survives a GitHub release-download outage.** When
+  `github.com/.../releases/download/` answers 5xx or fails in transit, the engine
+  fetches the channel statement or bundle once more through the REST API asset
+  endpoint. A 404 stays final and non-GitHub rules repos never fall back. The
+  statement signature and bundle digest are still checked after download.
 - The `Harness files:` line in the scan summary no longer says that no rule judges
   those files. It now says what is checked: Codex hooks for risky commands and
   harness guidance files for hidden text, with OpenCode plugins and agents not
