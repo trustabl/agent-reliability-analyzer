@@ -220,6 +220,12 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoScriptRunsAgentCliWithBypassFlag != nil && (len(inv.ProjectConfig.ScriptAgentBypass) > 0) != *e.RepoScriptRunsAgentCliWithBypassFlag {
 		return false
 	}
+	if e.RepoAgentServerAllowsAnyOrigin != nil && (len(inv.ProjectConfig.AnyOriginServer) > 0) != *e.RepoAgentServerAllowsAnyOrigin {
+		return false
+	}
+	if e.RepoAgentServerExposedWithoutKey != nil && (len(inv.ProjectConfig.AgentServerNoKey) > 0) != *e.RepoAgentServerExposedWithoutKey {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -631,6 +637,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_settings_env_redirects_model_endpoint":   true,
 		"repo_settings_allow_all_bash":                 true,
 		"repo_script_runs_agent_cli_with_bypass_flag":  true,
+		"repo_agent_server_allows_any_origin":          true,
+		"repo_agent_server_exposed_without_key":        true,
 	},
 }
 
@@ -743,6 +751,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoSettingsEnvRedirectsModelEndpoint != nil, "repo_settings_env_redirects_model_endpoint")
 	add(e.RepoSettingsAllowAllBash != nil, "repo_settings_allow_all_bash")
 	add(e.RepoScriptRunsAgentCliWithBypassFlag != nil, "repo_script_runs_agent_cli_with_bypass_flag")
+	add(e.RepoAgentServerAllowsAnyOrigin != nil, "repo_agent_server_allows_any_origin")
+	add(e.RepoAgentServerExposedWithoutKey != nil, "repo_agent_server_exposed_without_key")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")

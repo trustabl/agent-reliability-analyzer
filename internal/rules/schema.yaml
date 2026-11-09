@@ -845,6 +845,32 @@ rules:
 #       and workflow run steps are not read. A hit's Reason names the surface, binary
 #       and flag, never other script text (ProjectConfigFacts.ScriptAgentBypass).
 #       AGCFG-015.
+#   repo_agent_server_allows_any_origin: true | false
+#       A committed file sets the origin list of a Google ADK server to *: the
+#       adk.web.cors.origins key of Spring application*.properties / .yml / .yaml; the
+#       allow_origins list of a get_fast_api_app(...) call in a Python file that imports
+#       google.adk; the allowOrigins option of an AdkApiServer(...) call in a TS/JS file
+#       that imports @google/adk-devtools; an --allow_origins option of "adk web" or
+#       "adk api_server" in a Dockerfile, Makefile, *.sh, compose command / entrypoint or
+#       package.json script. Python and TS/JS files in test paths are skipped, and a call in a
+#       comment, docstring or string literal, or on a # comment line of a script file, is not judged. A value
+#       that is a variable reference, a narrower list, Java source and generic CORS
+#       middleware are not judged. The hit's Reason names the surface, never the list
+#       (ProjectConfigFacts.AnyOriginServer). AGSRV-001.
+#   repo_agent_server_exposed_without_key: true | false
+#       A Docker Compose service (docker-compose*.yml, compose*.yml) or a docker run line
+#       (Dockerfile, Makefile, *.sh) runs ghcr.io/openhands/agent-server (the literal, or
+#       the default inside ${VAR:-default}) and all three hold: (a) a port is published
+#       without a loopback host address (short mapping, bare container port, or long
+#       syntax with no host_ip or 0.0.0.0); (b) the server's --host (in the compose
+#       entrypoint or command, or after the image in a docker run line) is an IP literal
+#       other than a loopback address (0.0.0.0, ::, [::], another address); the server
+#       reads its bind address from --host alone, and binds loopback when it gets none
+#       and no key is configured; (c) the environment names neither OH_SESSION_API_KEYS_*
+#       nor SESSION_API_KEY. Environment keys are compared by name only. A service with an
+#       env_file, or a docker run line with --env-file, is not judged; a host address or
+#       --host value that is a $ variable, or a host name, is not judged. Each compose file
+#       is judged on its own (ProjectConfigFacts.AgentServerNoKey). AGSRV-002.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,

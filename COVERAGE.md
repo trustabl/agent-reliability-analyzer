@@ -4,6 +4,8 @@ Coverage matrix for Trustabl's static analysis: which agent SDKs (and which
 languages) we currently scan, analyse, and detect against. This file is the
 at-a-glance reference; `ARCHITECTURE.md` has the implementation detail.
 
+_Last reviewed: 2026-11-09 (branch `feat/agent-server-exposure`, from `main` d59d3b6; first reviewed 2026-11-09) — **AGSRV-001 / AGSRV-002: agent server exposure (`schema_version` 43, provisional, new category `agent_server`):** `application*.properties` / `.yml` `adk.web.cors.origins`, Python `get_fast_api_app(allow_origins=)`, TS `AdkApiServer({allowOrigins})` and `adk web|api_server --allow_origins` with a `*` entry (AGSRV-001); compose services and `docker run` lines for `ghcr.io/openhands/agent-server` with a non-loopback `--host`, published on all interfaces, with no session key name (AGSRV-002). Java source is not parsed.
+
 _Last reviewed: 2026-11-04 (branch `feat/agcfg-permission-bypass`, from `main` 8cdd880; first reviewed 2026-11-04) — **AGCFG-015 / AGCFG-016: permission bypass committed in the repo (`schema_version` 40 → 41, provisional; +2 rules, 389 total).** AGCFG-015 high / 0.6 over `repo_script_runs_agent_cli_with_bypass_flag` (`ProjectConfigFacts.ScriptAgentBypass`): `package.json` preinstall/install/postinstall/prepare, `.husky` files and JS/TS spawn calls that start claude, gemini, codex, aider or `q chat` with a documented bypass flag. AGCFG-016 high / 0.7 over `repo_settings_allow_all_bash` (`AllowAllBash`): a bare `Bash` or `Bash(*)` allow entry in `.claude/settings*.json`. Not judged: named package.json scripts, Makefiles, shell scripts, workflow run steps on trusted triggers, cline, `agent`, `Bash()`, `Bash(:*)`, user and managed settings._
 _Last reviewed: 2026-10-29 (branch `feat/agcfg-model-endpoint-override`, from `main` 97eec42; first reviewed 2026-10-29) — **AGCFG-014: model endpoint override in project settings (`schema_version` 39 → 40, provisional; +1 rule, 387 total).** Medium / 0.5, repo scope, new pack `agent_config/model_endpoint_override.yaml`, predicate `repo_settings_env_redirects_model_endpoint` over `ProjectConfigFacts.ModelEndpointOverride`. Reads `ANTHROPIC_BASE_URL` in the `env` block of `.claude/settings*.json` and flags a host outside api.anthropic.com and loopback; the host is reduced to a class and never stored. Not judged: other base-URL variables, `.env` files, workflow `env`, `.codex` and `.gemini` config, user and managed settings, code-level `base_url`, and any list of approved gateways._
 _Last reviewed: 2026-10-29 (branch `feat/agcfg-guidance-injection-markers`, from `main` 6426954; first reviewed 2026-10-29) — **AGCFG-013: hidden text in agent guidance files (`schema_version` 38 → 39, provisional; +1 rule, 386 total).** The AGCFG-009 character test now also reads CLAUDE.md, GEMINI.md, repo-root Cursor `.mdc` rules, Windsurf and Devin rules files and the GitHub Copilot instruction files; `.cursorrules` is not read._
@@ -409,6 +411,15 @@ typed) are not modeled.
 | Tool grants | `claude_args` `--allowedTools`, `settings` JSON `permissions.allow`, Gemini `settings` `tools.core` / `tools.allowed`, Codex `sandbox` / `safety-strategy` / `codex-args`, CLI flags (CI-004, CI-005) |
 
 **v1 gaps:** `${{ }}` expressions and `strategy.matrix` are not evaluated; `if:` boolean structure is not evaluated (an allow-list joined by `||` with an open branch counts as gated); an actor check made in a step, environment reviewers and label gates are not recognised; reusable workflows are followed one hop and only when local; composite actions are not resolved; a missing `permissions:` block is not flagged (the repository default is not visible); `workflow_run` and `pull_request_review` are not in the trigger set; cline and aider tool flags are not modelled; `anthropics/claude-code-security-review` is not recognised.
+
+### Agent server exposure — any repo (category `agent_server`)
+
+| Construct | Recognition |
+|---|---|
+| Spring config | `application*.properties` / `.yml` / `.yaml`: `adk.web.cors.origins` with a `*` entry (AGSRV-001) |
+| ADK Python / TS options | `get_fast_api_app(allow_origins=[...])` in a file importing `google.adk`; `AdkApiServer({allowOrigins})` in a file importing `@google/adk-devtools`; `adk web` / `adk api_server` `--allow_origins` in Dockerfile, Makefile, `*.sh`, compose command, package.json script (AGSRV-001) |
+| OpenHands agent server | compose service or `docker run` line for `ghcr.io/openhands/agent-server` with a non-loopback `--host`, a port published on all interfaces and no `OH_SESSION_API_KEYS_*` / `SESSION_API_KEY` name (AGSRV-002) |
+| Not read | Java source (`setAllowedOrigins`), Kubernetes Services, `ApptainerWorkspace`, server versions |
 
 ### Pre-trust agent config — any repo (category `agent_config`)
 

@@ -174,6 +174,8 @@ type MatchExpr struct {
 	RepoSettingsEnvRedirectsModelEndpoint  *bool `yaml:"repo_settings_env_redirects_model_endpoint,omitempty"`
 	RepoSettingsAllowAllBash               *bool `yaml:"repo_settings_allow_all_bash,omitempty"`
 	RepoScriptRunsAgentCliWithBypassFlag   *bool `yaml:"repo_script_runs_agent_cli_with_bypass_flag,omitempty"`
+	RepoAgentServerAllowsAnyOrigin         *bool `yaml:"repo_agent_server_allows_any_origin,omitempty"`
+	RepoAgentServerExposedWithoutKey       *bool `yaml:"repo_agent_server_exposed_without_key,omitempty"`
 
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.

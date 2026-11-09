@@ -1,0 +1,57 @@
+policy:
+  id: agent_server_unauthenticated_publish
+  name: OpenHands agent server bound to all interfaces and published without a session key
+  category: agent_server
+  description: >
+    Repo-scoped rule for a committed Docker Compose service or docker run command
+    that sets the OpenHands agent server's --host to a non-loopback address,
+    publishes its port on all host interfaces, and names no session API key in the
+    service's environment. The pack loads for each scan, because the files it reads
+    have no SDK import; the rule's own predicate does the gating. Fires once per
+    scan, attributed to the first offending service or line.
+
+rules:
+  - id: AGSRV-002
+    title: OpenHands agent server is bound to all interfaces and published with no session key
+    severity: critical
+    confidence: 0.7
+    applies_to:
+      - agent_server
+    scope: repo
+    match:
+      repo_agent_server_exposed_without_key: true
+    explanation: >
+      A committed Docker Compose service, or a docker run command, runs the
+      ghcr.io/openhands/agent-server image, passes --host with a non-loopback
+      address such as 0.0.0.0, publishes the server port without a loopback host
+      address, and names neither OH_SESSION_API_KEYS_0 nor SESSION_API_KEY in its
+      environment. The server takes its bind address from the --host option and from
+      no environment variable; with no --host it binds loopback unless a session API
+      key is configured, and an explicit --host is used as given. The server's
+      configuration states for session_api_keys: "Empty list implies the server will
+      be unsecured." The VulnCheck advisory for CVE-2026-112346 states: "Attackers
+      who can reach the published container port can send unauthenticated HTTP and
+      WebSocket requests to execute arbitrary shell commands as root in the sandbox,
+      access the mounted workspace, and read plaintext secrets from the secrets
+      store."
+      Limits of this check: it matches the image path ghcr.io/openhands/agent-server
+      in a compose service, or in a docker run command in a Dockerfile, shell script
+      or Makefile; a service built from a local or renamed image is not judged. A
+      --host value counts when it is an IP literal other than a loopback address; a
+      host name, a variable reference and a loopback address are not judged, and a
+      --host that appears before the image in a docker run command is not read. Key
+      names are read, not values, and a name set to an empty value counts as set. A
+      service with an env_file, or a docker run command with --env-file, is not
+      judged. Each compose file is judged on its own, so a key set in another compose
+      file that is merged at run time is not seen, and the config-file path option of
+      the server is not read. A port mapping whose host address is a variable, and a
+      commented docker run line, are not judged. An image tag whose server defaults
+      differ is a version question outside this check. Kubernetes Services, uvicorn
+      commands, and the DockerWorkspace and ApptainerWorkspace launchers are not
+      read. Firewalls and networks outside the repo are not seen, so a host that is
+      not reachable from other machines still matches.
+    fix: >
+      Publish the port on loopback, for example 127.0.0.1:8010:8000, and set a
+      session API key in the service environment, such as OH_SESSION_API_KEYS_0 taken
+      from a secret. Do not set --host 0.0.0.0 without a session API key. Send the
+      same key from the client in the X-Session-API-Key header.

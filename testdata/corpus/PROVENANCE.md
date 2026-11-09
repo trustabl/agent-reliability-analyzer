@@ -92,3 +92,4 @@ We do not modify vendored examples. The corpus exists to scan
 real-world-shape code; editing it would defeat that purpose. The single
 exception is removing transitively-installed `node_modules/` and other
 build artefacts (covered by `.gitignore`), which are not redistribution.
+| `agent-server-exposure-fixture/` | Synthetic repo for AGSRV-001 and AGSRV-002: a Spring `application.properties` and a Python `get_fast_api_app` call with a `*` origin list, a compose service running the OpenHands agent server image with `--host 0.0.0.0`, a short port mapping and no session key name, a test-path file (skipped), and a `safe/` folder with a named origin, a loopback mapping, a keyed service and a service with no `--host`. Authored for this repo; no external code. See `SOURCE.md`. |

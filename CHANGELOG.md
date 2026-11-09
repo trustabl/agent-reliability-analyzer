@@ -15,6 +15,22 @@ side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and th
 
 ### Added
 
+- **Agent server exposure (rule schema 42 → 43, provisional; new category `agent_server`).** Two
+  new repo-scope predicates and rules, loaded unconditionally. **AGSRV-001** (high, 0.6, pack file
+  `agent_server/any_origin.yaml`, predicate `repo_agent_server_allows_any_origin`) flags a `*` origin
+  list on a Google ADK server: the `adk.web.cors.origins` key of Spring `application*.properties` /
+  `.yml` / `.yaml`, the `allow_origins` list of a `get_fast_api_app(...)` call, the `allowOrigins`
+  option of an `AdkApiServer(...)` call, or an `--allow_origins` option of `adk web` / `adk api_server`
+  in a Dockerfile, Makefile, shell script, compose command or package.json script. **AGSRV-002**
+  (critical, 0.7, pack file `agent_server/unauthenticated_publish.yaml`, predicate
+  `repo_agent_server_exposed_without_key`) flags a Docker Compose service or `docker run` line that
+  runs `ghcr.io/openhands/agent-server`, sets the server's `--host` to a non-loopback IP literal,
+  publishes its port on all host interfaces and names neither `OH_SESSION_API_KEYS_0` nor
+  `SESSION_API_KEY` (the server binds loopback when given no `--host` and no key). New manifest lists `PropertiesFiles` and
+  `ServerScriptFiles`. Environment keys are read by name; no origin list, port or value is stored. Java
+  source (`setAllowedOrigins`) is not parsed. Not judged: a server version, Kubernetes Services,
+  `ApptainerWorkspace`.
+
 - **Permission bypass committed in the repo (rule schema 40 → 41, provisional).** Two new
   repo-scope predicates and rules. **AGCFG-015** (high, 0.6, pack file
   `agent_config/script_agent_bypass.yaml`, predicate
