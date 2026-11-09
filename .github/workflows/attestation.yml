@@ -41,10 +41,18 @@ jobs:
       # `.sig` asset that installer expects). This job is a functional e2e, not a
       # cosign-provenance gate, so a direct download is the right tradeoff; the
       # keyless job below still uses the installer.
+      # Download through the authenticated API (gh), not an anonymous curl of the
+      # /releases/download/ URL: that route has 504'd for anonymous traffic during
+      # GitHub incidents while the API served the same asset. Retry a flaky moment.
       - name: Install cosign ${{ matrix.cosign }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          sudo curl -sSfL "https://github.com/sigstore/cosign/releases/download/${{ matrix.cosign }}/cosign-linux-amd64" -o /usr/local/bin/cosign
-          sudo chmod +x /usr/local/bin/cosign
+          for i in 1 2 3; do
+            gh release download "${{ matrix.cosign }}" -R sigstore/cosign -p cosign-linux-amd64 -O "$RUNNER_TEMP/cosign" --clobber && break
+            [ "$i" = 3 ] && exit 1; sleep 10
+          done
+          sudo install -m 0755 "$RUNNER_TEMP/cosign" /usr/local/bin/cosign
           cosign version
 
       - name: Attestation e2e (key mode, cosign ${{ matrix.cosign }})

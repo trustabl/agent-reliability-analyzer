@@ -12,7 +12,7 @@ func bodyGetter(s string) httpGetter { return fixedBody{s} }
 
 type fixedBody struct{ body string }
 
-func (g fixedBody) Get(string) (*http.Response, error) {
+func (g fixedBody) Do(*http.Request) (*http.Response, error) {
 	return &http.Response{
 		StatusCode: http.StatusOK,
 		Status:     "200 OK",
