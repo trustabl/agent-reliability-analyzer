@@ -298,6 +298,10 @@ func agentKindMatches(kind string, a models.AgentDef) bool {
 		return a.SDK == models.SDKLangChain && a.Class == "AgentExecutor"
 	case "langchain_state_graph":
 		return a.SDK == models.SDKLangChain && a.Class == "StateGraph"
+	// Deep Agents (create_deep_agent): a separate Class so the langchain_agent
+	// rules, which read ReactAgent / CreateAgent, do not start matching it.
+	case "langchain_deep_agent":
+		return a.SDK == models.SDKLangChain && a.Class == "DeepAgent"
 	// CrewAI: the single Agent(...) constructor, SDK-stamped at discovery to
 	// disambiguate from the identically-named OpenAI and ADK Agent classes.
 	case "crewai_agent":

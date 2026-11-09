@@ -2161,3 +2161,28 @@ func TestPredRepoOtelLabelsRunEndSuccessOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestPredAgentDeepAgentShellExecuteUngated(t *testing.T) {
+	for _, tc := range []struct {
+		class, shape, gate string
+		want               bool
+	}{
+		{"DeepAgent", "direct", "absent", true},
+		{"DeepAgent", "direct", "empty", true},
+		{"DeepAgent", "direct", "other_tools", true},
+		{"DeepAgent", "direct", "execute_false", true},
+		{"DeepAgent", "composite_default", "absent", true},
+		{"DeepAgent", "subclass", "absent", true},
+		{"DeepAgent", "direct", "gated", false},
+		{"DeepAgent", "direct", "unjudged", false},
+		{"DeepAgent", "direct", "", false},
+		{"DeepAgent", "", "absent", false},
+		{"CreateAgent", "direct", "absent", false},
+		{"ReactAgent", "direct", "absent", false},
+	} {
+		a := models.AgentDef{SDK: models.SDKLangChain, Class: tc.class, DeepShellBackend: tc.shape, DeepExecuteGate: tc.gate}
+		if got := rules.PredAgentDeepAgentShellExecuteUngated(a); got != tc.want {
+			t.Errorf("%s shape=%q gate=%q: got %v, want %v", tc.class, tc.shape, tc.gate, got, tc.want)
+		}
+	}
+}

@@ -84,6 +84,9 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentServerReachable != nil && PredAgentServerReachable(a, inv) != *e.AgentServerReachable {
 		return false
 	}
+	if e.AgentDeepAgentShellExecuteUngated != nil && PredAgentDeepAgentShellExecuteUngated(a) != *e.AgentDeepAgentShellExecuteUngated {
+		return false
+	}
 	if e.RepoLangGraphPlatformConfigPresent != nil && PredRepoLangGraphPlatformConfigPresent(inv) != *e.RepoLangGraphPlatformConfigPresent {
 		return false
 	}
@@ -556,6 +559,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_kwargs_observed":                     true,
 		"agent_checkpointer_in_memory":              true,
 		"agent_server_reachable":                    true,
+		"agent_deep_agent_shell_execute_ungated":    true,
 		// Dual-scope (see EvaluateAgent): LangGraph Platform injects a checkpointer.
 		"repo_langgraph_platform_config_present": true,
 	},
@@ -689,6 +693,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentKwargsObserved != nil, "agent_kwargs_observed")
 	add(e.AgentCheckpointerInMemory != nil, "agent_checkpointer_in_memory")
 	add(e.AgentServerReachable != nil, "agent_server_reachable")
+	add(e.AgentDeepAgentShellExecuteUngated != nil, "agent_deep_agent_shell_execute_ungated")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
 	add(e.SubagentInheritsAllTools != nil, "subagent_inherits_all_tools")

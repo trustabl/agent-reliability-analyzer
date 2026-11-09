@@ -1,0 +1,53 @@
+policy:
+  id: langchain_deep_agent_shell
+  name: LangChain Deep Agents host shell
+  category: langchain
+  description: >
+    Agent-scope rule for Deep Agents (create_deep_agent from the deepagents package)
+    that run shell commands on the host without an approval pause on the execute tool.
+
+rules:
+  - id: LC-118
+    title: Deep Agent with a host-shell backend and no approval on execute
+    severity: high
+    confidence: 0.6
+    language: python
+    applies_to:
+      - langchain_deep_agent
+    scope: agent
+    match:
+      agent_deep_agent_shell_execute_ungated: true
+    explanation: >
+      This create_deep_agent call is given a LocalShellBackend (directly, through a
+      variable, as the default of a CompositeBackend, or through a same-file subclass
+      that does not override execute). LocalShellBackend runs shell commands directly
+      on the host with no sandboxing or isolation. Its documentation names
+      human-in-the-loop (HITL) middleware as the strongly recommended primary
+      safeguard, lists local development CLIs and personal development environments
+      as appropriate uses, and lists web servers, APIs and multi-tenant systems as
+      inappropriate ones. create_deep_agent adds an execute tool when the backend can
+      run commands, and for a CompositeBackend it checks the default backend.
+      interrupt_on maps tool names to an approval pause. Here interrupt_on is
+      missing, empty, or has no execute entry (or sets execute to False, which
+      langchain treats as auto-approved), so the model's execute calls run without a
+      human decision. Limits of this check: it matches a local developer tool the same
+      way as a deployed service, because it cannot tell them apart. It reads
+      interrupt_on as a literal dict in this call, treats an execute entry given as a
+      config as a gate and does not read its when predicate. It does not judge a
+      HumanInTheLoopMiddleware in middleware= (or a middleware= value it cannot read
+      in full), a harness profile or excluded_tools, an interrupt_on built at run
+      time, a backend created in another module or returned by a factory, or a
+      subclass that overrides execute. A
+      subagent dict that sets its own interrupt_on overrides the parent's for that
+      subagent; that case is not checked. It does not show that untrusted input can
+      reach the agent. FilesystemPermission rules are not a substitute: the
+      middleware raises NotImplementedError for permissions on a backend that runs
+      commands unless each path is scoped to a composite route.
+    fix: >
+      Pass interrupt_on={"execute": True} together with a checkpointer, since the
+      pause is a LangGraph interrupt and the run resumes from saved state. Or use a
+      backend that does not run commands (StateBackend, StoreBackend) or an isolated
+      sandbox that extends BaseSandbox. Drop inherit_env=True unless the commands need
+      the server's environment variables, since they are then visible to each command
+      the model runs. Keep LocalShellBackend for local development on a trusted
+      machine.

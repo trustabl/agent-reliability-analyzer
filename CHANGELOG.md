@@ -6,6 +6,35 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+Rule schema 41 → 44 (`rules.SupportedSchemaVersion`, provisional: 42 and 43 are held by branches
+not yet on main, so a later merge may renumber). The rules fixture goes from 389 to 390 rules.
+`ScanID` changes, as with every schema bump. Engines older than this release skip LC-118 and
+report a degraded scan ("rules skipped", META-005) until they are upgraded.
+
+### Added
+
+- **Deep Agent with a host-shell backend and no approval on execute (rule schema 41 → 44,
+  provisional).** One new agent-scope predicate, `agent_deep_agent_shell_execute_ungated`, one
+  new `applies_to` token, `langchain_deep_agent`, and rule **LC-118** (high, 0.6, pack file
+  `langchain/deep_agent_shell.yaml`). It flags a Python `create_deep_agent(...)` call from the
+  `deepagents` package whose `backend=` is a `LocalShellBackend` and whose `interrupt_on` is
+  missing, `None`, `{}`, a dict with no `"execute"` key, or sets `"execute"` to `False`. The
+  backend counts as a host shell when it is `LocalShellBackend(...)` directly, a variable bound
+  once and unconditionally to it in the call's function or at module level, a `CompositeBackend`
+  whose default is one (a `LocalShellBackend` only in `routes` does not expose `execute`), or a
+  same-file subclass that overrides neither `execute` nor `aexecute`. Not judged: a backend built
+  by a factory, a lambda or another module; a `middleware=` value that is not a literal list of
+  calls or that holds a `HumanInTheLoopMiddleware(...)` call; a harness profile or
+  `excluded_tools` in the file; an `interrupt_on` that is not a literal dict; an `execute`
+  entry given as a config (treated as a gate, its `when` predicate is not read); and a subagent
+  dict that sets its own `interrupt_on`. A local developer tool is matched the same way as a
+  deployed service. There is no Critical tier: the engine cannot link a Deep Agent to a server
+  entrypoint. `async_create_deep_agent` is not matched, because the library does not define it.
+  New discovery `DiscoverDeepAgents` (`internal/analysis/deepagents_agents.go`) emits one
+  `AgentDef` (SDK `langchain`, Class `DeepAgent`) per call bound to `deepagents` by import; the
+  new Class keeps the `langchain_agent` rules from matching it. Backed by the in-memory
+  `AgentDef.DeepShellBackend` and `AgentDef.DeepExecuteGate`. Primary source: CVE-2026-77926.
+
 ## [0.1.16] - 2026-11-09
 
 Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
