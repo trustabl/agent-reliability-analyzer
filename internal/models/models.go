@@ -94,6 +94,10 @@ const (
 	// events any GitHub user can cause (CI-*). Not an SDK; loads
 	// unconditionally, the rule predicate gates.
 	CategoryCI DetectorCategory = "ci"
+	// CategoryAgentServer covers how a server the repo runs for an agent is
+	// exposed to browsers and networks (AGSRV-*). Not an SDK; loads
+	// unconditionally, the rule predicate gates.
+	CategoryAgentServer DetectorCategory = "agent_server"
 )
 
 // display order. It is the single source of truth for category membership:
@@ -105,7 +109,7 @@ var AllCategories = []DetectorCategory{
 	CategoryClaudeSDK, CategoryOpenAISDK, CategoryOpenShell, CategoryGoogleADK,
 	CategoryMCP, CategoryLangChain, CategoryCrewAI, CategoryPydanticAI,
 	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill, CategoryObservability,
-	CategoryRawLLMSDK, CategoryAgentConfig, CategoryCI,
+	CategoryRawLLMSDK, CategoryAgentConfig, CategoryCI, CategoryAgentServer,
 }
 
 // ValidCategory reports whether c is a category this build recognizes. The rule
@@ -400,6 +404,12 @@ type ScanManifest struct {
 	// depth; the generated .husky/_ helper directory is left out). Sorted. Read by
 	// AGCFG-015 only.
 	HuskyFiles []string `json:"husky_files,omitempty"`
+	// PropertiesFiles holds application*.properties files at any depth. Sorted.
+	// Read by AGSRV-001 only.
+	PropertiesFiles []string `json:"properties_files,omitempty"`
+	// ServerScriptFiles holds Dockerfile*, *.dockerfile, Makefile and *.sh files at
+	// any depth. Sorted. Read by AGSRV-001 and AGSRV-002 only.
+	ServerScriptFiles []string `json:"server_script_files,omitempty"`
 	// GuidanceFiles holds the agent guidance files the walk keeps beyond the
 	// ordinary extension lists: .cursor/rules/**/*.mdc, .windsurfrules,
 	// .windsurf/rules and .devin/rules *.md, .github/copilot-instructions.md and

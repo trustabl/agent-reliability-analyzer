@@ -1,0 +1,17 @@
+services:
+  loopback:
+    image: ghcr.io/openhands/agent-server:latest-python
+    command: ["--host", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:8010:8000"
+  keyed:
+    image: ghcr.io/openhands/agent-server:latest-python
+    command: ["--host", "0.0.0.0"]
+    ports:
+      - "8011:8000"
+    environment:
+      - OH_SESSION_API_KEYS_0
+  default-host:
+    image: ghcr.io/openhands/agent-server:latest-python
+    ports:
+      - "8012:8000"

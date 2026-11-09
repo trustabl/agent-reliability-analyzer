@@ -124,7 +124,7 @@ func (d repoRuleDetector) Applies(p models.RepoProfile, inv models.RepoInventory
 			continue
 		}
 		// "raw_llm_sdk" is likewise not an SDK; the rule's own predicate gates.
-		if k == "raw_llm_sdk" || k == "agent_config" || k == "github_actions" {
+		if k == "raw_llm_sdk" || k == "agent_config" || k == "github_actions" || k == "agent_server" {
 			return true
 		}
 		// The repo-scope applies_to tokens are category labels, which equal
@@ -226,6 +226,10 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.AllowAllBash
 	case m.RepoScriptRunsAgentCliWithBypassFlag != nil:
 		hits = pc.ScriptAgentBypass
+	case m.RepoAgentServerAllowsAnyOrigin != nil:
+		hits = pc.AnyOriginServer
+	case m.RepoAgentServerExposedWithoutKey != nil:
+		hits = pc.AgentServerNoKey
 	}
 	if len(hits) == 0 {
 		return "", 0
@@ -436,6 +440,9 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 		// the workflow files exist with no SDK code in the repo. The rule
 		// predicates do the gating.
 		"ci": true,
+		// agent_server (exposure of a server the repo runs for an agent) is not an
+		// SDK either: the files it reads exist with no SDK import. Predicates gate.
+		"agent_server": true,
 	}
 	for _, sdk := range sdks {
 		switch sdk {

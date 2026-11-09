@@ -350,6 +350,16 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Agent server exposure (2026-11-09, `schema_version` 42 -> 43, provisional; +2 rules; schema 42 is held by
+> the observability reasoning-evidence batch, branch `TR-1496-cot-obs-rules`, which merges first):** new unconditionally-loaded
+> category `agent_server` (pack dir `agent_server/`, prefix `AGSRV-`, outside the NNN/1NN/2NN convention; registered in
+> `models.ValidCategory`, `loader.go` repo-scope applies_to, `rule_detector.go`). **AGSRV-001** (high, 0.6, `any_origin.yaml`)
+> over `repo_agent_server_allows_any_origin` (`ProjectConfigFacts.AnyOriginServer`) and **AGSRV-002** (critical, 0.7,
+> `unauthenticated_publish.yaml`) over `repo_agent_server_exposed_without_key` (`AgentServerNoKey`; needs a non-loopback `--host`, a port published on all interfaces and no session key name). Sources: CVE-2026-107858
+> (ADK Java dev server) and the VulnCheck advisory for CVE-2026-112346 (OpenHands). Spring config files only for Java; Java source
+> is not parsed (follow-up). Key names are read, values never stored. The fixture holds **391** rules (389 + 2; re-derive; 393 once
+> the observability batch lands). Rulebook docs: `docs/Policy/agent_server/`.
+>
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
 > `ProjectConfigFacts.ScriptAgentBypass`, and **AGCFG-016** (high, 0.7, pack file `agent_config/allow_all_bash.yaml`) over

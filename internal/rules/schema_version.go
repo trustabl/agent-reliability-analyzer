@@ -65,4 +65,9 @@ package rules
 //
 // Schema 41 adds the repo_settings_allow_all_bash and
 // repo_script_runs_agent_cli_with_bypass_flag predicates (repo scope).
-const SupportedSchemaVersion = 41
+//
+// Schema 43 adds the repo_agent_server_allows_any_origin and
+// repo_agent_server_exposed_without_key predicates (repo scope, category
+// agent_server). Schema 42 is held by the observability reasoning-evidence
+// batch (branch TR-1496-cot-obs-rules), which merges first.
+const SupportedSchemaVersion = 43
