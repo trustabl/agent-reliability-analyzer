@@ -2056,6 +2056,28 @@ func PredAgentServerReachable(a models.AgentDef, inv models.RepoInventory) bool 
 	return false
 }
 
+// PredAgentDeepAgentShellExecuteUngated is true for a Deep Agent (Class
+// "DeepAgent") whose backend= discovery resolved to a host shell
+// (AgentDef.DeepShellBackend: LocalShellBackend, directly, through a same-file
+// variable, as the default of a CompositeBackend, or a same-file subclass that
+// does not override execute) and whose interrupt_on, read as a literal dict in
+// the call, is missing, empty, has no "execute" entry, or sets it to False
+// (AgentDef.DeepExecuteGate). Every case discovery could not read is false:
+// "gated" and "unjudged" never fire. Not judged: a HumanInTheLoopMiddleware or
+// any other value in middleware=, a harness profile or excluded_tools in the
+// file, an interrupt_on that is not a literal dict, a subagent dict that sets
+// its own interrupt_on, and a backend built by a factory or in another module.
+func PredAgentDeepAgentShellExecuteUngated(a models.AgentDef) bool {
+	if a.Class != "DeepAgent" || a.DeepShellBackend == "" {
+		return false
+	}
+	switch a.DeepExecuteGate {
+	case "absent", "empty", "other_tools", "execute_false":
+		return true
+	}
+	return false
+}
+
 // PredRepoLangGraphPlatformConfigPresent reports whether the repo ships a
 // langgraph.json (any depth). A LangGraph Platform deployment injects its own
 // checkpointer, so a compile() with no checkpointer= is intended there. Dual

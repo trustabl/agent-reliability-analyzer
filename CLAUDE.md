@@ -350,6 +350,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Deep Agent host shell without approval (2026-11-09, `schema_version` 41 -> 44, provisional; +1 rule):** **LC-118** (high, 0.6, agent
+> scope, `langchain/deep_agent_shell.yaml`) over the new predicate `agent_deep_agent_shell_execute_ungated` and the new `applies_to` token
+> `langchain_deep_agent`. Discovery (`analysis/deepagents_agents.go`) emits one `AgentDef` (SDK `langchain`, Class `DeepAgent`) per
+> `create_deep_agent(...)` bound to `deepagents`, stamping `DeepShellBackend` and `DeepExecuteGate`. Same-file only: a factory, a lambda, a
+> backend from another module, a `HumanInTheLoopMiddleware` in `middleware=` and a subagent dict's own `interrupt_on` are not judged. No
+> Critical tier: the engine cannot link this agent to a server entrypoint. 42 and 43 are held by branches not yet on main, so 44 is
+> provisional. The fixture holds **390** rules (389 + 1; re-derive). Primary source: CVE-2026-77926; the grounding is in the rulebook doc
+> `docs/Policy/langchain/deep_agent_shell.md`.
+>
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
 > `ProjectConfigFacts.ScriptAgentBypass`, and **AGCFG-016** (high, 0.7, pack file `agent_config/allow_all_bash.yaml`) over

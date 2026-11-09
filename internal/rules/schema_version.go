@@ -65,4 +65,8 @@ package rules
 //
 // Schema 41 adds the repo_settings_allow_all_bash and
 // repo_script_runs_agent_cli_with_bypass_flag predicates (repo scope).
-const SupportedSchemaVersion = 41
+//
+// Schema 44 adds the agent_deep_agent_shell_execute_ungated predicate (agent
+// scope) and the langchain_deep_agent applies_to token. Provisional: 42 and 43
+// are held by branches not yet on main, so a later merge may renumber.
+const SupportedSchemaVersion = 44

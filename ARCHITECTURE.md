@@ -1143,6 +1143,22 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   synthetic kwarg. `langchain_hosted_tools.go` classifies the `PythonREPLTool` /
   `PythonAstREPLTool` / `ShellTool` / `Requests*` built-ins in an agent's tool list
   as `HostedToolDef`s (SDK `langchain`).
+- **DiscoverDeepAgents** (`deepagents_agents.go`) — Python Deep Agents. One
+  `create_deep_agent(...)` call bound to the `deepagents` package by import
+  (`from deepagents import create_deep_agent [as X]`, `deepagents.create_deep_agent`)
+  → `AgentDef` SDK `langchain`, Class `DeepAgent`. The Class is separate from
+  `ReactAgent` / `CreateAgent` so the `langchain_agent` rules do not match it; rules
+  target it with `applies_to: langchain_deep_agent`. Two in-memory facts are stamped
+  for LC-118: `DeepShellBackend` (`backend=` resolves in the same file to a host
+  shell: `LocalShellBackend(...)`, a variable bound once and unconditionally to it, a
+  `CompositeBackend` whose default is one — a LocalShellBackend only inside `routes`
+  does not expose `execute` — or a same-file subclass that does not override
+  `execute` / `aexecute`) and `DeepExecuteGate` (what a literal `interrupt_on` dict
+  says about `"execute"`; `unjudged` when middleware, a harness profile, a splat or a
+  non-literal value could change it). Factories, lambdas, other-module backends and
+  subagent `interrupt_on` overrides are not resolved. `async_create_deep_agent` is not
+  matched (the library does not define it). `PredAgentDeepAgentShellExecuteUngated`
+  reads the two facts.
 - **DiscoverLangGraphGraphs** (`langgraph_graph.go`) — Python raw LangGraph
   graphs. The imperative `StateGraph(...)` → `.add_node` / `.add_edge` →
   `.compile()` builder is emergent across many call sites, so the single-call

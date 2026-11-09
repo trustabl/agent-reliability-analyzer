@@ -346,7 +346,7 @@ var appliesToByScope = map[models.Scope][]string{
 		"claude_query_main",
 		"adk_llm_agent", "adk_sequential_agent", "adk_parallel_agent",
 		"adk_loop_agent", "adk_langgraph_agent",
-		"langchain_agent", "langchain_agent_executor", "langchain_state_graph",
+		"langchain_agent", "langchain_agent_executor", "langchain_state_graph", "langchain_deep_agent",
 		"crewai_agent", "pydantic_ai_agent", "vercel_ai_agent",
 		"autogen_conversable_agent", "autogen_user_proxy_agent",
 		"autogen_assistant_agent", "autogen_group_chat_manager",
