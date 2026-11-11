@@ -8304,6 +8304,9 @@ func TestPolicyRules_AllRulesCovered(t *testing.T) {
 	for _, tc := range policySkillRuleCases {
 		record(tc.ruleID, tc.wantFires)
 	}
+	for _, tc := range policySlashCommandRuleCases {
+		record(tc.ruleID, tc.wantFires)
+	}
 	var missingAny, missingFire, missingSilent []string
 	for _, p := range policies {
 		for _, r := range p.Rules {

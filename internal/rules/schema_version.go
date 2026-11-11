@@ -65,4 +65,10 @@ package rules
 //
 // Schema 41 adds the repo_settings_allow_all_bash and
 // repo_script_runs_agent_cli_with_bypass_flag predicates (repo scope).
-const SupportedSchemaVersion = 41
+//
+// Schema 45 (provisional; 42-44 are held by open branches) adds the
+// slash_command scope (applies_to claude_slash_command) and its three predicates,
+// slash_command_allows_unrestricted_shell, slash_command_model_invocable and
+// slash_command_allows_unrestricted_tool. A binary without the scope skips those
+// rules with META-005.
+const SupportedSchemaVersion = 45

@@ -1212,7 +1212,14 @@ func skillGrantIsUnrestricted(g models.ToolGrant) bool {
 // pattern (`Bash(*)` / `Bash(:*)`). allowed-tools is an auto-approval list, not a
 // sandbox, so this lets the skill run any shell command without prompting.
 func PredSkillAllowsUnrestrictedShell(s models.SkillDef) bool {
-	for _, g := range s.ToolGrants {
+	return grantsUnrestrictedShell(s.ToolGrants)
+}
+
+// grantsUnrestrictedShell reports whether any grant is a Bash grant that places
+// no command restriction. Shared by the skill and slash-command predicates so
+// both file kinds (Claude Code treats a command file as a skill) read one rule.
+func grantsUnrestrictedShell(grants []models.ToolGrant) bool {
+	for _, g := range grants {
 		if g.Tool == "Bash" && skillGrantIsUnrestricted(g) {
 			return true
 		}
@@ -1227,21 +1234,51 @@ func PredSkillAllowsUnrestrictedShell(s models.SkillDef) bool {
 // allowed-tools token with no parsed grant (s.AllowedTools fallback) is
 // treated as unrestricted, since a bare token is unrestricted by definition.
 func PredSkillAllowsUnrestrictedTool(s models.SkillDef, names []string) bool {
+	return grantsUnrestrictedTool(s.ToolGrants, s.AllowedTools, names)
+}
+
+// grantsUnrestrictedTool reports whether any of names is granted with no real
+// restriction. A raw allowed-tools token with no parsed grant is treated as
+// unrestricted. Shared by the skill and slash-command predicates.
+func grantsUnrestrictedTool(grants []models.ToolGrant, tokens []string, names []string) bool {
 	want := make(map[string]bool, len(names))
 	for _, n := range names {
 		want[n] = true
 	}
-	for _, g := range s.ToolGrants {
+	for _, g := range grants {
 		if want[g.Tool] && skillGrantIsUnrestricted(g) {
 			return true
 		}
 	}
-	for _, t := range s.AllowedTools {
+	for _, t := range tokens {
 		if want[t] {
 			return true
 		}
 	}
 	return false
+}
+
+// ─── slash-command predicates ─────────────────────────────────────────────────
+
+// PredSlashCommandAllowsUnrestrictedShell reports whether the slash command
+// pre-approves unrestricted shell through allowed-tools: a bare Bash grant or a
+// wildcard pattern (Bash(*) / Bash(:*)).
+func PredSlashCommandAllowsUnrestrictedShell(c models.SlashCommandDef) bool {
+	return grantsUnrestrictedShell(c.ToolGrants)
+}
+
+// PredSlashCommandModelInvocable reports whether the model can start the
+// command itself (disable-model-invocation is not set).
+func PredSlashCommandModelInvocable(c models.SlashCommandDef) bool {
+	return !c.DisableModelInvocation
+}
+
+// PredSlashCommandAllowsUnrestrictedTool reports whether the slash command
+// pre-approves any of names with a genuinely unrestricted grant. A scoped grant
+// (Edit(docs/**), WebFetch(domain:example.com)) does not count; a Write or
+// NotebookEdit grant always counts (Claude Code ignores a path on those).
+func PredSlashCommandAllowsUnrestrictedTool(c models.SlashCommandDef, names []string) bool {
+	return grantsUnrestrictedTool(c.ToolGrants, c.AllowedTools, names)
 }
 
 var (

@@ -145,6 +145,21 @@ rules are CSDK-110 ("Subagent granted the built-in Bash tool"), CSDK-111
 ("Subagent granted filesystem-write or web-fetch built-ins"), CSDK-112 and
 CSDK-115, all in `claude_sdk/subagent_safety.yaml`.
 
+**`scope: slash_command`** — receives a `SlashCommandDef` (one
+`.claude/commands/*.md`, or a plugin `<root>/commands/*.md`). `applies_to` is
+matched against a fixed token:
+
+| `applies_to` value     | Matches                                         |
+| ---------------------- | ----------------------------------------------- |
+| `claude_slash_command` | A Claude Code slash command file (any path depth) |
+
+Slash command rules use the `slash_command_*` predicate family
+(`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+`slash_command_allows_unrestricted_tool`), which share their grant logic with
+the skill predicates. They carry **no `language:` field**. The shipped rules are
+CCMD-001..003 in `claude_skill/slash_command_safety.yaml`; the IDs sit outside
+the SDK-prefix convention, like AGCFG.
+
 ## "Add a rule for X"
 
 Default sequence:

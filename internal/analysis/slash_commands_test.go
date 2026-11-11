@@ -75,3 +75,39 @@ func TestSlashCommands_DeterministicOrderAndIgnoresOtherKinds(t *testing.T) {
 		t.Fatalf("expected 2 commands sorted by FilePath, got %+v", got)
 	}
 }
+
+// disable-model-invocation written as a string, a number or a YAML 1.1 bool word
+// must not drop the frontmatter (allowed-tools stays parsed), and a spelling that
+// reads as true counts as true.
+func TestSlashCommands_DisableModelInvocationSpellings(t *testing.T) {
+	cases := []struct {
+		value string
+		want  bool
+	}{
+		{`true`, true}, {`True`, true}, {`TRUE`, true}, {`"true"`, true}, {`"True"`, true},
+		{`'true'`, true}, {`yes`, true}, {`"yes"`, true}, {`"Yes"`, true}, {`on`, true},
+		{`1`, true}, {`"1"`, true},
+		{`false`, false}, {`"false"`, false}, {`no`, false}, {`"no"`, false}, {`0`, false}, {`""`, false},
+		{`"maybe"`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.value, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFixture(t, dir, ".claude/commands/c.md",
+				"---\ndisable-model-invocation: "+tc.value+"\nallowed-tools: Write\n---\nbody\n")
+			got := analysis.DiscoverSlashCommands(models.ScanManifest{
+				RepoRoot:   dir,
+				Components: []models.AgentComponent{{Kind: models.ComponentSlashCommand, Path: ".claude/commands/c.md"}},
+			})
+			if len(got) != 1 {
+				t.Fatalf("got %d commands", len(got))
+			}
+			if got[0].DisableModelInvocation != tc.want {
+				t.Errorf("DisableModelInvocation = %v, want %v", got[0].DisableModelInvocation, tc.want)
+			}
+			if !reflect.DeepEqual(got[0].AllowedTools, []string{"Write"}) {
+				t.Errorf("AllowedTools = %v; frontmatter was dropped", got[0].AllowedTools)
+			}
+		})
+	}
+}

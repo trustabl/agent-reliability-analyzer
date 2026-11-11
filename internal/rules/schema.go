@@ -136,6 +136,11 @@ type MatchExpr struct {
 	SkillDescriptionHasText                 []string            `yaml:"skill_description_has_text,omitempty"`
 	SkillTextMatches                        *SkillTextMatchExpr `yaml:"skill_text_matches,omitempty"`
 
+	// Slash-command-scope predicates
+	SlashCommandAllowsUnrestrictedShell *bool    `yaml:"slash_command_allows_unrestricted_shell,omitempty"`
+	SlashCommandModelInvocable          *bool    `yaml:"slash_command_model_invocable,omitempty"`
+	SlashCommandAllowsUnrestrictedTool  []string `yaml:"slash_command_allows_unrestricted_tool,omitempty"`
+
 	// Repo-scope predicates
 	RepoHasSDKInCode                        []string                    `yaml:"repo_has_sdk_in_code,omitempty"`
 	RepoComponentPresent                    []string                    `yaml:"repo_component_present,omitempty"`
