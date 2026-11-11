@@ -85,7 +85,7 @@ rules:
                                             # for that kind. Cross-SDK rules belong in their own
                                             # SDK-specific policy file with their own framing.
 
-    scope: tool                             # REQUIRED. One of: tool | agent | subagent | skill | repo.
+    scope: tool                             # REQUIRED. One of: tool | agent | subagent | skill | slash_command | repo.
                                             #   tool  — fires per ToolDef. Input: a ToolDef + ParsedFile.
                                             #           applies_to accepts: claude_sdk_tool, openai_tool,
                                             #           mcp_tool, adk_function_tool, shell_invocation, unknown,
@@ -106,6 +106,9 @@ rules:
                                             #           claude_subagent.
                                             #   skill — fires per Claude Code skill (SKILL.md). applies_to accepts:
                                             #           claude_skill.
+                                            #   slash_command — fires per Claude Code slash command
+                                            #           (.claude/commands/*.md). applies_to accepts:
+                                            #           claude_slash_command.
                                             #   repo  — fires once per scan. applies_to accepts:
                                             #           claude_sdk, openai_agents, google_adk, openshell, mcp,
                                             #           langchain, crewai, pydantic_ai, vercel_ai, autogen,
@@ -477,6 +480,30 @@ rules:
 #       A `tools:` key with an empty or null value counts as declared (false).
 #       Files found by the frontmatter-shape fallback are excluded. Used by
 #       CSDK-115.
+#
+#
+# ━━━ SLASH-COMMAND-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# (used only in scope: slash_command rules — Claude Code slash commands,
+# .claude/commands/*.md. Claude Code treats a command file as a skill that
+# takes the same frontmatter, so these mirror the skill predicates and share
+# their grant logic.)
+#
+#   slash_command_allows_unrestricted_shell: true
+#       Fires when allowed-tools pre-approves unrestricted shell: a bare `Bash`
+#       grant or a wildcard pattern (Bash(*) / Bash(:*)). Same logic as
+#       skill_allows_unrestricted_shell. Bool predicate; negate with `false`.
+#
+#   slash_command_model_invocable: true
+#       Fires when the model can start the command itself
+#       (disable-model-invocation is not set). Bool predicate.
+#
+#   slash_command_allows_unrestricted_tool: [Write, Edit, WebFetch, ...]
+#       Fires when allowed-tools pre-approves any of the given tool names with a
+#       genuinely unrestricted grant. Same pattern rules as
+#       skill_allows_unrestricted_tool: a scoped grant (Edit(docs/**),
+#       WebFetch(domain:example.com), Bash(git status *)) does not count; Write
+#       and NotebookEdit always count; a tool with no specifier (WebSearch)
+#       counts when listed.
 #
 #
 # ━━━ SKILL-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

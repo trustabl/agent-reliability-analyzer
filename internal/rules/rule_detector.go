@@ -377,6 +377,34 @@ func (d skillRuleDetector) Detect(s models.SkillDef, inv models.RepoInventory) [
 	return []models.Finding{findingFromRule(d.rule, models.ScopeSkill, s.FilePath, s.Line, s.EndLine, s.Name)}
 }
 
+// slashCommandRuleDetector adapts a slash_command-scoped RuleDef into a
+// SlashCommandDetector.
+type slashCommandRuleDetector struct{ rule RuleDef }
+
+func (d slashCommandRuleDetector) RuleID() string                    { return d.rule.ID }
+func (d slashCommandRuleDetector) Category() models.DetectorCategory { return d.rule.Category }
+func (d slashCommandRuleDetector) Applies(c models.SlashCommandDef) bool {
+	// No language gate: a command file is markdown, so SlashCommandDef has no
+	// Language. Slash commands are inherently Claude Code artifacts.
+	for _, k := range d.rule.AppliesTo {
+		if k == "claude_slash_command" {
+			return true
+		}
+	}
+	return false
+}
+func (d slashCommandRuleDetector) Detect(c models.SlashCommandDef, inv models.RepoInventory) []models.Finding {
+	if !d.rule.Match.EvaluateSlashCommand(c, inv) {
+		return nil
+	}
+	// A command file under a test path is classified by internal/pathclass from
+	// the finding's FilePath like any other finding: reported, tagged test-origin,
+	// and left out of scoring and the exit-code gate by default.
+	// SlashCommandDef embeds Location: Line = the opening "---" of the
+	// frontmatter (1 when the file has none).
+	return []models.Finding{findingFromRule(d.rule, models.ScopeSlashCommand, c.FilePath, c.Line, c.EndLine, c.Name)}
+}
+
 // NewToolRuleDetector wraps a RuleDef as a ToolDetector. Exported for test packages.
 func NewToolRuleDetector(r RuleDef) detectors.ToolDetector { return toolRuleDetector{r} }
 
@@ -391,6 +419,11 @@ func NewSubagentRuleDetector(r RuleDef) detectors.SubagentDetector { return suba
 
 // NewSkillRuleDetector wraps a RuleDef as a SkillDetector. Exported for test packages.
 func NewSkillRuleDetector(r RuleDef) detectors.SkillDetector { return skillRuleDetector{r} }
+
+// NewSlashCommandRuleDetector wraps a RuleDef as a SlashCommandDetector. Exported for test packages.
+func NewSlashCommandRuleDetector(r RuleDef) detectors.SlashCommandDetector {
+	return slashCommandRuleDetector{r}
+}
 
 func findingFromRule(r RuleDef, scope models.Scope, filePath string, startLine, endLine int, toolName string) models.Finding {
 	return models.Finding{
@@ -489,6 +522,7 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 	var repo []detectors.RepoDetector
 	var subagent []detectors.SubagentDetector
 	var skill []detectors.SkillDetector
+	var slashCommand []detectors.SlashCommandDetector
 	for _, p := range all {
 		if !wanted[string(p.Policy.Category)] {
 			continue
@@ -505,10 +539,12 @@ func LoadFor(fsys fs.FS, sdks []models.SDK) (*detectors.Registry, []string, erro
 				subagent = append(subagent, subagentRuleDetector{r})
 			case models.ScopeSkill:
 				skill = append(skill, skillRuleDetector{r})
+			case models.ScopeSlashCommand:
+				slashCommand = append(slashCommand, slashCommandRuleDetector{r})
 			}
 		}
 	}
-	return detectors.New(tool, agent, repo, subagent, skill), skipped, nil
+	return detectors.New(tool, agent, repo, subagent, skill).WithSlashCommand(slashCommand), skipped, nil
 }
 
 // LoadRegistry loads policies from fsys and returns a populated detector Registry.
@@ -522,6 +558,7 @@ func LoadRegistry(fsys fs.FS) (*detectors.Registry, error) {
 	var repo []detectors.RepoDetector
 	var subagent []detectors.SubagentDetector
 	var skill []detectors.SkillDetector
+	var slashCommand []detectors.SlashCommandDetector
 	for _, p := range policies {
 		for _, r := range p.Rules {
 			switch r.Scope {
@@ -535,8 +572,10 @@ func LoadRegistry(fsys fs.FS) (*detectors.Registry, error) {
 				subagent = append(subagent, subagentRuleDetector{r})
 			case models.ScopeSkill:
 				skill = append(skill, skillRuleDetector{r})
+			case models.ScopeSlashCommand:
+				slashCommand = append(slashCommand, slashCommandRuleDetector{r})
 			}
 		}
 	}
-	return detectors.New(tool, agent, repo, subagent, skill), nil
+	return detectors.New(tool, agent, repo, subagent, skill).WithSlashCommand(slashCommand), nil
 }

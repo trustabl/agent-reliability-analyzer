@@ -26,9 +26,9 @@ and internal prefixes (e.g. the clone temp-dir `trustabl-clone-*`). When in
 doubt: if a human reads it as a sentence, it's "Trustabl"; if a machine
 parses it as a token, it's `trustabl`.
 
-## Detection model: five scopes
+## Detection model: six scopes
 
-Every rule is classified into exactly one of five scopes. The `scope:`
+Every rule is classified into exactly one of six scopes. The `scope:`
 field is REQUIRED on every rule — the loader rejects a rule with no
 `scope:` (there is no longer a default-to-`tool` fallback; that historical
 behavior was removed when the loader adopted strict decoding).
@@ -79,6 +79,16 @@ behavior was removed when the loader adopted strict decoding).
     dynamic-context command performs network egress or reads secrets
     (CSKILL-003), model-invocable skill grants side-effecting tools
     (CSKILL-050).
+
+- **`slash_command`** — fires per `.claude/commands/*.md` declaration.
+  - **Input**: a `SlashCommandDef` parsed from markdown frontmatter
+    (`allowed-tools[]` → `ToolGrants`, `disable-model-invocation`). Matched at
+    any path depth. No `Language` field, so slash command rules carry no
+    `language:` field. Claude Code treats a command file as a skill, so the
+    predicates share the skill grant logic.
+  - **Examples**: command pre-approves unrestricted `Bash` (CCMD-001),
+    model-invocable command pre-approves file writes (CCMD-002), command
+    pre-approves `WebSearch` or an unrestricted `WebFetch` (CCMD-003).
 
 - **`repo`** — fires once per scan against the whole repo.
   - **Input**: `RepoProfile` + `RepoInventory` (languages, declared SDK
@@ -190,7 +200,7 @@ Rules:
 ### Step 4 — Analysis
 
 Run the selected policy packs against the inventory. Detectors are
-scope-aware (see the five-scope model above) and receive typed inputs:
+scope-aware (see the six-scope model above) and receive typed inputs:
 
 - `tool`-scoped detectors receive a `ToolDef`.
 - `agent`-scoped detectors receive an `AgentDef` with its resolved
@@ -249,10 +259,11 @@ SDK-specific. A Claude-SDK rule and an OpenAI-Agents-SDK rule that detect
 the same conceptual problem (e.g. missing timeout) are TWO separate rules
 in different policy files, each with framing that matches the target SDK.
 
-This holds at all five scopes:
+This holds at all six scopes:
 - Tool scope: `applies_to: [claude_sdk_tool]` vs `[openai_tool]`.
 - Agent scope: `applies_to: [openai_agent]` vs `[claude_agent_definition]`.
 - Repo scope: rules are organized by the SDK they target.
+- Slash command scope: `applies_to: [claude_slash_command]` — Claude-only.
 - Skill scope: `applies_to: [claude_skill]` — Claude-only, no cross-SDK
   equivalent, and skills carry no `language:`.
 
@@ -350,6 +361,16 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Slash command rules, CCMD-001..003 (2026-11-11, `schema_version` 41 -> 45, provisional; +3 rules):** new `slash_command` scope
+> (`applies_to: [claude_slash_command]`, evaluator `EvaluateSlashCommand`, detectors attached with `Registry.WithSlashCommand`) and predicates
+> `slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`, `slash_command_allows_unrestricted_tool`, backed by the existing
+> `SlashCommandDef` discovery and sharing grant logic with the skill predicates. **CCMD-001** (high, 0.9), **CCMD-002** (high, 0.8),
+> **CCMD-003** (medium, 0.7), pack file `claude_skill/slash_command_safety.yaml`. A scoped grant (`Bash(git status *)`,
+> `Edit(docs/**)`, `WebFetch(domain:...)`) is silent. The rules first shipped in rules #138 and were reverted in #139 with the rest of that
+> bulk reconcile (the engine had no scope then). Not scored: command findings are not a surface, so no score changes (follow-up). A
+> command under a test path is tagged test-origin by `internal/pathclass`. The fixture holds **392** rules (389 + 3; re-derive).
+> Rulebook doc: `docs/Policy/claude_skill/slash_command_safety.md`.
+>
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
 > `ProjectConfigFacts.ScriptAgentBypass`, and **AGCFG-016** (high, 0.7, pack file `agent_config/allow_all_bash.yaml`) over

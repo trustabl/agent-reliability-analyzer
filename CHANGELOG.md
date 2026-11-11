@@ -6,6 +6,31 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+Rule schema 41 → 45 (`rules.SupportedSchemaVersion`, provisional: 42 to 44 are held by open
+branches). The rules fixture goes from 389 to 392 rules. `ScanID` changes, as with every
+schema bump, because it folds the engine's supported schema version. Engines without schema 45
+skip the three new rules and report a degraded scan ("rules skipped", META-005) until they are
+upgraded.
+
+### Added
+
+- **Slash command rules (rule schema 41 → 45, provisional).** New `slash_command` scope
+  (`applies_to: [claude_slash_command]`) over the existing `.claude/commands/*.md` discovery,
+  three predicates (`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+  `slash_command_allows_unrestricted_tool`) and rules **CCMD-001** (high, 0.9; a bare `Bash`,
+  `Bash(*)` or `Bash(:*)` grant in `allowed-tools`), **CCMD-002** (high, 0.8; a command the
+  model can start that pre-approves `Write`, `Edit`, `MultiEdit` or `NotebookEdit` with no
+  restricting pattern) and **CCMD-003** (medium, 0.7; `WebSearch` or a `WebFetch` with no
+  domain pattern), pack file `claude_skill/slash_command_safety.yaml`. Claude Code treats a
+  command file as a skill, so the predicates share their grant logic with the skill predicates;
+  a scoped grant such as `Bash(git status *)`, `Edit(docs/**)` or
+  `WebFetch(domain:example.com)` is silent. `disable-model-invocation` is read leniently
+  (`true`, `yes`, `on`, `y`, `1`, quoted or not), so a quoted value no longer drops a command's
+  whole frontmatter. The rules first shipped in rules #138 and were reverted in #139 with the
+  rest of that bulk reconcile. Command findings are not a scored surface, so no score changes;
+  a command under a test path is tagged test-origin like any finding. Not read: command bodies,
+  `~/.claude/commands`, MCP fetch tools.
+
 ## [0.1.16] - 2026-11-09
 
 Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes

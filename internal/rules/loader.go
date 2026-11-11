@@ -216,9 +216,9 @@ func loadPolicies(fsys fs.FS, lenient bool) ([]PolicyFile, []string, error) {
 				errs = append(errs, fmt.Errorf("%s: unknown language %q (allowed: %s)", tag, rule.Language, languageAllowList()))
 			}
 			if rule.Scope == "" {
-				errs = append(errs, fmt.Errorf("%s: scope is required (tool|agent|repo|subagent|skill)", tag))
+				errs = append(errs, fmt.Errorf("%s: scope is required (tool|agent|repo|subagent|skill|slash_command)", tag))
 			} else if !models.ValidScope(rule.Scope) {
-				errs = append(errs, fmt.Errorf("%s: unknown scope %q (allowed: tool, agent, repo, subagent, skill)", tag, rule.Scope))
+				errs = append(errs, fmt.Errorf("%s: unknown scope %q (allowed: tool, agent, repo, subagent, skill, slash_command)", tag, rule.Scope))
 			}
 			// Reject a match nested beyond the depth bound BEFORE any recursive
 			// walk (outOfScopePredicates / degenerateCombinators below, or the
@@ -358,8 +358,9 @@ var appliesToByScope = map[models.Scope][]string{
 		"crewai", "pydantic_ai", "vercel_ai", "autogen",
 		"raw_llm_sdk", "agent_config", "github_actions",
 	},
-	models.ScopeSubagent: {"claude_subagent"},
-	models.ScopeSkill:    {"claude_skill"},
+	models.ScopeSubagent:     {"claude_subagent"},
+	models.ScopeSkill:        {"claude_skill"},
+	models.ScopeSlashCommand: {"claude_slash_command"},
 }
 
 func validAppliesToForScope(scope models.Scope, kind string) bool {

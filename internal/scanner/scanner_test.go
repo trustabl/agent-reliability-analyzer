@@ -2219,3 +2219,62 @@ export const agent = new Agent({ name: "travel-booker" });
 		}
 	}
 }
+
+// End to end: the slash-command fixture holds five command files at the repo
+// root and one under tests/fixtures/. CCMD-001 fires on the bare Bash command,
+// CCMD-002 on the model-invocable Write command, CCMD-003 on the WebSearch
+// command; the scoped-grant and disable-model-invocation commands are silent.
+// The test-path command fires CCMD-001 but is tagged test-origin, so it stays
+// out of scoring and the exit-code gate. Findings are attributed to the command.
+func TestScan_SlashCommandFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "slash-command-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string]bool{}
+	for _, f := range res.Findings {
+		if !strings.HasPrefix(f.RuleID, "CCMD-") {
+			continue
+		}
+		if f.Scope != models.ScopeSlashCommand {
+			t.Errorf("%s scope = %q, want slash_command", f.RuleID, f.Scope)
+		}
+		got[f.RuleID+" "+f.FilePath+" "+f.ToolName] = true
+		if strings.HasPrefix(f.FilePath, "tests/") != (f.Origin == models.OriginTest) {
+			t.Errorf("%s on %s: origin %q does not match the path", f.RuleID, f.FilePath, f.Origin)
+		}
+	}
+	want := []string{
+		"CCMD-001 .claude/commands/unrestricted-shell.md unrestricted-shell",
+		"CCMD-001 tests/fixtures/workspace/.claude/commands/test-path-shell.md test-path-shell",
+		"CCMD-002 .claude/commands/write-model-invocable.md write-model-invocable",
+		"CCMD-003 .claude/commands/web-search.md web-search",
+	}
+	for _, w := range want {
+		if !got[w] {
+			t.Errorf("missing finding %q; got %v", w, got)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("CCMD findings = %d, want %d: %v", len(got), len(want), got)
+	}
+	for _, silent := range []string{"manual-write-silent", "manual-write-quoted-silent", "manual-write-yes-silent", "scoped-silent"} {
+		for k := range got {
+			if strings.HasSuffix(k, " "+silent) {
+				t.Errorf("finding on %s, which opts out of model invocation or is scoped: %s", silent, k)
+			}
+		}
+	}
+	again, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil || again.ScanID != res.ScanID {
+		t.Errorf("ScanID not stable across runs: %v %q vs %q", err, res.ScanID, again.ScanID)
+	}
+	// Slash commands are not a scored surface in this release.
+	for _, s := range res.Surfaces {
+		if s.Kind == models.ScopeSlashCommand {
+			t.Errorf("slash command surface scored: %+v", s)
+		}
+	}
+}

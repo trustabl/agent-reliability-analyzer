@@ -401,6 +401,46 @@ func (e MatchExpr) EvaluateSkill(s models.SkillDef, inv models.RepoInventory) bo
 	return true
 }
 
+// EvaluateSlashCommand walks a MatchExpr against a slash command. Slash-command
+// predicates are dispatched here; predicates for other scopes return true
+// vacuously (a slash-command rule should only set slash-command predicates and
+// combinators).
+func (e MatchExpr) EvaluateSlashCommand(c models.SlashCommandDef, inv models.RepoInventory) bool {
+	for _, sub := range e.All {
+		if !sub.EvaluateSlashCommand(c, inv) {
+			return false
+		}
+	}
+	if len(e.Any) > 0 {
+		matched := false
+		for _, sub := range e.Any {
+			if sub.EvaluateSlashCommand(c, inv) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	if e.Not != nil && e.Not.EvaluateSlashCommand(c, inv) {
+		return false
+	}
+	if e.Always != nil && !*e.Always {
+		return false
+	}
+	if e.SlashCommandAllowsUnrestrictedShell != nil && PredSlashCommandAllowsUnrestrictedShell(c) != *e.SlashCommandAllowsUnrestrictedShell {
+		return false
+	}
+	if e.SlashCommandModelInvocable != nil && PredSlashCommandModelInvocable(c) != *e.SlashCommandModelInvocable {
+		return false
+	}
+	if len(e.SlashCommandAllowsUnrestrictedTool) > 0 && !PredSlashCommandAllowsUnrestrictedTool(c, e.SlashCommandAllowsUnrestrictedTool) {
+		return false
+	}
+	return true
+}
+
 // EvaluateTool walks a MatchExpr against a tool and returns whether it matches.
 //
 // Semantics:
@@ -584,6 +624,11 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"skill_description_has_text":                    true,
 		"skill_text_matches":                            true,
 	},
+	models.ScopeSlashCommand: {
+		"slash_command_allows_unrestricted_shell": true,
+		"slash_command_model_invocable":           true,
+		"slash_command_allows_unrestricted_tool":  true,
+	},
 	models.ScopeRepo: {
 		"repo_has_sdk_in_code":   true,
 		"repo_component_present": true, "repo_uses_default_tracing": true,
@@ -712,6 +757,10 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(len(e.SkillNameHasText) > 0, "skill_name_has_text")
 	add(len(e.SkillDescriptionHasText) > 0, "skill_description_has_text")
 	add(e.SkillTextMatches != nil, "skill_text_matches")
+	// Slash-command scope
+	add(e.SlashCommandAllowsUnrestrictedShell != nil, "slash_command_allows_unrestricted_shell")
+	add(e.SlashCommandModelInvocable != nil, "slash_command_model_invocable")
+	add(len(e.SlashCommandAllowsUnrestrictedTool) > 0, "slash_command_allows_unrestricted_tool")
 	// Repo scope
 	add(len(e.RepoHasSDKInCode) > 0, "repo_has_sdk_in_code")
 	add(len(e.RepoComponentPresent) > 0, "repo_component_present")

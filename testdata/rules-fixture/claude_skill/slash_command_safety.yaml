@@ -1,0 +1,109 @@
+policy:
+  id: claude_slash_command_safety
+  name: Claude Code slash command safety
+  category: claude_skill
+  description: >
+    Capability handed over by a Claude Code slash command (.claude/commands/*.md).
+    Claude Code treats a command file as a skill that takes the same frontmatter, so a
+    command's allowed-tools is a tool pre-approval list exactly as a SKILL.md's is. The
+    skill rules read SKILL.md files; these rules read command files. They audit
+    frontmatter and carry no language: field.
+
+rules:
+  - id: CCMD-001
+    title: Slash command pre-approves unrestricted shell
+    severity: high
+    confidence: 0.9
+    applies_to:
+      - claude_slash_command
+    scope: slash_command
+    match:
+      slash_command_allows_unrestricted_shell: true
+    explanation: >
+      This slash command's `allowed-tools` lists `Bash` with no command pattern: a bare
+      `Bash`, `Bash(*)` or `Bash(:*)`. In Claude Code `allowed-tools` is a pre-approval
+      list, not a sandbox. During the turn that runs the command, any shell command the
+      model issues runs with no approval prompt, and the grant applies even in a `-p` run in
+      a folder that has not been trusted. Unless `disable-model-invocation` is
+      set, the model can also start the command itself. A fetched page, a file the
+      command reads or an issue body pasted into the prompt can then steer the model to
+      the shell with no human check. A command file takes the same frontmatter as a
+      skill, so this is the same exposure CSKILL-001 reports on a SKILL.md.
+
+
+      Limits of this check: it reads the command file's frontmatter. It does not judge a
+      prefix pattern such as `Bash(git *)` for breadth, the command body, settings
+      permission rules (deny and ask rules override the grant), a managed policy that
+      ignores `allowed-tools`, or a bare `Bash` allow rule in settings (see AGCFG-016).
+    fix: >
+      Narrow the grant to the commands the task needs, for example
+      `allowed-tools: Bash(git status *) Bash(npm test *)`. If the command needs open
+      shell access, remove `Bash` from `allowed-tools` and let the normal approval
+      prompt run, and set `disable-model-invocation: true` so the model cannot start it.
+
+  - id: CCMD-002
+    title: Model-invocable slash command pre-approves file writes
+    severity: high
+    confidence: 0.8
+    applies_to:
+      - claude_slash_command
+    scope: slash_command
+    match:
+      all:
+        - slash_command_model_invocable: true
+        - slash_command_allows_unrestricted_tool:
+            - Write
+            - Edit
+            - MultiEdit
+            - NotebookEdit
+    explanation: >
+      This slash command pre-approves a file-writing tool with no path pattern, and it
+      does not set `disable-model-invocation: true`, so the model can start it without
+      the user typing it. The command is then reachable from any text that reaches the
+      model and carries write access that needs no prompt. An injected instruction does
+      not have to talk the model into a risky edit; it has to get the model to run a
+      command that already has permission to make one. Writes persist: source,
+      configuration, or the `.claude/settings.json` that governs the agent's own
+      permissions. A `Write` or `NotebookEdit` path pattern is not consulted by Claude
+      Code, so those grants count as unrestricted whatever follows them; an `Edit` grant
+      counts when it has no path pattern or a catch-all one.
+
+
+      Limits of this check: it reads frontmatter. It does not judge what the command
+      body asks the model to write, a path-scoped `Edit(docs/**)` grant, settings deny
+      rules, or whether a description makes the model likely to pick the command.
+    fix: >
+      Set `disable-model-invocation: true` so the command runs when a person types it, or
+      drop the write tools from `allowed-tools` and let each write go through the normal
+      approval prompt. If the model must run the command, scope writes with an
+      `Edit(<path>)` grant and a PreToolUse hook.
+
+  - id: CCMD-003
+    title: Slash command pre-approves model-driven web retrieval
+    severity: medium
+    confidence: 0.7
+    applies_to:
+      - claude_slash_command
+    scope: slash_command
+    match:
+      slash_command_allows_unrestricted_tool:
+        - WebFetch
+        - WebSearch
+    explanation: >
+      This slash command pre-approves `WebSearch`, or `WebFetch` with no domain pattern,
+      so the pages and results the model chooses to retrieve enter the conversation with
+      no prompt. Retrieved pages and results enter the conversation as text the model
+      reads, so pre-approved retrieval is an inbound channel for instructions; the URL or
+      query is an outbound channel for in-context data. The same grant on a subagent is
+      reported by CSDK-112 and CSDK-124.
+
+
+      Limits of this check: it reads frontmatter. A `WebFetch(domain:example.com)` grant
+      is a real restriction and is not reported; `WebSearch` has no specifier, so a grant
+      of it is reported. It does not judge MCP fetch tools or what the command body does
+      with retrieved text.
+    fix: >
+      Remove `WebFetch` and `WebSearch` from `allowed-tools` unless the command needs web
+      access. If it does, pin `WebFetch` to a domain you control with
+      `WebFetch(domain:example.com)`, and treat everything retrieved as untrusted input:
+      keep it out of instructions and do not let it widen tool permissions.

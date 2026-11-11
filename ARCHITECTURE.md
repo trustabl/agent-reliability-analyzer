@@ -427,7 +427,7 @@ flowchart TD
     score --> result
 ```
 
-The five scopes a rule can fire at — `tool`, `agent`, `subagent`, `skill`, `repo` —
+The six scopes a rule can fire at — `tool`, `agent`, `subagent`, `skill`, `slash_command`, `repo` —
 flow into `Registry.Run` from the same `RepoInventory`, but each detector consumes a
 different typed input:
 
@@ -887,6 +887,19 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   snapshot version is folded into `ScanID` **only** when `--vuln-scan` is on,
   leaving default scans byte-identical. Coverage is honest about its bound: a
   declared range (no lockfile to pin it) is skipped, not guessed.
+- **Slash command rules (CCMD-*)** — `slash_command` scope. `Registry.Run`
+  visits each `SlashCommandDef` in `RepoInventory.SlashCommands` with the
+  `SlashCommandDetector`s attached through `Registry.WithSlashCommand`;
+  `applies_to` is `claude_slash_command`. The three predicates
+  (`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+  `slash_command_allows_unrestricted_tool`) share `grantsUnrestrictedShell` /
+  `grantsUnrestrictedTool` with the skill predicates, so a command file and a
+  `SKILL.md` read one grant rule. Findings carry `scope: slash_command`, the
+  command's file and frontmatter line, and the command name as `ToolName`. A
+  command under a test path is tagged test-origin by `internal/pathclass` like
+  any finding. Command findings are NOT a scored surface: `analysis.Score`
+  ignores the scope, so command findings change no score (scoring is a
+  follow-up).
 - **DiscoverSlashCommands** (`slash_commands.go`) — emits one
   `SlashCommandDef` per `ComponentSlashCommand` component. Recon tags those
   at two path shapes: the canonical `.claude/commands/*.md` (any depth) AND
@@ -2201,7 +2214,7 @@ Discipline rules:
   is legacy/uninitialized and the human renderer collapses such records to
   `file:N` form. Rule detectors that emit a `Finding` MUST propagate the
   entity's `Line` to `Finding.Line` so jump-to-source works from a finding —
-  this is currently done for all five scopes (tool, agent, subagent, skill, repo).
+  this is currently done for all six scopes (tool, agent, subagent, skill, slash_command, repo).
 - **No source-text storage.** The inventory is a structured *index of
   locations*; consumers fetch source by reading the file at
   `(FilePath, Line, EndLine)`. `RawSource` is deliberately **not** included
@@ -2945,9 +2958,10 @@ writing any SDK code.
 
 **matchConditionForScope** dispatches "When this applies" text by scope: tool →
 "When defining a tool.", agent → "When declaring an agent.", repo → "For any
-repo using this SDK.", subagent → "When declaring a subagent.", skill →
+repo using this SDK.", subagent → "When declaring a subagent.", slash_command → "When declaring a
+slash command.", skill →
 delegates to the existing `matchCondition` predicate switch. This keeps the
-generated prose accurate for all five scopes without enumerating 15+ predicates.
+generated prose accurate for all six scopes without enumerating 15+ predicates.
 
 **Output.** A valid `SKILL.md` (`allowed-tools: Read`,
 `disable-model-invocation: false`) intended to be dropped into

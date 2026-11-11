@@ -143,6 +143,8 @@ func matchConditionForScope(scope models.Scope, expr rules.MatchExpr) string {
 		return "For any repo using this SDK."
 	case models.ScopeSubagent:
 		return "When declaring a subagent."
+	case models.ScopeSlashCommand:
+		return "When declaring a slash command."
 	default: // ScopeSkill
 		return matchCondition(expr)
 	}
@@ -256,6 +258,7 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 		subagents []rules.RuleDef
 		repos     []rules.RuleDef
 		skills    []rules.RuleDef
+		slashCmds []rules.RuleDef
 		// typed counts the pack's language-typed rules per listed language,
 		// before filtering, to find the languages the pack has no rules for.
 		typed map[models.Language]int
@@ -294,6 +297,8 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 				sec.repos = append(sec.repos, r)
 			case models.ScopeSkill:
 				sec.skills = append(sec.skills, r)
+			case models.ScopeSlashCommand:
+				sec.slashCmds = append(sec.slashCmds, r)
 			}
 		}
 	}
@@ -361,6 +366,7 @@ func GenerateCombined(categories []models.DetectorCategory, policies []rules.Pol
 		emitRuleSection(&b, "Subagent Rules", sec.subagents, models.ScopeSubagent)
 		emitRuleSection(&b, "Repo Rules", sec.repos, models.ScopeRepo)
 		emitRuleSection(&b, "Skill Rules", sec.skills, models.ScopeSkill)
+		emitRuleSection(&b, "Slash Command Rules", sec.slashCmds, models.ScopeSlashCommand)
 	}
 
 	return b.String()

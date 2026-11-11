@@ -202,10 +202,10 @@ implementation reference see [ARCHITECTURE.md](ARCHITECTURE.md); for the
 at-a-glance SDK coverage matrix see [COVERAGE.md](COVERAGE.md).
 
 <a id="what-it-analyzes--the-five-scope-model"></a>
-## What it analyzes — agent reliability across five scopes
+## What it analyzes — agent reliability across six scopes
 
 Agent Reliability Analyzer does not treat a repository as one undifferentiated
-blob. Every agent reliability rule is classified into exactly one of five scopes,
+blob. Every agent reliability rule is classified into exactly one of six scopes,
 and each scope receives a different typed input:
 
 - **`tool`** — fires once per tool definition. Input: a `ToolDef` (a
@@ -250,6 +250,16 @@ and each scope receives a different typed input:
   model-invocable while granting side-effecting tools (CSKILL-050). Skills
   are markdown, so skill rules carry no `language:`; the `claude_skill`
   pack loads whenever a `SKILL.md` is present.
+- **`slash_command`** — fires once per `.claude/commands/*.md` slash command.
+  Input: a `SlashCommandDef` (`allowed-tools` → `ToolGrants[]`,
+  `disable-model-invocation`). Claude Code treats a command file as a skill
+  that takes the same frontmatter, so the same grants matter: a command that
+  pre-approves unrestricted `Bash` (CCMD-001), pre-approves file writes while
+  the model can start it (CCMD-002), or pre-approves `WebSearch` or an
+  unrestricted `WebFetch` (CCMD-003). A scoped grant such as
+  `Bash(git status *)` or `WebFetch(domain:example.com)` is silent. Command
+  findings are not part of surface scoring yet, so a repo's score does not
+  change when it ships commands.
 - **`repo`** — fires once per scan against the whole inventory. Catches
   project-wide gaps such as the OpenAI Agents SDK being present with no
   custom trace processor configured.
