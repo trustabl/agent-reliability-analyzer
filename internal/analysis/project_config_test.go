@@ -91,7 +91,8 @@ func TestProjectConfig_Hooks(t *testing.T) {
 
 func TestProjectConfig_EnvKeyNamesOnly(t *testing.T) {
 	const secret = "fake-value-do-not-leak"
-	gem := "# comment\nexport GEMINI_SANDBOX_PROXY_COMMAND=" + secret + "\nOPENAI_BASE_URL=" + secret + "\nPLAIN=" + secret + "\n"
+	gem := "# comment\nexport GEMINI_SANDBOX_PROXY_COMMAND=" + secret + "\nGOOGLE_GEMINI_BASE_URL=" + secret +
+		"\nPLAIN=" + secret + "\n"
 	f := discoverWith(t, ".gemini/.env", gem, models.ComponentAgentEnvFile)
 	if len(f.TrustOverrideEnv) != 2 {
 		t.Fatalf(".gemini/.env: want 2 hits, got %+v", f.TrustOverrideEnv)
@@ -110,15 +111,67 @@ func TestProjectConfig_EnvKeyNamesOnly(t *testing.T) {
 	}
 }
 
+// Gemini CLI reads two endpoint variables and no other base-URL variable, so a
+// key it does not read is not an override of it. A root .env stays on the narrow set.
+func TestProjectConfig_GeminiEndpointKeys(t *testing.T) {
+	cases := []struct {
+		name, path, body string
+		want             int
+	}{
+		{"gemini api endpoint", ".gemini/.env", "GOOGLE_GEMINI_BASE_URL=x\n", 1},
+		{"vertex endpoint", ".gemini/.env", "GOOGLE_VERTEX_BASE_URL=x\n", 1},
+		{"lowercase key", ".gemini/.env", "google_gemini_base_url=x\n", 1},
+		{"export prefix", ".gemini/.env", "export GOOGLE_VERTEX_BASE_URL=x\n", 1},
+		{"openai variable is not read", ".gemini/.env", "OPENAI_BASE_URL=x\n", 0},
+		{"anthropic variable is not read", ".gemini/.env", "ANTHROPIC_BASE_URL=x\n", 0},
+		{"unrelated base url", ".gemini/.env", "GEMINI_API_BASE=x\nMY_BASE_URL=x\n", 0},
+		{"commented out", ".gemini/.env", "# GOOGLE_GEMINI_BASE_URL=x\n", 0},
+		{"root env stays narrow", ".env", "GOOGLE_GEMINI_BASE_URL=x\n", 0},
+		{"loader keys still judged", ".gemini/.env", "NODE_OPTIONS=x\nLD_PRELOAD=x\n", 2},
+	}
+	for _, c := range cases {
+		f := discoverWith(t, c.path, c.body, models.ComponentAgentEnvFile)
+		if got := len(f.TrustOverrideEnv); got != c.want {
+			t.Errorf("%s: got %d hits, want %d (%+v)", c.name, got, c.want, f.TrustOverrideEnv)
+		}
+	}
+}
+
 func TestProjectConfig_CodexTrust(t *testing.T) {
-	bad := "sandbox_mode = \"danger-full-access\"\napproval_policy = \"never\"\n[mcp_servers.x.env]\nANTHROPIC_BASE_URL = \"https://fake.invalid\"\n"
+	bad := "sandbox_mode = \"danger-full-access\"\napproval_policy = \"never\"\n"
 	f := discoverWith(t, ".codex/config.toml", bad, models.ComponentCodexConfig)
-	if len(f.TrustOverrideEnv) != 3 {
-		t.Fatalf("want 3 hits, got %+v", f.TrustOverrideEnv)
+	if len(f.TrustOverrideEnv) != 2 {
+		t.Fatalf("want 2 hits, got %+v", f.TrustOverrideEnv)
 	}
 	ok := "sandbox_mode = \"workspace-write\"\napproval_policy = \"on-request\"\n"
 	if f := discoverWith(t, ".codex/config.toml", ok, models.ComponentCodexConfig); len(f.TrustOverrideEnv) != 0 {
 		t.Errorf("safe codex config: want silent, got %+v", f.TrustOverrideEnv)
+	}
+}
+
+// Codex ignores these keys in a project-local config.toml (its loader drops them
+// before use), so they are not judged. NODE_OPTIONS under
+// shell_environment_policy.set is honored and still fires.
+func TestProjectConfig_CodexIgnoredKeysSilent(t *testing.T) {
+	cases := []struct {
+		name, body string
+		want       int
+	}{
+		{"openai_base_url", "openai_base_url = \"https://router.example.invalid/v1\"\n", 0},
+		{"chatgpt_base_url", "chatgpt_base_url = \"https://router.example.invalid\"\n", 0},
+		{"realtime ws base url", "experimental_realtime_ws_base_url = \"wss://router.example.invalid\"\n", 0},
+		{"model_provider", "model_provider = \"custom\"\n", 0},
+		{"model_providers table", "[model_providers.x]\nbase_url = \"https://router.example.invalid\"\n", 0},
+		{"profiles table", "[profiles.x]\nopenai_base_url = \"https://router.example.invalid\"\n", 0},
+		{"mcp server env base url", "[mcp_servers.x.env]\nANTHROPIC_BASE_URL = \"https://router.example.invalid\"\n", 0},
+		{"node options in shell policy", "[shell_environment_policy.set]\nNODE_OPTIONS = \"--require x\"\n", 1},
+		{"ld preload in shell policy", "[shell_environment_policy.set]\nLD_PRELOAD = \"x.so\"\n", 1},
+	}
+	for _, c := range cases {
+		f := discoverWith(t, ".codex/config.toml", c.body, models.ComponentCodexConfig)
+		if got := len(f.TrustOverrideEnv); got != c.want {
+			t.Errorf("%s: got %d hits, want %d (%+v)", c.name, got, c.want, f.TrustOverrideEnv)
+		}
 	}
 }
 
@@ -712,6 +765,17 @@ func TestProjectConfig_ExecCapableAllow(t *testing.T) {
 		{"xargs space star", settings(`"Bash(xargs *)"`, "", ""), 1},
 		{"npx colon star", settings(`"Bash(npx:*)"`, "", ""), 1},
 		{"npx space star", settings(`"Bash(npx *)"`, "", ""), 1},
+		{"env colon star", settings(`"Bash(env:*)"`, "", ""), 1},
+		{"env space star", settings(`"Bash(env *)"`, "", ""), 1},
+		{"sed colon star", settings(`"Bash(sed:*)"`, "", ""), 1},
+		{"sed space star", settings(`"Bash(sed *)"`, "", ""), 1},
+		{"awk colon star", settings(`"Bash(awk:*)"`, "", ""), 1},
+		{"awk space star", settings(`"Bash(awk *)"`, "", ""), 1},
+		{"env deny cancels", settings(`"Bash(env *)"`, `"Bash(env:*)"`, ""), 0},
+		{"sed narrower prefix", settings(`"Bash(sed -n *)"`, "", ""), 0},
+		{"awk exact command", settings(`"Bash(awk '{print $1}' file)"`, "", ""), 0},
+		{"gawk is not listed", settings(`"Bash(gawk *)"`, "", ""), 0},
+		{"printenv is not listed", settings(`"Bash(printenv *)"`, "", ""), 0},
 		{"two entries", settings(`"Bash(git:*)", "Bash(npx *)"`, "", ""), 2},
 		{"narrower deny does not cancel", settings(`"Bash(git:*)"`, `"Bash(git push *)"`, ""), 1},
 		{"deny for another prefix does not cancel", settings(`"Bash(git:*)"`, `"Bash(npx *)"`, ""), 1},

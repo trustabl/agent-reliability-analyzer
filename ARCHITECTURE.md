@@ -498,8 +498,8 @@ matches each WebFetch allow entry against a fixed host list using the documented
 `domain:` rules (`webFetchCovers`), and a deny or ask rule in the same `.claude/`
 folder cancels it.
 `repo_settings_allow_exec_capable_prefix` (AGCFG-012) reads the same parsed rules:
-`execCapableAllowHits` flags a `Bash` allow entry that is a bare `git`, `xargs` or `npx`
-command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
+`execCapableAllowHits` flags a `Bash` allow entry that is a bare `git`, `xargs`, `npx`,
+`env`, `sed` or `awk` command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
 command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in the
 same `.claude/` folder cancels it (`coversExecPrefix`).
 `repo_settings_allow_all_bash` (AGCFG-016) reads the parsed `permissions` of each
@@ -551,7 +551,10 @@ Settings files are parsed as JSONC (comments and trailing commas stripped), Code
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set
 (`GEMINI_SANDBOX*`, `*_PROXY_COMMAND`); `.gemini/.env` and `.codex/config.toml`
-also check `*_BASE_URL`, `NODE_OPTIONS` and `LD_PRELOAD`. Unlike other repo-scope
+also check `NODE_OPTIONS` and `LD_PRELOAD`, and `.gemini/.env` also checks the two endpoint
+variables Gemini CLI reads (`GOOGLE_GEMINI_BASE_URL`, `GOOGLE_VERTEX_BASE_URL`, named in
+`geminiEndpointKeys`). No other `*_BASE_URL` key is judged: Codex ignores them in a project
+file and Gemini CLI does not read them. Unlike other repo-scope
 rules, an `agent_config` finding is attributed to the first path-sorted hit's
 file and line (`configHitLocation` in `rule_detector.go`), so `pathclass` can tag
 a vendored fixture as test-origin. The pack loads unconditionally and the

@@ -69,18 +69,27 @@ rules:
     match:
       repo_workspace_env_overrides_trust: true
     explanation: >
-      A workspace config file sets a key that redirects how the agent harness
-      sandboxes or reaches the network: GEMINI_SANDBOX*, a *_PROXY_COMMAND, in
-      .gemini/.env or .codex/config.toml also *_BASE_URL (including
-      ANTHROPIC_BASE_URL and OPENAI_BASE_URL), NODE_OPTIONS or LD_PRELOAD, or
-      Codex is set to sandbox_mode = "danger-full-access" or approval_policy =
-      "never". Harnesses read these files on open, so a proxy command runs and
-      an endpoint override captures prompts and credentials before the user is
-      asked anything. Only key names are inspected; values are never read.
+      A workspace config file sets a key that changes how the agent harness
+      sandboxes or reaches the network. In .gemini/.env: GEMINI_SANDBOX*, a
+      *_PROXY_COMMAND, GOOGLE_GEMINI_BASE_URL or GOOGLE_VERTEX_BASE_URL (the two
+      endpoint variables Gemini CLI reads), NODE_OPTIONS or LD_PRELOAD. In
+      .codex/config.toml: sandbox_mode = "danger-full-access", approval_policy =
+      "never", and NODE_OPTIONS, LD_PRELOAD, a *_PROXY_COMMAND or GEMINI_SANDBOX*
+      key anywhere in the file. In a repo-root .env: GEMINI_SANDBOX* and
+      *_PROXY_COMMAND. Gemini CLI loads the file once the user trusts the
+      folder; after that, a proxy command runs and an endpoint override sends
+      prompts and credentials to the named host with no further prompt. Limits of this check:
+      Codex ignores openai_base_url, chatgpt_base_url, model_provider,
+      model_providers and profiles in a project-local config.toml, and Gemini CLI
+      reads no other *_BASE_URL variable, so those keys are not judged. Key names
+      are inspected and values are not read, so an override that points at the
+      vendor's own host is flagged like any other. Whether NODE_OPTIONS or
+      LD_PRELOAD in .gemini/.env reaches a child process, and which tool reads a
+      *_PROXY_COMMAND or GEMINI_SANDBOX* key in config.toml, are not verified.
     fix: >
       Delete the override from the committed file. Set sandbox and proxy
-      options in user-level configuration or the process environment, never in
-      a workspace file that travels with the repo. Keep sandbox_mode at its
+      options in user-level configuration or the process environment, not in a
+      workspace file that travels with the repo. Keep sandbox_mode at its
       restrictive default and approval_policy on a mode that prompts.
 
   - id: AGCFG-007

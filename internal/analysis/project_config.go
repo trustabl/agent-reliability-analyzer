@@ -779,7 +779,15 @@ var envKeyRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // trustKey reports whether an env key can redirect a sandbox, proxy, endpoint,
 // or loader. full selects the wide set (.gemini/.env, .codex/config.toml);
 // the narrow set is used for a repo-root .env, where ordinary applications set
-// *_BASE_URL, NODE_OPTIONS and LD_PRELOAD legitimately.
+// NODE_OPTIONS and LD_PRELOAD legitimately.
+//
+// The endpoint variables are named, not matched by suffix: a *_BASE_URL key is
+// judged where the tool reads it. Gemini CLI reads GOOGLE_GEMINI_BASE_URL
+// and GOOGLE_VERTEX_BASE_URL (packages/core/src/core/contentGenerator.ts) and no
+// other base-URL variable. Codex ignores openai_base_url, chatgpt_base_url,
+// model_provider, model_providers, profile, profiles and the realtime base-URL
+// keys in a project-local config.toml (codex-rs/config/src/loader/mod.rs,
+// PROJECT_LOCAL_CONFIG_DENYLIST), so config.toml judges no endpoint key.
 func trustKey(key string, full bool) bool {
 	k := strings.ToUpper(key)
 	if strings.HasPrefix(k, "GEMINI_SANDBOX") || strings.HasSuffix(k, "_PROXY_COMMAND") {
@@ -788,13 +796,21 @@ func trustKey(key string, full bool) bool {
 	if !full {
 		return false
 	}
-	return strings.HasSuffix(k, "_BASE_URL") || k == "NODE_OPTIONS" || k == "LD_PRELOAD"
+	return k == "NODE_OPTIONS" || k == "LD_PRELOAD"
+}
+
+// geminiEndpointKeys are the .gemini/.env variables that change Gemini CLI's
+// model endpoint. The key name is read; the value is not.
+var geminiEndpointKeys = map[string]bool{
+	"GOOGLE_GEMINI_BASE_URL": true,
+	"GOOGLE_VERTEX_BASE_URL": true,
 }
 
 // envHits reads KEY NAMES from a dotenv file. The right-hand side of every
 // line is discarded unread.
 func envHits(path string, raw []byte) []models.ConfigHit {
 	full := path != ".env" // a repo-root .env gets the narrow key set
+	gemini := strings.HasSuffix(path, ".gemini/.env")
 	var out []models.ConfigHit
 	for i, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "export "))
@@ -806,7 +822,10 @@ func envHits(path string, raw []byte) []models.ConfigHit {
 			continue
 		}
 		key := strings.TrimSpace(line[:eq])
-		if !envKeyRe.MatchString(key) || !trustKey(key, full) {
+		if !envKeyRe.MatchString(key) {
+			continue
+		}
+		if !trustKey(key, full) && !(gemini && geminiEndpointKeys[strings.ToUpper(key)]) {
 			continue
 		}
 		out = append(out, hit(path, i+1, "env key "+key+" overrides sandbox, proxy, endpoint, or loader behavior"))
@@ -953,11 +972,18 @@ func anyCovers(rules []models.PermissionRule, host string) bool {
 // run a program you name; xargs with flags is matched as an xargs command; and
 // npx runs its arguments as a command and is not a stripped wrapper. find and the
 // exec wrappers are not listed because the same page says a prefix rule cannot
-// auto-approve their exec forms.
+// auto-approve their exec forms. env, sed and awk rest on the GNU manuals (env
+// runs the command operand; sed runs a program through its e command or the
+// s///e flag; awk runs one through system() or a pipe); the permissions page does
+// not say a prefix rule prompts for these forms, and it may in ways it does not
+// describe.
 var execCapablePrefixes = map[string]string{
 	"git":   "a git prefix whose options include -c, which runs a program",
 	"xargs": "an xargs prefix, and xargs runs the command it is given",
 	"npx":   "an npx prefix, and npx runs the command it is given",
+	"env":   "an env prefix, and env runs the command it is given",
+	"sed":   "a sed prefix, and the sed e command runs a program",
+	"awk":   "an awk prefix, and awk system() and pipes run a program",
 }
 
 // execPrefixWord returns the bare command a Bash rule pattern covers when the
