@@ -4,87 +4,130 @@
   "history": [
     {
       "date": "2026-06-18",
-      "downloads": 380
+      "downloads": 196,
+      "all_files": 380,
+      "estimated": true
     },
     {
       "date": "2026-06-30",
-      "downloads": 394
+      "downloads": 203,
+      "all_files": 394,
+      "estimated": true
     },
     {
       "date": "2026-07-06",
-      "downloads": 410
+      "downloads": 212,
+      "all_files": 410,
+      "estimated": true
     },
     {
       "date": "2026-07-13",
-      "downloads": 440
+      "downloads": 227,
+      "all_files": 440,
+      "estimated": true
     },
     {
       "date": "2026-07-20",
-      "downloads": 464
+      "downloads": 239,
+      "all_files": 464,
+      "estimated": true
     },
     {
       "date": "2026-08-03",
-      "downloads": 498
+      "downloads": 257,
+      "all_files": 498,
+      "estimated": true
     },
     {
       "date": "2026-08-10",
-      "downloads": 541
+      "downloads": 279,
+      "all_files": 541,
+      "estimated": true
     },
     {
       "date": "2026-08-17",
-      "downloads": 599
+      "downloads": 309,
+      "all_files": 599,
+      "estimated": true
     },
     {
       "date": "2026-08-24",
-      "downloads": 793
+      "downloads": 409,
+      "all_files": 793,
+      "estimated": true
     },
     {
       "date": "2026-08-31",
-      "downloads": 1347
+      "downloads": 695,
+      "all_files": 1347,
+      "estimated": true
     },
     {
       "date": "2026-09-07",
-      "downloads": 1810
+      "downloads": 934,
+      "all_files": 1810,
+      "estimated": true
     },
     {
       "date": "2026-09-14",
-      "downloads": 2692
+      "downloads": 1389,
+      "all_files": 2692,
+      "estimated": true
     },
     {
       "date": "2026-09-21",
-      "downloads": 3500
+      "downloads": 1806,
+      "all_files": 3500,
+      "estimated": true
     },
     {
       "date": "2026-09-28",
-      "downloads": 3611
+      "downloads": 1863,
+      "all_files": 3611,
+      "estimated": true
     },
     {
       "date": "2026-10-05",
-      "downloads": 6190
+      "downloads": 3194,
+      "all_files": 6190,
+      "estimated": true
     },
     {
       "date": "2026-10-12",
-      "downloads": 13684
+      "downloads": 7061,
+      "all_files": 13684,
+      "estimated": true
     },
     {
       "date": "2026-10-19",
-      "downloads": 21669
+      "downloads": 11182,
+      "all_files": 21669,
+      "estimated": true
     },
     {
       "date": "2026-10-26",
-      "downloads": 30849
+      "downloads": 15919,
+      "all_files": 30849,
+      "estimated": true
     },
     {
       "date": "2026-11-02",
-      "downloads": 40485
+      "downloads": 20892,
+      "all_files": 40485,
+      "estimated": true
     },
     {
       "date": "2026-11-09",
-      "downloads": 50105
+      "downloads": 25856,
+      "all_files": 50105,
+      "estimated": true
     },
     {
       "date": "2026-11-10",
-      "downloads": 52373
+      "downloads": 27026,
+      "all_files": 52373,
+      "estimated": true
     }
-  ]
+  ],
+  "note": "Downloads of program files only (release archives and packages), not checksums.txt or other files used to verify an install; downloads, not users; includes CI installs. Points marked estimated were restated on 2026-11-12 from all-file totals (kept in all_files) x the program-file share across all releases on that day (51.6%)."
 }

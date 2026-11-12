@@ -46,17 +46,26 @@ jobs:
                   return json.load(r)
 
           # Sum download_count across every release asset (paginated, future-proof).
-          total, page = 0, 1
+          # Program files only (archives, npm .tgz, .mcpb bundles), like Forge. checksums.txt, *.sha256 and
+          # server.json are fetched alongside an install to verify it; counting them counts one install twice.
+          PROGRAM = (".tar.gz", ".zip", ".tgz", ".mcpb")
+          releases, page = {}, 1
           while True:
               rels = api("https://api.github.com/repos/%s/releases?per_page=100&page=%d" % (repo, page))
               if not rels:
                   break
               for rel in rels:
-                  for a in rel.get("assets", []):
-                      total += a.get("download_count", 0)
+                  if rel.get("draft"):
+                      continue
+                  releases[rel["tag_name"]] = sum(
+                      a.get("download_count", 0)
+                      for a in rel.get("assets", [])
+                      if a.get("name", "").endswith(PROGRAM)
+                  )
               if len(rels) < 100:
                   break
               page += 1
+          total = sum(releases.values())
 
           # Philippine date (UTC+8): the run starts Monday 00:00 there, which is still Sunday in UTC.
           day = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()
@@ -68,16 +77,22 @@ jobs:
               data = {"repo": repo, "unit": "cumulative_release_downloads", "history": []}
 
           hist = {p["date"]: p for p in data.get("history", [])}
-          hist[day] = {"date": day, "downloads": total}   # upsert today's snapshot
+          hist[day] = {"date": day, "downloads": total,   # upsert today's snapshot
+                       "releases": {t: releases[t] for t in sorted(releases)}}
           data["repo"] = repo
           data["unit"] = "cumulative_release_downloads"
+          data.setdefault("note", "Downloads of program files only (release archives and packages), not checksums.txt or other files used to verify an install; downloads, not users; includes CI installs.")
           data["history"] = [hist[d] for d in sorted(hist)]
 
           os.makedirs(os.path.dirname(path), exist_ok=True)
           with open(path, "w") as f:
               json.dump(data, f, indent=2)
               f.write("\n")
-          print("%s: %s = %d cumulative downloads" % (day, repo, total))
+          os.makedirs("badges", exist_ok=True)
+          with open("badges/downloads.json", "w") as f:   # README badge: program downloads, same number as the history
+              json.dump({"schemaVersion": 1, "label": "downloads", "message": "{:,}".format(total), "color": "2ea043"}, f)
+              f.write("\n")
+          print("%s: %s = %d cumulative program downloads" % (day, repo, total))
           PY
 
       # main is protection-gated: a direct push is rejected with GH013
@@ -89,14 +104,16 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          add-paths: .github/stats/download-history.json
+          add-paths: |
+            .github/stats/download-history.json
+            badges/downloads.json
           branch: chore/download-history
           base: main
           commit-message: "chore: record weekly download snapshot"
           title: "chore: weekly download-history snapshot"
           body: |
-            Automated weekly snapshot of cumulative release-asset downloads.
-            Updates `.github/stats/download-history.json` — safe to merge.
+            Automated weekly snapshot of cumulative program downloads (release archives, not checksums.txt).
+            Updates `.github/stats/download-history.json` and `badges/downloads.json`; safe to merge.
           author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           delete-branch: false

@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
   <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/v/release/trustabl/agent-reliability-analyzer" alt="Latest release"></a>
-  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/github/downloads/trustabl/agent-reliability-analyzer/total?label=downloads&color=2ea043" alt="Total downloads"></a>
+  <a href="https://github.com/trustabl/agent-reliability-analyzer/releases"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrustabl%2Fagent-reliability-analyzer%2Fmain%2Fbadges%2Fdownloads.json" alt="Program downloads (total)"></a>
   <a href="https://github.com/trustabl/agent-reliability-analyzer/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/trustabl/agent-reliability-analyzer/test.yml?branch=main&amp;label=tests" alt="Tests"></a>
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/trustabl/agent-reliability-analyzer" alt="Go version"></a>
   <br>
