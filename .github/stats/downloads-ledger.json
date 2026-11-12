@@ -1,0 +1,387 @@
+{
+ "description": "Weekly Trustabl downloads, one record per Monday x product x channel. total is cumulative; change is the growth since the Monday before (null when the channel was counted for the first time). Downloads count installs, CI runs and file fetches, not unique users.",
+ "updated": "2026-11-09",
+ "channels": {
+  "github": "GitHub release-file downloads (weekly snapshot). Analyzer includes checksums.txt; rules includes statement.json downloads carried over from replaced files.",
+  "npm": "npm registry downloads.",
+  "pypi": "pypistats downloads including mirrors.",
+  "claude-directory": "Claude Directory installs, copied from the listing's usage page.",
+  "cursor-directory": "Cursor Directory installs, copied from the listing page.",
+  "vscode-marketplace": "VS Code Marketplace installs.",
+  "azure-devops-marketplace": "Azure DevOps Marketplace on-prem downloads (cloud installs are not public).",
+  "docker-hub": "Docker Hub pulls of trustabl/trustabl-pipe (Bitbucket pipe)."
+ },
+ "records": [
+  {
+   "week": "2026-06-29",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 380,
+   "change": null
+  },
+  {
+   "week": "2026-07-06",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 410,
+   "change": 30
+  },
+  {
+   "week": "2026-07-13",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 440,
+   "change": 30
+  },
+  {
+   "week": "2026-07-20",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 464,
+   "change": 24
+  },
+  {
+   "week": "2026-07-27",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 464,
+   "change": 0
+  },
+  {
+   "week": "2026-08-03",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 498,
+   "change": 34
+  },
+  {
+   "week": "2026-08-10",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 541,
+   "change": 43
+  },
+  {
+   "week": "2026-08-17",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 599,
+   "change": 58
+  },
+  {
+   "week": "2026-08-24",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 793,
+   "change": 194
+  },
+  {
+   "week": "2026-08-31",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 1347,
+   "change": 554
+  },
+  {
+   "week": "2026-09-07",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 1810,
+   "change": 463
+  },
+  {
+   "week": "2026-09-07",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 626,
+   "change": 626
+  },
+  {
+   "week": "2026-09-14",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 2692,
+   "change": 882
+  },
+  {
+   "week": "2026-09-14",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 1264,
+   "change": 638
+  },
+  {
+   "week": "2026-09-21",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 3500,
+   "change": 808
+  },
+  {
+   "week": "2026-09-21",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 1383,
+   "change": 119
+  },
+  {
+   "week": "2026-09-28",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 3611,
+   "change": 111
+  },
+  {
+   "week": "2026-09-28",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 1606,
+   "change": 223
+  },
+  {
+   "week": "2026-10-05",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 6190,
+   "change": 2579
+  },
+  {
+   "week": "2026-10-05",
+   "product": "agent-reliability-analyzer",
+   "channel": "npm",
+   "total": 302,
+   "change": 302
+  },
+  {
+   "week": "2026-10-05",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 1679,
+   "change": 73
+  },
+  {
+   "week": "2026-10-12",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 13684,
+   "change": 7494
+  },
+  {
+   "week": "2026-10-12",
+   "product": "agent-reliability-analyzer",
+   "channel": "npm",
+   "total": 316,
+   "change": 14
+  },
+  {
+   "week": "2026-10-12",
+   "product": "agent-reliability-analyzer",
+   "channel": "pypi",
+   "total": 442,
+   "change": 442
+  },
+  {
+   "week": "2026-10-12",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 2484,
+   "change": 805
+  },
+  {
+   "week": "2026-10-19",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 21669,
+   "change": 7985
+  },
+  {
+   "week": "2026-10-19",
+   "product": "agent-reliability-analyzer",
+   "channel": "npm",
+   "total": 330,
+   "change": 14
+  },
+  {
+   "week": "2026-10-19",
+   "product": "agent-reliability-analyzer",
+   "channel": "pypi",
+   "total": 489,
+   "change": 47
+  },
+  {
+   "week": "2026-10-19",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 2571,
+   "change": 87
+  },
+  {
+   "week": "2026-10-26",
+   "product": "agent-network-access-probe",
+   "channel": "github",
+   "total": 75,
+   "change": 75
+  },
+  {
+   "week": "2026-10-26",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 30849,
+   "change": 9180
+  },
+  {
+   "week": "2026-10-26",
+   "product": "agent-reliability-analyzer",
+   "channel": "npm",
+   "total": 342,
+   "change": 12
+  },
+  {
+   "week": "2026-10-26",
+   "product": "agent-reliability-analyzer",
+   "channel": "pypi",
+   "total": 531,
+   "change": 42
+  },
+  {
+   "week": "2026-10-26",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 3441,
+   "change": 870
+  },
+  {
+   "week": "2026-11-02",
+   "product": "agent-network-access-probe",
+   "channel": "github",
+   "total": 199,
+   "change": 124
+  },
+  {
+   "week": "2026-11-02",
+   "product": "agent-network-access-probe",
+   "channel": "npm",
+   "total": 422,
+   "change": 422
+  },
+  {
+   "week": "2026-11-02",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 40485,
+   "change": 9636
+  },
+  {
+   "week": "2026-11-02",
+   "product": "agent-reliability-analyzer",
+   "channel": "npm",
+   "total": 357,
+   "change": 15
+  },
+  {
+   "week": "2026-11-02",
+   "product": "agent-reliability-analyzer",
+   "channel": "pypi",
+   "total": 552,
+   "change": 21
+  },
+  {
+   "week": "2026-11-02",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 5213,
+   "change": 1772
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-network-access-probe",
+   "channel": "cursor-directory",
+   "total": 2,
+   "change": null
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-network-access-probe",
+   "channel": "github",
+   "total": 271,
+   "change": 72
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-network-access-probe",
+   "channel": "npm",
+   "total": 487,
+   "change": 65
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-network-access-probe",
+   "channel": "pypi",
+   "total": 365,
+   "change": 365
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-analyzer",
+   "channel": "claude-directory",
+   "total": 352,
+   "change": null
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-analyzer",
+   "channel": "cursor-directory",
+   "total": 48,
+   "change": null
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 50105,
+   "change": 9620
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-analyzer",
+   "channel": "npm",
+   "total": 569,
+   "change": 212
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-analyzer",
+   "channel": "pypi",
+   "total": 876,
+   "change": 324
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 6276,
+   "change": 1063
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-skills",
+   "channel": "github",
+   "total": 3,
+   "change": 3
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-skills",
+   "channel": "npm",
+   "total": 479,
+   "change": 479
+  },
+  {
+   "week": "2026-11-09",
+   "product": "agent-reliability-skills",
+   "channel": "pypi",
+   "total": 658,
+   "change": 658
+  }
+ ]
+}
