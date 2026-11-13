@@ -529,6 +529,18 @@ func TestDetectObsDeps_NoObservabilityDeclared(t *testing.T) {
 	}
 }
 
+func TestDetectObsDeps_LangWatch(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("langchain\nlangwatch==1.4.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := detectObsDeps(dir)
+	if len(got) != 1 || got[0].Vendor != models.VendorLangWatch || got[0].Source != "requirements.txt" {
+		t.Fatalf("got %+v, want one langwatch dep from requirements.txt", got)
+	}
+}
+
 func TestNormalize_PreTrustHarnessConfigClassified(t *testing.T) {
 	dir := t.TempDir()
 	for rel, body := range map[string]string{

@@ -69,12 +69,13 @@ import (
 //     arbitrary identifier: it must be a compiled-graph variable
 //     (`app = builder.compile(...)`, from DiscoverLangGraphGraphs' compile map),
 //     the direct chain `builder.compile(...).invoke(...)`, or the variable of a
-//     prebuilt create_react_agent / create_agent. A module-level compiled graph
-//     or prebuilt agent imported into another file (`from graph import app`) is
-//     resolved through the entrypoint import resolver and recorded with
-//     AgentFilePath. AgentVarName is the BUILDER variable (the StateGraph
-//     AgentDef's VarName), or the prebuilt agent's own variable. A graph built
-//     or compiled inside a factory function and returned is not tracked.
+//     prebuilt create_react_agent / create_agent or an AgentExecutor. A
+//     module-level compiled graph or agent imported into another file
+//     (`from graph import app`) is resolved through the entrypoint import
+//     resolver and recorded with AgentFilePath. AgentVarName is the BUILDER
+//     variable (the StateGraph AgentDef's VarName), or the agent's own
+//     variable. A graph built or compiled inside a factory function and
+//     returned is not tracked.
 //
 // The other four discoverers require the agent reference (first positional arg for
 // OpenAI, receiver for Pydantic AI / AutoGen, Runner(agent=) identifier for ADK)
@@ -159,7 +160,7 @@ func discoverLangGraphRunCalls(files []ParsedFile) []models.AgentRunCallDef {
 			}
 		}
 		for _, a := range discoverLangChainAgentsInFile(pf) {
-			if (a.Class == "ReactAgent" || a.Class == "CreateAgent") && a.VarName != "" {
+			if a.VarName != "" && (a.Class == "ReactAgent" || a.Class == "CreateAgent" || a.Class == "AgentExecutor") {
 				vars[a.VarName] = a.VarName
 			}
 		}

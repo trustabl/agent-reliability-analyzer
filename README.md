@@ -472,7 +472,7 @@ files in the scanned repo. Fixes are applied only when you opt in with
 - **Observability signals** (`observability`) — the instrumentation found in
   code, one record per fact: the vendor (OpenTelemetry, Langfuse, Logfire,
   Phoenix/OpenInference, OpenLLMetry, Braintrust, Weave, AgentOps, MLflow,
-  Datadog LLM Observability, LangSmith) and whether it is merely **imported** or
+  Datadog LLM Observability, LangSmith, LangWatch) and whether it is merely **imported** or
   actually **initialized**, with the file and line. That distinction is the
   point: a repo that imports a tracing SDK and never starts it looks
   instrumented in its manifest and produces no traces at all. Detected
@@ -1172,6 +1172,10 @@ Multiple categories are comma-separated: `--policy openai_sdk,mcp`.
   Pydantic AI (Python), the OpenAI Agents SDK (Python, TypeScript),
   LangChain / LangGraph (Python), CrewAI (Python), AutoGen (Python), and MCP
   client sessions (Python). Other frameworks get the language block only.
+  When a dependency manifest declares LangWatch (Python or TypeScript), that
+  language's setup keeps the project's LangWatch setup call instead of adding
+  a second tracer provider, and shows how to send plain OpenTelemetry spans to
+  LangWatch over HTTP.
   Non-OpenTelemetry tracing stacks are not covered. The section is left out
   when no supported language is found, and when `claude_skill` is the only
   category (Agent Skills are `SKILL.md` files, not agent code to trace).

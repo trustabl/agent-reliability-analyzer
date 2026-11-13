@@ -662,7 +662,7 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   Python and TS/JS files emitting a typed `ObservabilitySignal` per
   observability fact found: the vendor (`otel`, `langfuse`, `logfire`,
   `openinference`, `openllmetry`, `braintrust`, `weave`, `agentops`, `mlflow`,
-  `datadog_llmobs`, `langsmith`, `opik`, `native`) and a `Kind` grading the
+  `datadog_llmobs`, `langsmith`, `opik`, `langwatch`, `native`) and a `Kind` grading the
   evidence — `import` (module imported), `init` (provider set or vendor client
   constructed), `exporter` (span exporter, normalized to its sink: `console`,
   `otlp`, `jaeger`, `zipkin`, `memory`), `content_capture` (a switch sending
@@ -719,6 +719,38 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   kwarg as set. Vercel AI has no process-wide switch (`experimental_telemetry`
   is per call), so VAI-101 is unaffected. `opik` is a vendor on both the Python
   and TS sides (and a recon dep needle).
+
+  Two more shapes credit LangChain's `callbacks`. `langwatch.setup(instrumentors=
+  [LangChainInstrumentor()])` adds a second init signal,
+  `langwatch.setup.langchaininstrumentor`, which `globalInstrumentors` maps to
+  LangChain (LangWatch calls `.instrument()` on each instrumentor it is given; a
+  list passed by name is not read). And `analysis.ApplyRunCallInstrumentation`
+  (`run_call_instrumentation.go`, called in `scanner.go` right after
+  `DiscoverAgentRunCalls`) credits a LangChain agent whose run call passes
+  callbacks at run time — `agent.invoke(..., config={"callbacks": [...]})` or
+  `config=RunnableConfig(callbacks=[...])`, the wiring LangWatch, Langfuse and
+  LangSmith document. The run call is matched to its agent as
+  `agent_server_reachable` does (SDK, variable name, defining file); a config
+  passed by name, an empty list and `None` are not evidence, and an agent
+  already credited by a process-wide call keeps that credit. `Call` reads
+  `<callee> config callbacks`, e.g. `agent.invoke config callbacks`.
+
+  **LangWatch** is a vendor on both sides and a recon dep needle. In Python,
+  `langwatch.setup()` and `@langwatch.trace()` / `@langwatch.span()` (call,
+  bare-decorator and context-manager forms) are init signals: the decorators
+  call the SDK's `ensure_setup()`, which builds a client from
+  `LANGWATCH_API_KEY` when `setup()` was never called. Those names are generic,
+  so they count only when they resolve through the file's `langwatch` import
+  bindings (`import langwatch as lw`, `from langwatch import trace as t`),
+  collected by `pyImportAliases` (`py_import_aliases.go`, shared with the
+  otel-labels pass). In TS, `setupObservability` (`langwatch/observability/node`)
+  and `LangWatchTraceExporter` are init; `getLangWatchTracer` is not. TS init
+  matching follows a renamed import for every vendor (`import { NodeSDK as SDK }`
+  then `new SDK()`), and `trace.setGlobalTracerProvider` counts as an OTel init,
+  the twin of Python's `set_tracer_provider`. A provider used directly and never
+  registered is still not recognized. Both LangWatch SDKs emit OpenTelemetry
+  spans (Python builds an SDK `TracerProvider` with an HTTP OTLP exporter; TS
+  starts a `NodeSDK`).
 
   The **declared** half of the picture comes from recon, not this pass:
   `detectObsDeps` (`internal/ingestion/normalizer.go`) needle-scans the root
@@ -1007,15 +1039,16 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   arbitrary identifier: it must be a compiled-graph variable
   (`app = builder.compile(...)`, from `discoverLangGraphGraphsInFile`'s compile
   map), the direct chain `builder.compile(...).invoke(...)`, or the variable of a
-  prebuilt `create_react_agent` / `create_agent`. `AgentVarName` is the builder
-  variable. A module-level graph imported into another file (`from graph import
+  prebuilt `create_react_agent` / `create_agent` or an `AgentExecutor`.
+  `AgentVarName` is the builder variable. A module-level graph imported into another file (`from graph import
   app`) is recorded with `AgentFilePath` (in-memory) set to the defining file.
   `AgentDef.CheckpointerClass` (in-memory) carries the `checkpointer=` class of
   `compile()` / the prebuilt helpers, resolved through its langgraph import;
   unresolved names, local classes and conflicting bindings leave it empty.
   `agent_checkpointer_in_memory` (`MemorySaver` / `InMemorySaver`) and
   `agent_server_reachable` (a correlated run call with a `ServerReachable`
-  stamp; test paths ignored) back LC-116. Run calls are not in the JSON report.
+  stamp; test paths ignored) back LC-116; `ApplyRunCallInstrumentation` reads
+  their `config` kwarg. Run calls are not in the JSON report.
 - **DiscoverLangGraphNodes** (`langgraph_nodes.go`) — a function registered via
   `<builder>.add_node("name", func)` / `add_node(func)` is not a `@tool` but runs
   on every graph visit. Same-file, undecorated, top-level functions are emitted
@@ -2336,8 +2369,8 @@ internal/
 ├── forge/                       Pre-coding SKILL.md generator (trustabl forge).
 │   ├── detect.go                Detect (dep-manifest recon → categories + (category, language) pairs),
 │   │                            DetectCategories, MergeCategories (dedup + sort two category slices),
-│   │                            SelectTracing (languages + pairs for the Runtime Tracing section).
-│   ├── tracing.go               emitRuntimeTracing + the languageBlocks / frameworkRecipes tables.
+│   │                            SelectTracing (languages + pairs + backends for the Runtime Tracing section).
+│   ├── tracing.go               emitRuntimeTracing + the languageBlocks / frameworkRecipes / backendBlocks tables.
 │   ├── tracingtext/             Embedded markdown text of the Runtime Tracing section.
 │   ├── claims.go                emitToolCallClaims + the claimPlacements table.
 │   ├── claimtext/               Embedded markdown text of the Tool-Call Claims section.
@@ -2871,14 +2904,17 @@ writing any SDK code.
 
 1. **Detect** (`internal/forge/detect.go`) — calls `ingestion.Resolve` and
    `ingestion.Recon` against the target directory to obtain
-   `RepoProfile.SDKDeps`, then maps each dep name through a local
+   `RepoProfile.SDKDeps` and `RepoProfile.ObsDeps`, then maps each dep name through a local
    `depCategoryMap` table (mirrors `scanner.depNameToSDK`, plus the recon-only
    `google-adk-go`) to produce a sorted, deduplicated
    `[]models.DetectorCategory`. Each dep's `Source` manifest is mapped through
    `ingestion.ManifestLanguage` to a language, yielding `(category, language)`
    pairs for Python, TypeScript and Go. A category declared in a manifest with
    no known language (`composer.json`, say) is also recorded in
-   `Detection.Unplaced`. `DetectCategories` returns the categories alone.
+   `Detection.Unplaced`. An observability dep whose vendor has a row in
+   `backendBlocks` (LangWatch, Python and TypeScript), declared in a hand-edited
+   manifest (not a lock file), becomes a `TracingBackend{Vendor, Language}` in
+   `Detection.Backends`. `DetectCategories` returns the categories alone.
 
 2. **MergeCategories** — deduplicates and sorts the auto-detected slice with
    any categories supplied via `--policy`. Explicit additions are additive, not
@@ -2891,7 +2927,8 @@ writing any SDK code.
    not already place it: a category with no detected pair pairs with every
    selected language, and a language that was not detected pairs with every
    category. Repeating something detection already found changes nothing.
-   When `claude_skill` is the only category, `TracingApplies` is false and the
+   A detected backend is kept when its language is selected; `--lang` never
+   adds one. When `claude_skill` is the only category, `TracingApplies` is false and the
    selection is empty, so neither the section nor the stderr "pass --lang"
    note appears. With no category at all forge exits 1 before this step; if
    `--lang` was given, that message says `--lang` does not select a rule pack.
@@ -2927,8 +2964,14 @@ writing any SDK code.
    the selected languages: Step 1 sets up OpenTelemetry, Step 2 places the
    `agent-reliability-otel-labels` labels, Step 3 says how to choose their
    values, Step 4 lists checks. The text is embedded from
-   `internal/forge/tracingtext/`; two small tables (`languageBlocks`,
-   `frameworkRecipes`) fix what exists and in what order. The section is
+   `internal/forge/tracingtext/`; three small tables (`languageBlocks`,
+   `frameworkRecipes`, `backendBlocks`) fix what exists and in what order. A
+   selected backend's `tracingtext/backends/<vendor>_<language>_setup.md`
+   replaces that language's generic setup block, which would create a second
+   provider, under a `#### <Language> (<Vendor>)` heading, and its `_traps.md`
+   follows the language traps in Step 4; the recipes and Steps 2 and 3 are
+   shared. The LangWatch text gives its OTLP endpoint as scheme, host and path,
+   never one URL, because a URL in a skill body trips CSKILL-020. The section is
    omitted when no selected language has a block. It drops each rule whose
    `language` the category is not used in, through `RuleDef.AppliesToLanguage`
    (the scanner's own language gate, so TypeScript keeps JavaScript rules and

@@ -489,43 +489,52 @@ func TestGenerateCombined_SkillCompliant(t *testing.T) {
 		Categories:    []models.DetectorCategory{models.CategoryClaudeSDK, models.CategoryOpenAISDK},
 		Template:      TemplateVersion,
 	}
-	got := GenerateCombined(stamp.Categories, policies, stamp, allTracingSelection(), nil)
+	// The generic setup blocks and the backend blocks replace each other, so
+	// one selection cannot emit them all: check both.
+	for name, sel := range map[string]TracingSelection{
+		"generic":  allTracingSelection(),
+		"backends": allBackendsSelection(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := GenerateCombined(stamp.Categories, policies, stamp, sel, nil)
 
-	// Anchor: this test guards the hand-authored loop prose. If that prose is
-	// absent the assertions below would pass vacuously, so fail loudly rather
-	// than silently guarding nothing.
-	if !strings.Contains(got, "## How to Apply These Constraints") {
-		t.Fatal("apply-loop section absent — the compliance assertions below would pass vacuously")
-	}
-	if !strings.Contains(got, "## Runtime Tracing") {
-		t.Fatal("runtime tracing section absent — the compliance assertions below would not cover it")
-	}
+			// Anchor: this test guards the hand-authored loop prose. If that prose is
+			// absent the assertions below would pass vacuously, so fail loudly rather
+			// than silently guarding nothing.
+			if !strings.Contains(got, "## How to Apply These Constraints") {
+				t.Fatal("apply-loop section absent — the compliance assertions below would pass vacuously")
+			}
+			if !strings.Contains(got, "## Runtime Tracing") {
+				t.Fatal("runtime tracing section absent — the compliance assertions below would not cover it")
+			}
 
-	skill := discoverGeneratedSkill(t, got)
-	fired := fireSkillRules(t, skill)
+			skill := discoverGeneratedSkill(t, got)
+			fired := fireSkillRules(t, skill)
 
-	// Exact-set assertion, in both directions. want is empty: the generated
-	// skill must trip NO skill-scoped rule at all.
-	//
-	// Anything added here needs a written justification for why forge's own
-	// output may ship a finding. "It's only LOW" is not one — CSKILL-085 sat
-	// here on exactly that reasoning until the description template grew its
-	// purpose clause, which cost one clause and cleared it.
-	want := map[string]bool{}
+			// Exact-set assertion, in both directions. want is empty: the generated
+			// skill must trip NO skill-scoped rule at all.
+			//
+			// Anything added here needs a written justification for why forge's own
+			// output may ship a finding. "It's only LOW" is not one — CSKILL-085 sat
+			// here on exactly that reasoning until the description template grew its
+			// purpose clause, which cost one clause and cleared it.
+			want := map[string]bool{}
 
-	for _, id := range fired {
-		if !want[id] {
-			t.Errorf("generated skill trips %s — the emitted prose must not self-flag", id)
-		}
-	}
-	firedSet := make(map[string]bool, len(fired))
-	for _, id := range fired {
-		firedSet[id] = true
-	}
-	for id := range want {
-		if !firedSet[id] {
-			t.Errorf("%s no longer fires; remove it from want so this test keeps asserting an exact set", id)
-		}
+			for _, id := range fired {
+				if !want[id] {
+					t.Errorf("generated skill trips %s — the emitted prose must not self-flag", id)
+				}
+			}
+			firedSet := make(map[string]bool, len(fired))
+			for _, id := range fired {
+				firedSet[id] = true
+			}
+			for id := range want {
+				if !firedSet[id] {
+					t.Errorf("%s no longer fires; remove it from want so this test keeps asserting an exact set", id)
+				}
+			}
+		})
 	}
 }
 

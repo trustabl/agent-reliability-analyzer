@@ -1,0 +1,9 @@
+{
+  "name": "langwatch-ts-fixture",
+  "private": true,
+  "dependencies": {
+    "@langchain/langgraph": "0.2.0",
+    "@langchain/openai": "0.3.0",
+    "langwatch": "2.2.0"
+  }
+}
