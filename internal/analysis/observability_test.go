@@ -499,3 +499,126 @@ func TestApplyGlobalInstrumentation(t *testing.T) {
 		t.Errorf("langchain agent: got %+v", got)
 	}
 }
+
+func TestDiscoverObservability_LangWatchPython(t *testing.T) {
+	cases := []struct{ name, src, detail string }{
+		{"setup", "import langwatch\n\nlangwatch.setup()\n", "langwatch.setup"},
+		{"trace decorator", "import langwatch\n\n@langwatch.trace()\ndef run():\n    pass\n", "langwatch.trace"},
+		{"bare decorator", "import langwatch\n\n@langwatch.span\ndef tool():\n    pass\n", "langwatch.span"},
+		{"context manager", "import langwatch\n\nwith langwatch.trace():\n    pass\n", "langwatch.trace"},
+		{"module alias", "import langwatch as lw\n\nlw.setup()\n", "langwatch.setup"},
+		{"from import", "from langwatch import trace\n\n@trace()\ndef run():\n    pass\n", "langwatch.trace"},
+		{"from import renamed", "from langwatch import setup as lw_setup\n\nlw_setup()\n", "langwatch.setup"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pf := parsePyFile(t, "obs.py", tc.src)
+			got := analysis.DiscoverObservability([]analysis.ParsedFile{pf})
+			inits := obsInits(got)
+			if len(inits) != 1 || inits[0].Vendor != models.VendorLangWatch || inits[0].Detail != tc.detail {
+				t.Fatalf("got inits %+v, want one langwatch/%s", inits, tc.detail)
+			}
+			var imp bool
+			for _, s := range got {
+				imp = imp || (s.Vendor == models.VendorLangWatch && s.Kind == models.ObsSignalImport)
+			}
+			if !imp {
+				t.Errorf("no langwatch import signal in %+v", got)
+			}
+		})
+	}
+}
+
+// setup, trace and span are generic names: without a langwatch binding they
+// are someone else's, and an import alone is not initialization.
+func TestDiscoverObservability_LangWatchPythonNeedsBinding(t *testing.T) {
+	for name, src := range map[string]string{
+		"local setup":       "def setup():\n    pass\n\nsetup()\n",
+		"otel trace":        "from opentelemetry import trace\n\ntrace.get_tracer('x')\n",
+		"import only":       "import langwatch\n\nx = 1\n",
+		"other module span": "import langwatch\nfrom mylib import span\n\n@span()\ndef f():\n    pass\n",
+		"other attr":        "import langwatch\n\nlangwatch.get_current_trace()\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			pf := parsePyFile(t, "x.py", src)
+			if inits := obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf})); len(inits) != 0 {
+				t.Fatalf("unexpected init signals %+v", inits)
+			}
+		})
+	}
+}
+
+func TestDiscoverObservability_LangWatchTS(t *testing.T) {
+	cases := []struct{ name, src, detail string }{
+		{"setupObservability", "import { setupObservability } from \"langwatch/observability/node\";\n\nsetupObservability({ serviceName: \"agent\" });\n", "setupobservability"},
+		{"renamed", "import { setupObservability as lwSetup } from \"langwatch/observability/node\";\n\nlwSetup({ serviceName: \"agent\" });\n", "setupobservability"},
+		{"exporter", "import { LangWatchTraceExporter } from \"langwatch/observability\";\n\nconst e = new LangWatchTraceExporter();\n", "langwatchtraceexporter"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pf := parseTSForTest(t, "obs.ts", tc.src)
+			inits := obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf}))
+			if len(inits) != 1 || inits[0].Vendor != models.VendorLangWatch || inits[0].Detail != tc.detail {
+				t.Fatalf("got %+v, want one langwatch/%s", inits, tc.detail)
+			}
+		})
+	}
+}
+
+// getLangWatchTracer produces nothing without a setup, so it is not init.
+func TestDiscoverObservability_LangWatchTSTracerIsNotInit(t *testing.T) {
+	pf := parseTSForTest(t, "obs.ts", "import { getLangWatchTracer } from \"langwatch\";\n\nconst tracer = getLangWatchTracer(\"x\");\n")
+	if inits := obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf})); len(inits) != 0 {
+		t.Fatalf("unexpected init %+v", inits)
+	}
+}
+
+// A renamed import resolves for every vendor, not only LangWatch.
+func TestDiscoverObservability_TSRenamedImportResolves(t *testing.T) {
+	pf := parseTSForTest(t, "otel.ts", "import { NodeSDK as SDK } from \"@opentelemetry/sdk-node\";\n\nconst sdk = new SDK({});\n")
+	inits := obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf}))
+	if len(inits) != 1 || inits[0].Vendor != models.VendorOTel || inits[0].Detail != "nodesdk" {
+		t.Fatalf("got %+v, want one otel/nodesdk", inits)
+	}
+}
+
+// trace.setGlobalTracerProvider is the TypeScript twin of Python's
+// set_tracer_provider: registering a provider globally switches tracing on.
+// Forge's own TypeScript setup registers its provider this way.
+func TestDiscoverObservability_TSSetGlobalTracerProvider(t *testing.T) {
+	src := "import { trace } from \"@opentelemetry/api\";\nimport { BasicTracerProvider } from \"@opentelemetry/sdk-trace-base\";\n\nconst provider = new BasicTracerProvider();\ntrace.setGlobalTracerProvider(provider);\n"
+	pf := parseTSForTest(t, "otel.ts", src)
+	inits := obsInits(analysis.DiscoverObservability([]analysis.ParsedFile{pf}))
+	if len(inits) != 1 || inits[0].Vendor != models.VendorOTel || inits[0].Detail != "setglobaltracerprovider" {
+		t.Fatalf("got %+v, want one otel/setglobaltracerprovider", inits)
+	}
+}
+
+// LangWatch applies the instrumentors passed to setup() process-wide, so a
+// LangChainInstrumentor there credits LangChain agents the way
+// LangChainInstrumentor().instrument() does.
+func TestDiscoverObservability_LangWatchSetupInstrumentors(t *testing.T) {
+	cases := []struct {
+		name, src string
+		credit    bool
+	}{
+		{"langchain instrumentor", "import langwatch\nfrom openinference.instrumentation.langchain import LangChainInstrumentor\n\nlangwatch.setup(instrumentors=[LangChainInstrumentor()])\n", true},
+		{"module-qualified", "import langwatch\nimport openinference.instrumentation.langchain as oil\n\nlangwatch.setup(instrumentors=[oil.LangChainInstrumentor()])\n", true},
+		{"other instrumentor", "import langwatch\nfrom openinference.instrumentation.openai import OpenAIInstrumentor\n\nlangwatch.setup(instrumentors=[OpenAIInstrumentor()])\n", false},
+		{"no instrumentors", "import langwatch\n\nlangwatch.setup()\n", false},
+		{"not langwatch setup", "from openinference.instrumentation.langchain import LangChainInstrumentor\n\ndef setup(**kw):\n    pass\n\nsetup(instrumentors=[LangChainInstrumentor()])\n", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			signals := analysis.DiscoverObservability([]analysis.ParsedFile{parsePyFile(t, "obs.py", tc.src)})
+			agents := []models.AgentDef{{SDK: models.SDKLangChain, Language: models.LanguagePython}}
+			analysis.ApplyGlobalInstrumentation(agents, signals)
+			if got := agents[0].InstrumentedBy != nil; got != tc.credit {
+				t.Fatalf("credited = %v, want %v (signals %+v)", got, tc.credit, signals)
+			}
+			if tc.credit && agents[0].InstrumentedBy.Call != "langwatch.setup.langchaininstrumentor" {
+				t.Errorf("Call = %q", agents[0].InstrumentedBy.Call)
+			}
+		})
+	}
+}

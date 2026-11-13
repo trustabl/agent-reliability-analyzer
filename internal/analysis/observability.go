@@ -30,6 +30,7 @@ var obsPyModules = []struct {
 	{"mlflow", models.VendorMLflow},
 	{"ddtrace", models.VendorDatadogLLMObs},
 	{"opik", models.VendorOpik},
+	{"langwatch", models.VendorLangWatch},
 }
 
 // obsInitCallees maps a call expression to the vendor whose instrumentation it
@@ -70,12 +71,27 @@ var obsInitCallees = []struct {
 	{"track_openai", models.VendorOpik},
 }
 
+// langWatchPyActivators are the langwatch names whose call, or bare use as a
+// decorator, switches tracing on. setup() installs the exporter; trace() and
+// span() call the SDK's ensure_setup(), which builds a client from
+// LANGWATCH_API_KEY when setup() was never called. The names are generic, so
+// they count only when they resolve to a langwatch import binding.
+var langWatchPyActivators = map[string]bool{"setup": true, "trace": true, "span": true}
+
+func isLangWatchPyModule(mod string) bool { return mod == "langwatch" }
+
 // pydanticInstrumentAllDetail is the Detail recorded for Pydantic AI's
 // process-wide Agent.instrument_all(). It is matched outside obsInitCallees
 // because its gate differs: any `<receiver>.instrument_all()` counts (so an
 // aliased `PAgent.instrument_all()` is caught), but only in a file that imports
 // pydantic_ai or logfire — the name alone is too generic to trust.
 const pydanticInstrumentAllDetail = "agent.instrument_all"
+
+// langWatchSetupLangChainDetail is the extra init signal for
+// langwatch.setup(instrumentors=[LangChainInstrumentor()]): LangWatch calls
+// .instrument() on each instrumentor it is given, so LangChain is traced
+// process-wide just as by LangChainInstrumentor().instrument().
+const langWatchSetupLangChainDetail = "langwatch.setup.langchaininstrumentor"
 
 // instrumentorSuffix is the class-name suffix of the OpenInference and
 // OpenLLMetry instrumentor classes (LangChainInstrumentor, OpenAIInstrumentor,
@@ -93,6 +109,7 @@ var globalInstrumentors = map[string]models.SDK{
 	"logfire.instrument_pydantic_ai":   models.SDKPydanticAI,
 	pydanticInstrumentAllDetail:        models.SDKPydanticAI,
 	"langchaininstrumentor.instrument": models.SDKLangChain,
+	langWatchSetupLangChainDetail:      models.SDKLangChain,
 }
 
 // obsExporterNames maps a lowercased span-exporter class name to the sink it
@@ -219,6 +236,10 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 		}
 		return pydanticSeen
 	}
+	var lwAliases map[string]string
+	if imported[models.VendorLangWatch] {
+		lwAliases = pyImportAliases(pf, isLangWatchPyModule)
+	}
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
 		switch n.Type() {
 		case "call":
@@ -234,6 +255,11 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 			if !ok {
 				vendor, detail, ok = matchPyGlobalInstrumentCall(fn, pf, imported, pydanticImported)
 			}
+			if !ok {
+				if d, hit := matchPyLangWatchCallee(callee, lwAliases); hit {
+					vendor, detail, ok = models.VendorLangWatch, d, true
+				}
+			}
 			if ok {
 				out = append(out, models.ObservabilitySignal{
 					Vendor:    vendor,
@@ -244,6 +270,17 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 					EndLine:   astutil.NodeEndLine(n),
 					Language:  models.LanguagePython,
 				})
+				if detail == "langwatch.setup" && langWatchSetupHasLangChain(n, pf) {
+					out = append(out, models.ObservabilitySignal{
+						Vendor:    models.VendorLangWatch,
+						Kind:      models.ObsSignalInit,
+						Detail:    langWatchSetupLangChainDetail,
+						File:      pf.RelPath,
+						StartLine: astutil.NodeLine(n),
+						EndLine:   astutil.NodeEndLine(n),
+						Language:  models.LanguagePython,
+					})
+				}
 			}
 			if sink, ok := matchObsExporter(callee); ok {
 				out = append(out, models.ObservabilitySignal{
@@ -271,6 +308,27 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 					Language:  models.LanguagePython,
 				})
 			}
+		case "decorator":
+			// The call form, @langwatch.trace(), is a call node inside the
+			// decorator and is matched above. This is the bare form.
+			if lwAliases == nil || n.NamedChildCount() == 0 {
+				return true
+			}
+			expr := n.NamedChild(0)
+			if expr.Type() != "identifier" && expr.Type() != "attribute" {
+				return true
+			}
+			if detail, ok := matchPyLangWatchCallee(astutil.NodeText(expr, pf.Source), lwAliases); ok {
+				out = append(out, models.ObservabilitySignal{
+					Vendor:    models.VendorLangWatch,
+					Kind:      models.ObsSignalInit,
+					Detail:    detail,
+					File:      pf.RelPath,
+					StartLine: astutil.NodeLine(n),
+					EndLine:   astutil.NodeEndLine(n),
+					Language:  models.LanguagePython,
+				})
+			}
 		case "string":
 			lit := strings.Trim(astutil.NodeText(n, pf.Source), `"'`)
 			for _, env := range obsContentCaptureEnvVars {
@@ -291,6 +349,60 @@ func pyObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 		return true
 	})
 	return out
+}
+
+// matchPyLangWatchCallee resolves a callee, or a bare decorator expression,
+// against a file's langwatch bindings: `lw.setup` after `import langwatch as
+// lw`, `trace` after `from langwatch import trace`. It returns the signal
+// Detail, "langwatch.<name>", when the name switches tracing on.
+func matchPyLangWatchCallee(callee string, aliases map[string]string) (string, bool) {
+	if aliases == nil {
+		return "", false
+	}
+	var name string
+	if i := strings.LastIndex(callee, "."); i >= 0 {
+		if aliases[callee[:i]] != "*" {
+			return "", false
+		}
+		name = callee[i+1:]
+	} else if orig, ok := aliases[callee]; ok && orig != "*" {
+		name = orig
+	}
+	if !langWatchPyActivators[name] {
+		return "", false
+	}
+	return "langwatch." + name, true
+}
+
+// langWatchSetupHasLangChain reports whether a langwatch.setup(...) call's
+// instrumentors list constructs a LangChainInstrumentor, bare or
+// module-qualified. A list built elsewhere and passed by name is not read.
+func langWatchSetupHasLangChain(call *sitter.Node, pf ParsedFile) bool {
+	args := call.ChildByFieldName("arguments")
+	if args == nil {
+		return false
+	}
+	for i := 0; i < int(args.NamedChildCount()); i++ {
+		kw := args.NamedChild(i)
+		if kw.Type() != "keyword_argument" || astutil.NodeText(kw.ChildByFieldName("name"), pf.Source) != "instrumentors" {
+			continue
+		}
+		list := kw.ChildByFieldName("value")
+		if list == nil || list.Type() != "list" {
+			return false
+		}
+		for j := 0; j < int(list.NamedChildCount()); j++ {
+			el := list.NamedChild(j)
+			if el.Type() != "call" {
+				continue
+			}
+			callee := astutil.NodeText(el.ChildByFieldName("function"), pf.Source)
+			if callee[strings.LastIndex(callee, ".")+1:] == "LangChainInstrumentor" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // matchPyGlobalInstrumentCall recognizes the two process-wide instrumentation
@@ -501,6 +613,7 @@ var obsTSModules = []struct {
 	{"@agentops/", models.VendorAgentOps},
 	{"dd-trace", models.VendorDatadogLLMObs},
 	{"opik", models.VendorOpik},
+	{"langwatch", models.VendorLangWatch},
 }
 
 // obsTSInitCallees maps a lowercased TS/JS callee or constructor name to the
@@ -514,6 +627,7 @@ var obsTSInitCallees = []struct {
 	{"nodesdk", models.VendorOTel},
 	{"registerotel", models.VendorOTel},
 	{"registerinstrumentations", models.VendorOTel},
+	{"setglobaltracerprovider", models.VendorOTel},
 	{"traceloop.initialize", models.VendorOpenLLMetry},
 	{"langfuse", models.VendorLangfuse},
 	{"callbackhandler", models.VendorLangfuse},
@@ -523,6 +637,8 @@ var obsTSInitCallees = []struct {
 	{"opik", models.VendorOpik},
 	{"opikexporter", models.VendorOpik},
 	{"opikcallbackhandler", models.VendorOpik},
+	{"setupobservability", models.VendorLangWatch},
+	{"langwatchtraceexporter", models.VendorLangWatch},
 }
 
 // tsObservabilitySignals collects import and init signals from one TS/JS file.
@@ -531,15 +647,26 @@ var obsTSInitCallees = []struct {
 // generic enough (NodeSDK, Langfuse) that an ungated match would fire on any
 // same-named local class, so the import is the evidence that the name means
 // what we think it means.
+//
+// A renamed import is followed: after `import { NodeSDK as SDK }`, `new SDK()`
+// is matched as NodeSDK.
 func tsObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 	root := pf.Tree.RootNode()
 	imported := make(map[models.ObservabilityVendor]bool)
+	// renamed maps a local name bound from a vendor module to its imported
+	// name. A collision keeps the first in obsTSModules order.
+	renamed := make(map[string]string)
 	var out []models.ObservabilitySignal
 	for _, m := range obsTSModules {
 		needle := m.Needle
 		aliases := astutil.TSImportAliasesMatch(root, pf.Source, func(mod string) bool {
 			return strings.Contains(strings.ToLower(mod), needle)
 		})
+		for local, orig := range aliases {
+			if _, seen := renamed[local]; !seen && orig != "*" && orig != "default" {
+				renamed[local] = orig
+			}
+		}
 		if len(aliases) == 0 || imported[m.Vendor] {
 			continue
 		}
@@ -571,6 +698,11 @@ func tsObservabilitySignals(pf ParsedFile) []models.ObservabilitySignal {
 			return true
 		}
 		lower := strings.ToLower(astutil.NodeText(fn, pf.Source))
+		if fn.Type() == "identifier" {
+			if orig, ok := renamed[astutil.NodeText(fn, pf.Source)]; ok {
+				lower = strings.ToLower(orig)
+			}
+		}
 		for _, c := range obsTSInitCallees {
 			if !imported[c.Vendor] {
 				continue

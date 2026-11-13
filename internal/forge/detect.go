@@ -40,6 +40,14 @@ type SDKLanguage struct {
 	Language models.Language
 }
 
+// TracingBackend is an observability vendor's SDK declared in one language.
+// A selected backend replaces the generic OpenTelemetry setup for its
+// language, so the project keeps one tracer provider.
+type TracingBackend struct {
+	Vendor   models.ObservabilityVendor
+	Language models.Language
+}
+
 // Detection is what forge learns from a target's dependency manifests.
 type Detection struct {
 	Categories []models.DetectorCategory // sorted, deduplicated
@@ -48,6 +56,7 @@ type Detection struct {
 	// Unplaced are categories declared in a manifest whose language forge
 	// does not know (composer.json, say), so their languages are incomplete.
 	Unplaced []models.DetectorCategory // sorted, deduplicated
+	Backends []TracingBackend          // language order, then vendor
 }
 
 // TracingSelection is what the Runtime Tracing section is generated for. The
@@ -55,6 +64,17 @@ type Detection struct {
 type TracingSelection struct {
 	Languages []models.Language
 	Pairs     []SDKLanguage
+	Backends  []TracingBackend
+}
+
+// backendManifests are the manifests a backend may be declared in: the
+// hand-edited ones, as for repo_observability_declared. A lock file lists
+// transitive packages nobody chose.
+var backendManifests = map[string]bool{
+	"pyproject.toml":   true,
+	"requirements.txt": true,
+	"Pipfile":          true,
+	"package.json":     true,
 }
 
 func tracingLanguageRank(l models.Language) int {
@@ -73,6 +93,21 @@ func orderedLanguages(set map[models.Language]bool) []models.Language {
 			out = append(out, l)
 		}
 	}
+	return out
+}
+
+func orderedBackends(set map[TracingBackend]bool) []TracingBackend {
+	out := make([]TracingBackend, 0, len(set))
+	for b := range set {
+		out = append(out, b)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		ri, rj := tracingLanguageRank(out[i].Language), tracingLanguageRank(out[j].Language)
+		if ri != rj {
+			return ri < rj
+		}
+		return out[i].Vendor < out[j].Vendor
+	})
 	return out
 }
 
@@ -106,10 +141,10 @@ func Detect(ctx context.Context, target string) (Detection, error) {
 	if err != nil {
 		return Detection{}, err
 	}
-	return detectionFromDeps(profile.SDKDeps), nil
+	return detectionFromRecon(profile.SDKDeps, profile.ObsDeps), nil
 }
 
-func detectionFromDeps(deps []models.SDKDep) Detection {
+func detectionFromRecon(deps []models.SDKDep, obs []models.ObsDep) Detection {
 	cats := make(map[models.DetectorCategory]bool)
 	unplaced := make(map[models.DetectorCategory]bool)
 	langs := make(map[models.Language]bool)
@@ -129,11 +164,24 @@ func detectionFromDeps(deps []models.SDKDep) Detection {
 		pairs[SDKLanguage{Category: cat, Language: lang}] = true
 	}
 
+	backends := make(map[TracingBackend]bool)
+	for _, d := range obs {
+		if !backendManifests[d.Source] {
+			continue
+		}
+		lang, ok := ingestion.ManifestLanguage(d.Source)
+		if !ok || !hasBackendBlock(d.Vendor, lang) {
+			continue
+		}
+		backends[TracingBackend{Vendor: d.Vendor, Language: lang}] = true
+	}
+
 	return Detection{
 		Categories: sortedCategories(cats),
 		Languages:  orderedLanguages(langs),
 		Pairs:      orderedPairs(pairs),
 		Unplaced:   sortedCategories(unplaced),
+		Backends:   orderedBackends(backends),
 	}
 }
 
@@ -206,8 +254,10 @@ func TracingApplies(categories []models.DetectorCategory) bool {
 // selection only for what detection did not already place: a category with
 // no detected pair pairs with every selected language, and a language that
 // was not detected pairs with every category. Repeating on the command line
-// something detection already found changes nothing. When TracingApplies is
-// false the selection is empty, whatever languages were detected or given.
+// something detection already found changes nothing. A detected backend is
+// kept when its language is selected; --lang never adds one. When
+// TracingApplies is false the selection is empty, whatever languages were
+// detected or given.
 func SelectTracing(det Detection, categories, explicitCats []models.DetectorCategory, explicitLangs []models.Language) TracingSelection {
 	if !TracingApplies(categories) {
 		return TracingSelection{}
@@ -246,7 +296,17 @@ func SelectTracing(det Detection, categories, explicitCats []models.DetectorCate
 			pairs[SDKLanguage{Category: c, Language: l}] = true
 		}
 	}
-	return TracingSelection{Languages: orderedLanguages(langs), Pairs: orderedPairs(pairs)}
+	backends := make(map[TracingBackend]bool)
+	for _, be := range det.Backends {
+		if langs[be.Language] {
+			backends[be] = true
+		}
+	}
+	return TracingSelection{
+		Languages: orderedLanguages(langs),
+		Pairs:     orderedPairs(pairs),
+		Backends:  orderedBackends(backends),
+	}
 }
 
 // RuleLanguages lists, per category, every language forge knows the SDK is

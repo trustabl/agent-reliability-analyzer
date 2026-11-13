@@ -50,6 +50,36 @@ type frameworkRecipe struct {
 	Heading  string
 }
 
+// backendBlock is an observability vendor's variant of a language block. Its
+// text lives in tracingtext/backends/<vendor>_<language>_setup.md, which
+// replaces <language>_setup.md, and _traps.md, which follows
+// <language>_traps.md. The rest of the section is shared.
+type backendBlock struct {
+	Vendor   models.ObservabilityVendor
+	Language models.Language
+	Heading  string
+}
+
+// backendBlocks is in emit order. Detection drops a declared vendor with no
+// row here, so the project gets the generic setup.
+var backendBlocks = []backendBlock{
+	{Vendor: models.VendorLangWatch, Language: models.LanguagePython, Heading: "LangWatch"},
+	{Vendor: models.VendorLangWatch, Language: models.LanguageTypeScript, Heading: "LangWatch"},
+}
+
+func backendFile(be backendBlock, part string) string {
+	return fmt.Sprintf("backends/%s_%s_%s.md", be.Vendor, be.Language, part)
+}
+
+func hasBackendBlock(v models.ObservabilityVendor, l models.Language) bool {
+	for _, be := range backendBlocks {
+		if be.Vendor == v && be.Language == l {
+			return true
+		}
+	}
+	return false
+}
+
 // languageBlocks is in emit order.
 var languageBlocks = []languageBlock{
 	{
@@ -152,6 +182,25 @@ func selectedRecipes(sel TracingSelection) map[models.Language][]frameworkRecipe
 	return out
 }
 
+// selectedBackends maps each language to its selected backend block. A
+// language with two selected backends keeps the first in backendBlocks order.
+func selectedBackends(sel TracingSelection) map[models.Language]backendBlock {
+	want := make(map[TracingBackend]bool, len(sel.Backends))
+	for _, be := range sel.Backends {
+		want[be] = true
+	}
+	out := make(map[models.Language]backendBlock)
+	for _, be := range backendBlocks {
+		if _, taken := out[be.Language]; taken {
+			continue
+		}
+		if want[TracingBackend{Vendor: be.Vendor, Language: be.Language}] {
+			out[be.Language] = be
+		}
+	}
+	return out
+}
+
 // emitRuntimeTracing writes the Runtime Tracing section: how to make the agent
 // emit OpenTelemetry spans, then how to label them with
 // agent-reliability-otel-labels. It is a no-op when the selection names no
@@ -162,6 +211,7 @@ func emitRuntimeTracing(b *strings.Builder, sel TracingSelection) {
 		return
 	}
 	recipes := selectedRecipes(sel)
+	backends := selectedBackends(sel)
 
 	fmt.Fprintf(b, "## Runtime Tracing\n\n")
 	writeText(b, "intro.md")
@@ -169,8 +219,15 @@ func emitRuntimeTracing(b *strings.Builder, sel TracingSelection) {
 	fmt.Fprintf(b, "### Step 1 — Emit spans (OpenTelemetry)\n\n")
 	writeText(b, "step1.md")
 	for _, blk := range blocks {
-		fmt.Fprintf(b, "#### %s\n\n", blk.Heading)
-		writeText(b, string(blk.Language)+"_setup.md")
+		// A backend's setup replaces the generic one, which would create a
+		// second provider beside the backend's.
+		if be, ok := backends[blk.Language]; ok {
+			fmt.Fprintf(b, "#### %s (%s)\n\n", blk.Heading, be.Heading)
+			writeText(b, backendFile(be, "setup"))
+		} else {
+			fmt.Fprintf(b, "#### %s\n\n", blk.Heading)
+			writeText(b, string(blk.Language)+"_setup.md")
+		}
 		for _, r := range recipes[blk.Language] {
 			fmt.Fprintf(b, "##### %s\n\n", r.Heading)
 			writeText(b, recipeFile(r, "setup"))
@@ -202,6 +259,9 @@ func emitRuntimeTracing(b *strings.Builder, sel TracingSelection) {
 	for _, blk := range blocks {
 		fmt.Fprintf(b, "%s:\n\n", blk.Heading)
 		writeText(b, string(blk.Language)+"_traps.md")
+		if be, ok := backends[blk.Language]; ok {
+			writeText(b, backendFile(be, "traps"))
+		}
 		for _, r := range recipes[blk.Language] {
 			writeText(b, recipeFile(r, "check"))
 		}

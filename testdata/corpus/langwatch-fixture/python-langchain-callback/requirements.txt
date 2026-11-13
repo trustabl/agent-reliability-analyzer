@@ -1,0 +1,3 @@
+langchain==1.0.0
+langchain-openai==0.3.18
+langwatch==1.4.0

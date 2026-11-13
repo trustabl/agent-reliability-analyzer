@@ -161,39 +161,7 @@ func otelLabelsImports(pf ParsedFile, lang models.Language) (map[string]string, 
 // `... import mark_tool_span as mts` binds mts → mark_tool_span;
 // `import agent_reliability_otel_labels as otl` binds otl → "*".
 func pyOtelLabelsAliases(pf ParsedFile) map[string]string {
-	out := map[string]string{}
-	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
-		switch n.Type() {
-		case "import_from_statement":
-			if !isOtelLabelsPyModule(astutil.NodeText(n.ChildByFieldName("module_name"), pf.Source)) {
-				return true
-			}
-			for i := 0; i < int(n.ChildCount()); i++ {
-				if n.FieldNameForChild(i) != "name" {
-					continue
-				}
-				c := n.Child(i)
-				switch c.Type() {
-				case "dotted_name":
-					name := astutil.NodeText(c, pf.Source)
-					out[name] = name
-				case "aliased_import":
-					out[astutil.NodeText(c.ChildByFieldName("alias"), pf.Source)] =
-						astutil.NodeText(c.ChildByFieldName("name"), pf.Source)
-				}
-			}
-		case "import_statement":
-			for i := 0; i < int(n.NamedChildCount()); i++ {
-				c := n.NamedChild(i)
-				if c.Type() == "aliased_import" &&
-					isOtelLabelsPyModule(astutil.NodeText(c.ChildByFieldName("name"), pf.Source)) {
-					out[astutil.NodeText(c.ChildByFieldName("alias"), pf.Source)] = "*"
-				}
-			}
-		}
-		return true
-	})
-	return out
+	return pyImportAliases(pf, isOtelLabelsPyModule)
 }
 
 // otelLabelsCalleeName resolves a callee to the library name it calls, and
