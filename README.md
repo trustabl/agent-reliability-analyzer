@@ -92,7 +92,7 @@ If Agent Reliability Analyzer saves you a production incident, please ⭐ the re
 
 <p align="center">
   <a href="https://www.star-history.com/#trustabl/agent-reliability-analyzer&Date">
-    <img src="https://api.star-history.com/svg?repos=trustabl/agent-reliability-analyzer&type=Date" alt="GitHub stars over time for trustabl/agent-reliability-analyzer" width="600">
+    <img src="https://api.star-history.com/svg?repos=trustabl/agent-reliability-analyzer&type=Date" alt="GitHub stars over time for trustabl/agent-reliability-analyzer" width="800">
   </a>
 </p>
 
