@@ -90,6 +90,12 @@ If Agent Reliability Analyzer saves you a production incident, please ⭐ the re
   </sub>
 </p>
 
+<p align="center">
+  <a href="https://www.star-history.com/#trustabl/agent-reliability-analyzer&Date">
+    <img src="https://api.star-history.com/svg?repos=trustabl/agent-reliability-analyzer&type=Date" alt="GitHub stars over time for trustabl/agent-reliability-analyzer" width="600">
+  </a>
+</p>
+
 ---
 
 Trustabl scans an agent repository for the gaps that break agents in production:
@@ -1545,12 +1551,6 @@ The checks implement concepts from [Agent Reliability Engineering (ARE)](https:/
 ## Community
 
 Join the [Trustabl Discord](https://discord.gg/G6gM8nKxPg) to ask questions, share feedback, and follow development.
-
-## Star history
-
-<a href="https://www.star-history.com/#trustabl/agent-reliability-analyzer&Date">
-  <img src="https://api.star-history.com/svg?repos=trustabl/agent-reliability-analyzer&type=Date" alt="GitHub stars over time for trustabl/agent-reliability-analyzer">
-</a>
 
 ## License
 
