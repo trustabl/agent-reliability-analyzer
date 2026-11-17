@@ -92,6 +92,12 @@ If Agent Reliability Analyzer saves you a production incident, please ⭐ the re
 
 ---
 
+<p align="center">
+  <a href="https://www.star-history.com/#trustabl/agent-reliability-analyzer&Date">
+    <img src="https://api.star-history.com/svg?repos=trustabl/agent-reliability-analyzer&type=Date" alt="GitHub stars over time for trustabl/agent-reliability-analyzer" width="800">
+  </a>
+</p>
+
 Trustabl scans an agent repository for the gaps that break agents in production:
 tool descriptions too vague for a model to know when to use them, missing retry
 and timeout handling, untyped parameters, absent guardrails, and tool grants that
