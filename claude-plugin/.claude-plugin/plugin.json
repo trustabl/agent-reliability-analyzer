@@ -1,0 +1,29 @@
+{
+  "name": "agent-reliability-analyzer",
+  "displayName": "agent-reliability-analyzer",
+  "version": "0.4.2",
+  "description": "Self-audit AI agent, tool, and MCP-server code for security and reliability misconfigurations with Trustabl, the agent reliability scanner for the OpenAI Agents SDK, Claude Agent SDK, Google ADK, and MCP. Ships two skills (trustabl-scan and trustabl-enrich) and a subagent (trustabl) that together form a scan → enrich → review → apply pipeline.",
+  "author": {
+    "name": "Trustabl",
+    "url": "https://trustabl.ai",
+    "email": "eng@trustabl.ai"
+  },
+  "homepage": "https://trustabl.ai",
+  "repository": "https://github.com/trustabl/agent-reliability-analyzer",
+  "documentationUrl": "https://trustabl.ai/docs",
+  "supportUrl": "https://github.com/trustabl/agent-reliability-analyzer/issues",
+  "privacyPolicyUrl": "https://trustabl.ai/privacy",
+  "termsOfServiceUrl": "https://trustabl.ai/terms",
+  "license": "Apache-2.0",
+  "keywords": [
+    "security",
+    "static-analysis",
+    "agents",
+    "mcp",
+    "openai-agents-sdk",
+    "claude-agent-sdk",
+    "google-adk",
+    "reliability"
+  ],
+  "icon": "./.claude-plugin/icon.png"
+}
