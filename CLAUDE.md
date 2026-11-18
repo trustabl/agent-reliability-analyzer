@@ -350,6 +350,17 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **AGCFG-006 / AGCFG-012 corrections (2026-11-11, no schema change, stays 41; no rule added or
+> removed):** AGCFG-006 (critical, 0.8) no longer matches `*_BASE_URL` by suffix. `.gemini/.env` judges
+> `GOOGLE_GEMINI_BASE_URL` and `GOOGLE_VERTEX_BASE_URL` (the endpoint variables Gemini CLI reads, per
+> `contentGenerator.ts`) and `.codex/config.toml` judges no endpoint key (Codex's
+> `PROJECT_LOCAL_CONFIG_DENYLIST` drops `openai_base_url`, `chatgpt_base_url`, `model_provider`,
+> `model_providers`, `profiles` and others from a project file). Secrecy contract unchanged: key names are read, values are not.
+> Follow-up: verify which tool reads `*_PROXY_COMMAND` and `GEMINI_SANDBOX*` in a Codex `config.toml`.
+> AGCFG-012 adds `env`, `sed` and `awk` prefixes (GNU manuals; the permissions page is silent on them).
+> `.gemini/.env` was not sampled in public repos. Rulebook: `docs/Policy/agent_config/preauth_execution.md`
+> and `exec_capable_allow.md`.
+>
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
 > `ProjectConfigFacts.ScriptAgentBypass`, and **AGCFG-016** (high, 0.7, pack file `agent_config/allow_all_bash.yaml`) over
