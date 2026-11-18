@@ -350,6 +350,17 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **MCP tool description hidden text and MCP server bind (2026-11-12, `schema_version` 41 -> 46, provisional; +3 rules):** **MCP-036** (Python) /
+> **MCP-037** (TypeScript) (medium, 0.5, pack file `mcp/tool_description_hidden_text.yaml`) over the new tool-scope predicate
+> `tool_description_has_hidden_text`, which runs `analysis.HasHiddenText` (the AGCFG-009/013 code-point test and exemptions) on `ToolDef.Description` and
+> the Python `description=` decorator kwarg; no phrase or HTML-comment marker. **MCP-203** (high, 0.6, repo scope, pack file `mcp/server_exposure.yaml`)
+> over `repo_mcp_server_binds_all_interfaces_unprotected`, backed by `RepoInventory.MCPServerBinds` (`analysis.DiscoverMCPServerBinds`): a literal wildcard host on an
+> SSE / HTTP run call of a same-file `FastMCP` / `MCPServer` variable, constructor call or one-hop same-file factory result (or the SDK v1 constructor), or on `createMcpExpressApp`, with no auth, `transport_security`,
+> `allowedHosts` or SDK auth import in the file. Variables, env lookups, default and loopback hosts, `**kwargs` and test paths are not judged; the host is never
+> stored. Schema 42..45 are held by open branches, so 46 may renumber on merge. Not built: the `readOnlyHint` contradiction rule (backlog), "HTTP without auth",
+> uvicorn launches, TypeScript SDK v2. The fixture holds **392** rules (389 + 3; re-derive). Rulebook docs: `docs/Policy/mcp/tool_description_hidden_text.md`,
+> `server_exposure.md`.
+>
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
 > `ProjectConfigFacts.ScriptAgentBypass`, and **AGCFG-016** (high, 0.7, pack file `agent_config/allow_all_bash.yaml`) over
