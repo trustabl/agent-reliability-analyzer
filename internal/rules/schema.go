@@ -84,6 +84,10 @@ type MatchExpr struct {
 	// PredToolClaimUse and validToolClaimUse.
 	ToolClaimUse []string `yaml:"tool_claim_use,omitempty"`
 
+	// ToolDescriptionHasHiddenText: the tool description holds zero-width, Tags-block or
+	// bidirectional-override characters; see PredToolDescriptionHasHiddenText.
+	ToolDescriptionHasHiddenText *bool `yaml:"tool_description_has_hidden_text,omitempty"`
+
 	// Agent-scope predicates
 	AgentClass        []string `yaml:"agent_class,omitempty"`
 	AgentKwargPresent []string `yaml:"agent_kwarg_present,omitempty"`
@@ -174,6 +178,10 @@ type MatchExpr struct {
 	RepoSettingsEnvRedirectsModelEndpoint  *bool `yaml:"repo_settings_env_redirects_model_endpoint,omitempty"`
 	RepoSettingsAllowAllBash               *bool `yaml:"repo_settings_allow_all_bash,omitempty"`
 	RepoScriptRunsAgentCliWithBypassFlag   *bool `yaml:"repo_script_runs_agent_cli_with_bypass_flag,omitempty"`
+
+	// RepoMCPServerBindsAllInterfacesUnprotected is true when MCP server code starts an HTTP
+	// transport on a literal wildcard host with no auth or allow-list in the file (MCP-203).
+	RepoMCPServerBindsAllInterfacesUnprotected *bool `yaml:"repo_mcp_server_binds_all_interfaces_unprotected,omitempty"`
 
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.

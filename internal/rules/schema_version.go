@@ -65,4 +65,8 @@ package rules
 //
 // Schema 41 adds the repo_settings_allow_all_bash and
 // repo_script_runs_agent_cli_with_bypass_flag predicates (repo scope).
-const SupportedSchemaVersion = 41
+//
+// Schema 46 adds the tool_description_has_hidden_text predicate (tool scope) and the
+// repo_mcp_server_binds_all_interfaces_unprotected predicate (repo scope). Provisional: 42..45
+// are held by open branches, so a later merge may renumber it.
+const SupportedSchemaVersion = 46

@@ -1086,6 +1086,25 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   mis-attributed. Emitting `KindMCPTool` routes through the existing
   `SDKMCP` → `mcp` pack plumbing. Low-level `Server` + `setRequestHandler`
   tools are not extracted (gap).
+- **DiscoverMCPServerBinds** (`mcp_server_binds.go`) — the fact behind MCP-203, over the
+  Python and TS/JS parsed files (test paths skipped via `pathclass`). Python: a variable bound in
+  the same file to `FastMCP(...)` / `MCPServer(...)` imported from `mcp.server.fastmcp`,
+  `mcp.server.mcpserver`, `mcp.server` or `fastmcp`, whose `.run(transport=<sse|http|streamable-http>,
+  host=<literal>)` (or, SDK v1, a constructor `host=`) names a literal `0.0.0.0` / `::` / `[::]`,
+  with no `auth` / `token_verifier` / `auth_server_provider` / `transport_security` argument and no
+  `**kwargs` splat. TypeScript: `createMcpExpressApp({ host })` imported from
+  `@modelcontextprotocol/sdk/server/express.js` with a literal wildcard host, no `allowedHosts`
+  key or spread, and no import from `@modelcontextprotocol/sdk/server/auth/`. Each hit is a
+  `models.MCPServerBind` in `RepoInventory.MCPServerBinds` (sorted by path and line); the host text
+  is reduced to the judgment and not stored. The Python receiver of `.run(...)` (also
+  `run_sse_async` / `run_streamable_http_async`) is a variable bound in the file to the constructor,
+  the constructor call itself, or a call to a one-hop same-file factory (a top-level, undecorated
+  function with a single `return` of the constructor or of a variable assigned once to it). TypeScript SDK v2 packages and ASGI launches
+  (`uvicorn.run(mcp.http_app(), host=...)`) are not read.
+- **MCP tool description hidden text** (`hidden_text.go`, `rules.PredToolDescriptionHasHiddenText`)
+  — `tool_description_has_hidden_text` runs `analysis.HasHiddenText` (the AGCFG-009/013 zero-width
+  U+200B/200C/200D/FEFF, Tags-block and bidi test, with the same exemptions) over `ToolDef.Description`
+  and the Python `description=` decorator kwarg held in `ToolDef.Config` (MCP-036 / MCP-037).
 - **DiscoverTSOpenAITools** (`ts_openai_tools.go`) — `tool({...})` factory calls
   from `@openai/agents` / `-core` / `-openai`. Captures `name`/`description`
   (registered name), `parameters` top-level keys as `ParamNames`, handler body

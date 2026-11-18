@@ -33,6 +33,7 @@ These were authored in this repository as test fixtures.
 | `model-endpoint-override-fixture/` | Synthetic `.claude/settings*.json` files whose env block sets ANTHROPIC_BASE_URL to an off-vendor placeholder host, the vendor host, a loopback host and a variable reference, for AGCFG-014. All values are placeholders |
 | `agcfg-bypass-fixture/` | Synthetic repo for AGCFG-015 and AGCFG-016: a postinstall script that runs a JS file starting `claude` with a bypass flag in a `spawnSync` call, a named script with the same flag, a husky hook and nested package.json that use an allow-list, a `.claude/settings.json` that allows `Bash(*)`, and a nested settings file with an exact Bash command. Authored for this repo; no external code. See `SOURCE.md`. |
 | `guidance-hidden-fixture/` | Synthetic CLAUDE.md, GEMINI.md, Cursor `.mdc` rule, `.windsurfrules` and Copilot instructions file, each with a Unicode Tags-block run spelling a placeholder word, for AGCFG-013. No external code |
+| `mcp-server-tools-fixture/` | Synthetic MCP servers (Python and TypeScript) pairing tool descriptions that hold invisible characters and HTTP servers (a variable, and a one-hop factory result) bound to 0.0.0.0 with clean descriptions, credited authentication or an allow-list, a loopback host, and the unsafe shapes under a test path (MCP-036, MCP-037, MCP-203); invisible characters written by a generator command |
 
 ## Vendored from `openai/openai-agents-python` (MIT)
 

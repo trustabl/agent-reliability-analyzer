@@ -1,0 +1,49 @@
+policy:
+  id: mcp_server_exposure
+  name: MCP server HTTP exposure
+  category: mcp
+  description: >
+    Repo-scoped rule for an MCP server started on an HTTP transport and bound to all
+    network interfaces. The specification's transport section sets the localhost bind and
+    the Origin check, and the SDKs turn their DNS-rebinding check on for a loopback host.
+
+rules:
+  - id: MCP-203
+    title: MCP server is bound to all interfaces with no authentication or host allow-list
+    severity: high
+    confidence: 0.6
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_server_binds_all_interfaces_unprotected: true
+    explanation: >
+      A server started with the MCP SDK passes a literal wildcard host (0.0.0.0, :: or
+      [::]) to an SSE or streamable HTTP run call, or to the SDK's Express app helper, and
+      the same file names no authentication and no allowed-host list. The Streamable HTTP
+      transport section of the MCP specification says servers must validate the Origin
+      header, "SHOULD bind only to localhost (127.0.0.1) rather than all network
+      interfaces (0.0.0.0)", and "SHOULD implement proper authentication for all
+      connections". The Python SDK enables its DNS-rebinding protection when the host is
+      127.0.0.1, localhost or ::1 and no transport_security is given, and the TypeScript
+      createMcpExpressApp helper does the same for those hosts and logs a warning for
+      0.0.0.0 and ::. A server bound this way answers any client that can reach the port.
+      Limits of this check: it reads literal host values and one file at a time. In
+      Python the server is found when it is a variable bound in the file to the
+      constructor, the constructor call itself (FastMCP(...).run(...)), or the result of a
+      call to a function defined at the top level of the same file whose single return
+      statement is the constructor call or a variable assigned once to it. A factory that
+      is imported, decorated, defined twice, nested, has more than one return statement or
+      calls another factory is not followed. A host from a variable or an environment
+      lookup, a default host, a uvicorn or other ASGI launch of an MCP app, and
+      authentication or a proxy configured in another file or outside the repo are not
+      seen, so the rule can fire on a server protected elsewhere and stay silent on one
+      that is not. Credit is given for an auth, token_verifier,
+      auth_server_provider or transport_security argument in Python, and for allowedHosts
+      or an import of the SDK's auth modules in TypeScript. Files under test paths are not
+      judged.
+    fix: >
+      Bind to 127.0.0.1 unless the server must be reachable from other machines. If it
+      must be, configure the SDK's authentication (the auth argument with a token verifier
+      in Python, the bearer-auth middleware in TypeScript), pass an allowed-host and origin
+      list, and place the server behind a network control.

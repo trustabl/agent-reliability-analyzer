@@ -6,6 +6,30 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **MCP tool descriptions with hidden characters, and MCP servers bound to all interfaces (rule
+  schema 41 → 46, provisional; +3 rules, 392 in the fixture).** Two new predicates, one tool
+  scope and one repo scope. **MCP-036** (Python) and **MCP-037** (TypeScript) (medium, 0.5, pack
+  file `mcp/tool_description_hidden_text.yaml`, predicate `tool_description_has_hidden_text`) flag
+  an MCP tool description that holds a zero-width character, a Unicode Tags-block character or a
+  bidirectional override, using the code-point test and exemptions the guidance-file rules
+  (AGCFG-009/013) use; no phrase or HTML-comment marker is tested. Python reads the docstring and
+  a `description=` decorator argument; TypeScript reads the string-literal description of
+  `registerTool` / `tool`. The finding does not repeat the characters. **MCP-203** (high, 0.6,
+  repo scope, pack file `mcp/server_exposure.yaml`, predicate
+  `repo_mcp_server_binds_all_interfaces_unprotected`) flags a run call that starts an MCP server
+  on `sse`, `http` or `streamable-http` with a literal wildcard host (on a same-file server
+  variable, the constructor call itself, or the result of a one-hop same-file factory function) (`0.0.0.0`, `::`, `[::]`), or
+  a `createMcpExpressApp({ host })` call with one, when the same file names no `auth`,
+  `token_verifier`, `auth_server_provider`, `transport_security`, `allowedHosts` or SDK auth import.
+  A host from a variable or an environment lookup, a default or loopback host, and test paths are
+  not judged. Backed by the new `RepoInventory.MCPServerBinds` (`analysis.DiscoverMCPServerBinds`),
+  one finding per bind; the host text is reduced to the judgment and never stored. Not built:
+  phrase markers, an HTTP-transport-without-auth check, a uvicorn launch of an MCP app, TypeScript
+  SDK v2 packages. The annotation-contradiction rule (`readOnlyHint`) was reviewed and moved to the
+  backlog. Rulebook docs: `docs/Policy/mcp/tool_description_hidden_text.md`, `server_exposure.md`.
+
 ## [0.1.16] - 2026-11-09
 
 Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes

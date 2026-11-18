@@ -25,39 +25,58 @@ const (
 	hiddenBidiReason      = "contains bidirectional override characters"
 )
 
-// hiddenTextHits returns one hit per kind of hidden text found in raw, each at
-// the line of its first occurrence. The text itself is never echoed.
-func hiddenTextHits(path string, raw []byte) []models.ConfigHit {
-	rs := []rune(string(raw))
+// hiddenTextLines holds the line (1-based) of the first occurrence of each kind
+// of hidden text, or 0 when the kind is absent.
+type hiddenTextLines struct{ zw, tags, bidi int }
+
+// scanHiddenText finds the first occurrence of each kind of hidden text in rs.
+// It is the shared code-point test behind the guidance-file rules (via
+// hiddenTextHits) and the MCP tool description rules (HasHiddenText).
+func scanHiddenText(rs []rune) hiddenTextLines {
 	line := 1
-	var zw, tags, bidi int
+	var h hiddenTextLines
 	for i, r := range rs {
 		switch {
 		case r == '\n':
 			line++
 		case strings.ContainsRune(zeroWidthChars, r):
-			if zw == 0 && !benignZeroWidth(rs, i) {
-				zw = line
+			if h.zw == 0 && !benignZeroWidth(rs, i) {
+				h.zw = line
 			}
 		case r >= 0xE0000 && r <= 0xE007F:
-			if tags == 0 && !isFlagTagSequence(rs, i) {
-				tags = line
+			if h.tags == 0 && !isFlagTagSequence(rs, i) {
+				h.tags = line
 			}
 		case (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069):
-			if bidi == 0 {
-				bidi = line
+			if h.bidi == 0 {
+				h.bidi = line
 			}
 		}
 	}
+	return h
+}
+
+// HasHiddenText reports whether s contains zero-width, Tags-block or
+// bidirectional-override characters, after the same exemptions hiddenTextHits
+// applies. The text is never returned or echoed.
+func HasHiddenText(s string) bool {
+	h := scanHiddenText([]rune(s))
+	return h.zw > 0 || h.tags > 0 || h.bidi > 0
+}
+
+// hiddenTextHits returns one hit per kind of hidden text found in raw, each at
+// the line of its first occurrence. The text itself is never echoed.
+func hiddenTextHits(path string, raw []byte) []models.ConfigHit {
+	h := scanHiddenText([]rune(string(raw)))
 	var out []models.ConfigHit
-	if zw > 0 {
-		out = append(out, hit(path, zw, hiddenZeroWidthReason))
+	if h.zw > 0 {
+		out = append(out, hit(path, h.zw, hiddenZeroWidthReason))
 	}
-	if tags > 0 {
-		out = append(out, hit(path, tags, hiddenTagsReason))
+	if h.tags > 0 {
+		out = append(out, hit(path, h.tags, hiddenTagsReason))
 	}
-	if bidi > 0 {
-		out = append(out, hit(path, bidi, hiddenBidiReason))
+	if h.bidi > 0 {
+		out = append(out, hit(path, h.bidi, hiddenBidiReason))
 	}
 	return out
 }
