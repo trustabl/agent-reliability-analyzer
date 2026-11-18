@@ -469,6 +469,7 @@ const (
 	VendorMLflow        ObservabilityVendor = "mlflow"
 	VendorDatadogLLMObs ObservabilityVendor = "datadog_llmobs"
 	VendorOpik          ObservabilityVendor = "opik"
+	VendorLangWatch     ObservabilityVendor = "langwatch"
 	VendorNative        ObservabilityVendor = "native"
 )
 

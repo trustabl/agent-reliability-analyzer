@@ -2219,3 +2219,174 @@ export const agent = new Agent({ name: "travel-booker" });
 		}
 	}
 }
+
+// End to end: LangWatch is an observability vendor. Each sub-repo of the
+// langwatch fixture is scanned on its own. The absence rules stay silent where
+// LangWatch is wired, OBS-001 never fires (setup or a trace decorator is init),
+// and the otel-labels ladder runs (OBS-006). A dep-only repo gets OBS-005, and
+// repos with no observability at all still get the absence rule.
+func TestScan_LangWatchFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "langwatch-fixture")
+	cases := []struct {
+		dir          string
+		want, absent []string
+	}{
+		// No LangChain callback wired: the executor's internal steps are not
+		// traced, so LC-112 is a true positive here and the control for the
+		// two cases below.
+		{"python-langchain", []string{"OBS-006", "LC-112"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		// LangWatch's documented wiring: the callback in the run call's config.
+		{"python-langchain-callback", []string{"OBS-006"}, []string{"LC-112", "LC-202", "OBS-001", "OBS-005"}},
+		// LangChain instrumented process-wide through langwatch.setup().
+		{"python-langchain-instrumentor", []string{"OBS-006"}, []string{"LC-112", "LC-202", "OBS-001", "OBS-005"}},
+		{"python-alias", []string{"OBS-006"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		{"ts-langchain", []string{"OBS-006"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		{"python-openai-agents", []string{"OBS-006"}, []string{"OAI-203", "OBS-001", "OBS-005"}},
+		{"otlp-only", []string{"OBS-006"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		{"dep-only", []string{"OBS-005"}, []string{"LC-202", "OBS-001", "OBS-006"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.dir, func(t *testing.T) {
+			res, err := scanner.Run(scanner.Config{Target: filepath.Join(root, tc.dir), RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scan: %v", err)
+			}
+			fired := map[string]bool{}
+			for _, f := range res.Findings {
+				fired[f.RuleID] = true
+			}
+			for _, id := range tc.want {
+				if !fired[id] {
+					t.Errorf("%s did not fire; fired: %v", id, fired)
+				}
+			}
+			for _, id := range tc.absent {
+				if fired[id] {
+					t.Errorf("%s fired", id)
+				}
+			}
+		})
+	}
+	// Negative controls: the same agents with no observability still get the
+	// absence rule, so the silences above are not vacuous.
+	controls := map[string]map[string]string{
+		"python": {
+			"requirements.txt": "langchain==0.3.25\nlangchain-openai==0.3.18\n",
+			"agent.py":         readLangWatchFixture(t, root, "dep-only/agent.py"),
+		},
+		"typescript": {
+			"package.json": `{"name": "control", "dependencies": {"@langchain/langgraph": "0.2.0", "@langchain/openai": "0.3.0"}}`,
+			"agent.ts":     readLangWatchFixture(t, root, "ts-langchain/agent.ts"),
+		},
+	}
+	for name, files := range controls {
+		t.Run("control/"+name, func(t *testing.T) {
+			dir := t.TempDir()
+			for rel, body := range files {
+				// The control is the fixture with every LangWatch line removed.
+				var kept []string
+				for _, line := range strings.Split(body, "\n") {
+					if !strings.Contains(strings.ToLower(line), "langwatch") && !strings.Contains(line, "setupObservability") {
+						kept = append(kept, line)
+					}
+				}
+				if err := os.WriteFile(filepath.Join(dir, rel), []byte(strings.Join(kept, "\n")), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scan: %v", err)
+			}
+			for _, f := range res.Findings {
+				if f.RuleID == "LC-202" {
+					return
+				}
+			}
+			t.Errorf("LC-202 did not fire on a %s LangChain repo with no observability", name)
+		})
+	}
+}
+
+func readLangWatchFixture(t *testing.T, root, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(root, rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// Forge tells a coding model how to wire LangWatch and scan judges the result.
+// Each code block in forge's backend setup text, written into a LangChain repo
+// that declares LangWatch, must scan as initialized tracing: no OBS-001, no
+// LC-202, no OBS-005. A block with no LangWatch call changes the exporter of a
+// provider the project already has, so forge's generic setup block stands in
+// for that provider.
+func TestScan_ForgeBackendSetupScansAsInstrumented(t *testing.T) {
+	fence := regexp.MustCompile("(?s)```(python|typescript)\n(.*?)```")
+	generic := map[string]string{}
+	for _, lang := range []string{"python", "typescript"} {
+		raw, err := os.ReadFile("../forge/tracingtext/" + lang + "_setup.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := fence.FindStringSubmatch(string(raw))
+		if m == nil {
+			t.Fatalf("no code block in %s_setup.md", lang)
+		}
+		generic[lang] = m[2]
+	}
+	repos := map[string]struct{ ext, manifestName, manifest, agent string }{
+		"python": {".py", "requirements.txt",
+			"langchain==0.3.25\nlangchain-openai==0.3.18\nlangwatch==1.4.0\nopentelemetry-sdk\nopentelemetry-exporter-otlp-proto-http\n",
+			"from langchain.agents import AgentExecutor\n\nexecutor = AgentExecutor(agent=None, tools=[])\n"},
+		"typescript": {".ts", "package.json",
+			`{"name": "f", "dependencies": {"@langchain/langgraph": "0.2.0", "@langchain/openai": "0.3.0", "langwatch": "2.2.0", "@opentelemetry/api": "1.9.0"}}`,
+			"import { createReactAgent } from \"@langchain/langgraph/prebuilt\";\nimport { ChatOpenAI } from \"@langchain/openai\";\n\nexport const agent = createReactAgent({ llm: new ChatOpenAI({}), tools: [] });\n"},
+	}
+	paths, _ := filepath.Glob("../forge/tracingtext/backends/*_setup.md")
+	if len(paths) == 0 {
+		t.Fatal("no backend setup text found under internal/forge/tracingtext/backends")
+	}
+	for _, p := range paths {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, m := range fence.FindAllStringSubmatch(string(raw), -1) {
+			lang, block := m[1], m[2]
+			r := repos[lang]
+			t.Run(fmt.Sprintf("%s/%d", filepath.Base(p), i), func(t *testing.T) {
+				dir := t.TempDir()
+				files := map[string]string{r.manifestName: r.manifest, "agent" + r.ext: r.agent, "tracing" + r.ext: block}
+				if !strings.Contains(block, "langwatch") {
+					files["provider"+r.ext] = generic[lang]
+				}
+				for rel, body := range files {
+					if err := os.WriteFile(filepath.Join(dir, rel), []byte(body), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+				if err != nil {
+					t.Fatalf("scanner.Run: %v", err)
+				}
+				var initialized bool
+				for _, o := range res.Observability {
+					initialized = initialized || o.Kind == models.ObsSignalInit
+				}
+				if !initialized {
+					t.Fatalf("block did not scan as initialized tracing:\n%s", block)
+				}
+				for _, f := range res.Findings {
+					switch f.RuleID {
+					case "OBS-001", "LC-202", "OBS-005":
+						t.Errorf("forge's backend block trips %s at %s:%d\n%s", f.RuleID, f.FilePath, f.StartLine, block)
+					}
+				}
+			})
+		}
+	}
+}

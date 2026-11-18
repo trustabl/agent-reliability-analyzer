@@ -434,6 +434,10 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.CIWorkflows = analysis.DiscoverCIWorkflows(profile.Manifest)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
+	// Run-time callbacks (agent.invoke(..., config={"callbacks": [...]})) credit
+	// a LangChain agent the way a process-wide instrumentor does. Must follow
+	// both ApplyGlobalInstrumentation (whose credit it keeps) and the run calls.
+	analysis.ApplyRunCallInstrumentation(inventory.Agents, inventory.AgentRunCalls)
 	// Server-entrypoint fact (Python): must follow DiscoverAgentRunCalls, which
 	// supplies the run calls the reachability stamp is applied to.
 	inventory.Entrypoints = analysis.DiscoverEntrypoints(parsed)

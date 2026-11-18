@@ -159,6 +159,8 @@ func TestGenerateCombined_Tracing_GoldenFiles(t *testing.T) {
 			Languages: []models.Language{models.LanguageGo},
 			Pairs:     []SDKLanguage{{Category: models.CategoryGoogleADK, Language: models.LanguageGo}},
 		}},
+		// LangWatch replaces the setup blocks and adds traps, in both languages.
+		{"tracing_langwatch", langWatchSelection()},
 		{"tracing_mixed", TracingSelection{
 			Languages: []models.Language{models.LanguagePython, models.LanguageTypeScript},
 			Pairs: []SDKLanguage{
