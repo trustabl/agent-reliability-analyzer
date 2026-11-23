@@ -72,7 +72,12 @@ behavior was removed when the loader adopted strict decoding).
     `description`, `allowed-tools[]` → `ToolGrants`,
     `disable-model-invocation`) plus body facts (dynamic-context exec
     commands, external URLs, prompt-injection markers) and a bundled-file
-    inventory. Matched at any path depth (monorepo-safe). Carries no
+    inventory. Matched at any path depth (monorepo-safe). Frontmatter
+    booleans and `argument-hint` are decoded tolerantly (`lenient_bool.go`,
+    `lenient_hint.go`): a spelling Claude Code accepts, such as a quoted
+    `"true"` or `1`, must never drop the skill, because a dropped skill is
+    never judged. Add a new typed frontmatter field with a tolerant type, not
+    a bare `bool` or `string`. Carries no
     `Language` field — `SKILL.md` is markdown, so skill rules carry no
     `language:` field either and the detector does not gate on language.
   - **Examples**: skill auto-approves unrestricted `Bash` (CSKILL-001), a

@@ -16,8 +16,8 @@ type slashCommandFrontmatter struct {
 	Description            string       `yaml:"description"`
 	AllowedTools           stringOrList `yaml:"allowed-tools"`
 	Model                  string       `yaml:"model"`
-	ArgumentHint           string       `yaml:"argument-hint"`
-	DisableModelInvocation bool         `yaml:"disable-model-invocation"`
+	ArgumentHint           argumentHint `yaml:"argument-hint"`
+	DisableModelInvocation lenientBool  `yaml:"disable-model-invocation"`
 }
 
 // DiscoverSlashCommands parses every ComponentSlashCommand (.claude/commands/*.md)
@@ -47,8 +47,8 @@ func DiscoverSlashCommands(manifest models.ScanManifest) []models.SlashCommandDe
 				def.AllowedTools = tokens
 				def.ToolGrants = parseToolGrants(tokens)
 				def.Model = parsed.Model
-				def.ArgumentHint = parsed.ArgumentHint
-				def.DisableModelInvocation = parsed.DisableModelInvocation
+				def.ArgumentHint = string(parsed.ArgumentHint)
+				def.DisableModelInvocation = bool(parsed.DisableModelInvocation)
 				def.Line = startLine
 				def.EndLine = endLine
 			}
