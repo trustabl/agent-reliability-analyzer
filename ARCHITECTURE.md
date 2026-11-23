@@ -843,12 +843,11 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   reads, and any file for a committed secret literal (an AWS/GitHub/Slack/Google
   token or a private-key header) — the payload-in-aux-file surface that scanning
   `SKILL.md` alone misses. No frontmatter or no `name` → skipped.
-  CSKILL-080/081 (claimed crypto operations / sensitive-data handling) use
-  `skill_text_matches`, not the raw-substring `skill_*_has_text` family — a
-  sentence-scoped, word-boundary predicate added to fix confirmed false
-  positives a bare substring match produces (a term inside an unrelated word,
-  or a data class merely being *named* rather than actually handled).
-  CSKILL-082..087 still use the raw-substring predicates unmodified. See
+  CSKILL-080/081/084/085/086 use `skill_text_matches`, not the raw-substring
+  `skill_*_has_text` family: a sentence-scoped, word-boundary predicate added to fix
+  confirmed false positives a bare substring match produces (a term inside an unrelated
+  word, or a data class merely being *named* rather than actually handled). CSKILL-082,
+  083 and 087 still use the raw-substring predicates unmodified. See
   `PredSkillTextMatches` in `internal/rules/predicates.go`.
 - **DiscoverDependencies** (`deps.go`) — walks the repo (skipping vendored /
   installed trees: `node_modules`, `vendor`, `.venv`, `target`, …) for the

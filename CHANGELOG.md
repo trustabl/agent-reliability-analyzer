@@ -6,6 +6,21 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Changed
+
+- **CSKILL-081, 084, 085, 086: fewer false positives (rules change, no schema bump).** The
+  four rules in `claude_skill/skill_quality_text.yaml` now use the word-boundary predicate
+  `skill_text_matches`. 081 matches credential-type token phrases (api, access, auth,
+  authentication, bearer, refresh, session, oauth, secret token) instead of the bare word
+  "token". 084 matches whole-collection phrases and no longer matches "entire" inside
+  "entirely" or "all files" inside "small files". 085 recognises purpose and trigger words
+  ("to", "for", "when", "use", ...) where it recognised seven phrases. 086 no longer matches
+  "log" inside "logic" or "methodology", and "record" and "database" are no longer terms.
+  Severity and confidence are unchanged. On 43 public repositories (1,820 skills) the four
+  rules go from 3,938 to 1,656 findings; false-positive counts are model-assisted judgments,
+  and the 086 count is understated (see `COVERAGE.md`). A bare "token" with no credential
+  qualifier no longer matches in 081.
+
 ## [0.1.16] - 2026-11-09
 
 Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
