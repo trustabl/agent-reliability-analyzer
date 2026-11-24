@@ -199,6 +199,11 @@ type MatchExpr struct {
 	RepoOtelLabelsAttemptConstant       *bool `yaml:"repo_otel_labels_attempt_constant,omitempty"`
 	RepoOtelLabelsRunEndSuccessOnly     *bool `yaml:"repo_otel_labels_run_end_success_only,omitempty"`
 
+	// Reasoning-label predicates (OBS-013..014). Test-file signals never count.
+	RepoOtelLabelsReasoningUnhashed *bool `yaml:"repo_otel_labels_reasoning_unhashed,omitempty"`
+	RepoOtelLabelsReasoningLabelled *bool `yaml:"repo_otel_labels_reasoning_labelled,omitempty"`
+	RepoModelReasoningEnabled       *bool `yaml:"repo_model_reasoning_enabled,omitempty"`
+
 	// RepoLangGraphPlatformConfigPresent is ALSO valid at agent scope (dual-scope,
 	// like repo_has_observability): a langgraph.json means LangGraph Platform
 	// injects its own checkpointer.

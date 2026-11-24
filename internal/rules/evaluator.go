@@ -256,6 +256,15 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoOtelLabelsRunEndSuccessOnly != nil && !PredRepoOtelLabelsRunEndSuccessOnly(*e.RepoOtelLabelsRunEndSuccessOnly, inv) {
 		return false
 	}
+	if e.RepoOtelLabelsReasoningUnhashed != nil && !PredRepoOtelLabelsReasoningUnhashed(*e.RepoOtelLabelsReasoningUnhashed, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsReasoningLabelled != nil && !PredRepoOtelLabelsReasoningLabelled(*e.RepoOtelLabelsReasoningLabelled, inv) {
+		return false
+	}
+	if e.RepoModelReasoningEnabled != nil && !PredRepoModelReasoningEnabled(*e.RepoModelReasoningEnabled, inv) {
+		return false
+	}
 	if len(e.RepoClaudeDefaultModeIs) > 0 && !PredRepoClaudeDefaultModeIs(e.RepoClaudeDefaultModeIs, inv) {
 		return false
 	}
@@ -606,6 +615,9 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_otel_labels_tool_span_failure_unsafe":    true,
 		"repo_otel_labels_attempt_constant":            true,
 		"repo_otel_labels_run_end_success_only":        true,
+		"repo_otel_labels_reasoning_unhashed":          true,
+		"repo_otel_labels_reasoning_labelled":          true,
+		"repo_model_reasoning_enabled":                 true,
 		"repo_langgraph_platform_config_present":       true,
 		"repo_raw_anthropic_tool_output_in_system":     true,
 		"repo_raw_openai_tool_output_in_system":        true,
@@ -760,6 +772,9 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoOtelLabelsToolSpanFailureUnsafe != nil, "repo_otel_labels_tool_span_failure_unsafe")
 	add(e.RepoOtelLabelsAttemptConstant != nil, "repo_otel_labels_attempt_constant")
 	add(e.RepoOtelLabelsRunEndSuccessOnly != nil, "repo_otel_labels_run_end_success_only")
+	add(e.RepoOtelLabelsReasoningUnhashed != nil, "repo_otel_labels_reasoning_unhashed")
+	add(e.RepoOtelLabelsReasoningLabelled != nil, "repo_otel_labels_reasoning_labelled")
+	add(e.RepoModelReasoningEnabled != nil, "repo_model_reasoning_enabled")
 	return n
 }
 

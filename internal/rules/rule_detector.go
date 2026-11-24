@@ -247,6 +247,8 @@ func otelLabelsEvidence(e MatchExpr, inv models.RepoInventory) *models.OtelLabel
 		{e.RepoOtelLabelsToolSpanFailureUnsafe, otelToolSpanFailureUnsafeOffender},
 		{e.RepoOtelLabelsAttemptConstant, otelAttemptConstantOffender},
 		{e.RepoOtelLabelsRunEndSuccessOnly, otelRunEndSuccessOnlyOffender},
+		{e.RepoOtelLabelsReasoningUnhashed, otelReasoningUnhashedOffender},
+		{e.RepoModelReasoningEnabled, otelReasoningConfigEvidence},
 	}
 	for _, l := range lookups {
 		if l.set != nil && *l.set {

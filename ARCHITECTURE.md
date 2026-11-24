@@ -807,6 +807,24 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   an empty location. Hand-written `trustabl.*` keys credit the `OBS-006..008`
   ladder but are not read by these four.
 
+  Three more back `OBS-013..014`, for the reasoning labels
+  (`internal/analysis/otel_labels_reasoning.go`).
+  `repo_otel_labels_reasoning_unhashed` reads a hand-written `trustabl.cot.*`
+  key, known to the library or not, whose value could be the reasoning itself
+  (`ValueUnhashed`: a runtime value that is not visibly a hash). It does not
+  credit a hand-written key the way the ladder does, because it asks what the
+  key was given, not whether it exists. `repo_otel_labels_reasoning_labelled`
+  reads a `reasoning` signal (`mark_reasoning` / `markReasoning`) or any
+  hand-written `trustabl.cot.*` key. `repo_model_reasoning_enabled` reads a
+  `reasoning_config` signal, a model option such as `thinking` or
+  `reasoning_effort`, recorded only in a repo that already carries labels so a
+  repo without them keeps its report as it was. All three drop test-file signals,
+  and findings carry the file and line. The vendored
+  `testdata/forge/otel/otel-spec-keys.json` and `otelLabelsKeys` stay at profile
+  1.0.0 until the library release that has `mark_reasoning`, because forge's
+  recipe must not name a call the published package lacks; the `trustabl.cot.`
+  prefix check does not need that table.
+
 - **DiscoverSubagents** (`subagents.go`) — **hybrid** discovery in two passes.
   Pass 1 reads every `.claude/agents/*.md` component (matched at any path depth
   — monorepos that nest agent projects under `agent/.claude/agents/` or

@@ -2061,6 +2061,156 @@ const (
 `
 )
 
+// TestScan_ReasoningLabels runs real source through the full scanner for the
+// reasoning rules, so a discovery failure cannot hide behind the hand-built
+// inventories in policies_test.go.
+func TestScan_ReasoningLabels(t *testing.T) {
+	const thinkingOn = `
+
+def call_model(client, prompt):
+    return client.messages.create(model="m", messages=[], thinking={"type": "enabled", "budget_tokens": 1024})
+`
+	labelled := otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelGoodRunEnd)
+	cases := []struct {
+		name     string
+		src      string
+		testFile string
+		want     []string
+		wantLine string // a line of src the single finding must point at
+	}{
+		{"labelled, model does not reason", labelled, "", nil, ""},
+		{"labelled, model reasons, no reasoning label", labelled + thinkingOn, "", []string{"OBS-014"}, "thinking="},
+		{"labelled, model reasons, labelled through the library", labelled + thinkingOn + `
+
+def label_call(span, text):
+    from agent_reliability_otel_labels import mark_reasoning
+    mark_reasoning(span, text=text, mode="explicit_cot")
+`, "", nil, ""},
+		{"raw reasoning text written by hand", labelled + thinkingOn + `
+
+def label_call(span, text):
+    span.set_attribute("trustabl.cot.text_fp", text)
+`, "", []string{"OBS-013"}, `span.set_attribute("trustabl.cot.text_fp", text)`},
+		{"a fingerprint written by hand", labelled + thinkingOn + `
+
+def label_call(span, text):
+    span.set_attribute("trustabl.cot.text_fp", canonical_fp(text))
+`, "", nil, ""},
+		{"raw text only in a test file", labelled, `def test_label(span, text):
+    span.set_attribute("trustabl.cot.text_fp", text)
+`, nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			manifest := "[project]\nname = \"f\"\ndependencies = [\"openai-agents\", \"opentelemetry-sdk\", \"agent-reliability-otel-labels\"]\n"
+			files := map[string]string{"pyproject.toml": manifest, "agent.py": tc.src}
+			if tc.testFile != "" {
+				files["tests/test_agent.py"] = tc.testFile
+			}
+			for name, body := range files {
+				p := filepath.Join(dir, name)
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scanner.Run: %v", err)
+			}
+			var got []string
+			var hit models.Finding
+			for _, f := range res.Findings {
+				if f.RuleID == "OBS-013" || f.RuleID == "OBS-014" {
+					got = append(got, f.RuleID)
+					hit = f
+				}
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("reasoning findings: got %v, want %v", got, tc.want)
+			}
+			if tc.wantLine == "" {
+				return
+			}
+			wantLine := 0
+			for i, line := range strings.Split(tc.src, "\n") {
+				if strings.Contains(line, tc.wantLine) {
+					wantLine = i + 1
+					break
+				}
+			}
+			if hit.FilePath != "agent.py" || hit.StartLine != wantLine {
+				t.Errorf("finding at %s:%d, want agent.py:%d", hit.FilePath, hit.StartLine, wantLine)
+			}
+		})
+	}
+}
+
+// The TypeScript leg of TestScan_ReasoningLabels: the option sits deep inside
+// providerOptions, where only the object-key walk finds it.
+func TestScan_ReasoningLabelsTypeScript(t *testing.T) {
+	const src = `import { generateText, tool } from "ai";
+import { z } from "zod";
+import { Run, markReasoning, markRunEnd, markToolSpan } from "@trustabl/agent-reliability-otel-labels";
+
+export const search = tool({
+  description: "Search flights from an airport.",
+  inputSchema: z.object({ origin: z.string() }),
+  execute: async ({ origin }) => origin,
+});
+
+export async function runAgent(root, span, model) {
+  const run = new Run();
+  run.markStart(root);
+  const out = await generateText({
+    model,
+    prompt: "x",
+    tools: { search },
+    providerOptions: { anthropic: { thinking: { type: "adaptive" } } },
+  });
+  markToolSpan(span, { args: {}, result: out, attempt: 1 });
+  LABEL
+  markRunEnd(root, "final_answer");
+  return out;
+}
+`
+	cases := []struct{ name, label, want string }{
+		{"model reasons, no reasoning label", "", "OBS-014"},
+		{"labelled through the library", "markReasoning(span, { text: out.reasoningText });", ""},
+		{"raw reasoning text written by hand", `span.setAttribute("trustabl.cot.text_fp", out.reasoningText);`, "OBS-013"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			files := map[string]string{
+				"package.json": `{"dependencies": {"ai": "^5.0.0", "@trustabl/agent-reliability-otel-labels": "^0.1.1"}}`,
+				"agent.ts":     strings.Replace(src, "LABEL", tc.label, 1),
+			}
+			for name, body := range files {
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scanner.Run: %v", err)
+			}
+			var got []string
+			for _, f := range res.Findings {
+				if f.RuleID == "OBS-013" || f.RuleID == "OBS-014" {
+					got = append(got, f.RuleID)
+				}
+			}
+			if strings.Join(got, ",") != tc.want {
+				t.Errorf("reasoning findings: got %v, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestScan_OtelLabelsCorrectness(t *testing.T) {
 	cases := []struct {
 		name     string

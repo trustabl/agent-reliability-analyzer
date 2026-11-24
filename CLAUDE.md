@@ -350,6 +350,14 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Reasoning labels (2026-11-05, `schema_version` 41 -> 42; +2 rules):** **OBS-013** (medium, 0.6: a hand-written
+> `trustabl.cot.*` value that could be the reasoning itself) and **OBS-014** (low, 0.6: a labelled repo sets a reasoning option and no
+> span records it), new pack file `observability/reasoning.yaml`, over `repo_otel_labels_reasoning_unhashed`,
+> `repo_otel_labels_reasoning_labelled` and `repo_model_reasoning_enabled`. `OtelLabelsSignal` gains the `reasoning` and `reasoning_config`
+> kinds and `ValueUnhashed`. OBS-014 sits one rung below OBS-008 and is deliberately not gated on `repo_observability_initialized`. The key
+> names live in `trustabl-guard/docs/trustabl-otel-attributes.md` v1.5; the vendored manifest and forge's recipe stay at profile 1.0.0 until
+> the library release that has `mark_reasoning`. Paired with `agent-reliability-rules` on the branch of the same name. The fixture holds **391** rules (389 + 2; re-derive).
+>
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
 > `ProjectConfigFacts.ScriptAgentBypass`, and **AGCFG-016** (high, 0.7, pack file `agent_config/allow_all_bash.yaml`) over
