@@ -1,0 +1,70 @@
+policy:
+  id: mcp_tool_description_hidden_text
+  name: MCP tool descriptions with hidden characters
+  category: mcp
+  description: >
+    Rules for characters in an MCP tool description that a reviewer cannot see but a
+    model reads. A client sends each tool description to the model as input, while a
+    person reads the description through a rendered list that may omit or reorder
+    characters. The check is a code-point test and does not match phrases.
+
+rules:
+  - id: MCP-036
+    title: MCP tool description contains hidden characters
+    severity: medium
+    confidence: 0.5
+    language: python
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_description_has_hidden_text: true
+    explanation: >
+      The tool's docstring or description= argument contains zero-width characters,
+      Unicode Tags-block characters or bidirectional override characters. An MCP client
+      passes the description to the model as part of the tool definition. A Tags-block
+      character mirrors an ASCII character and renders as nothing, a zero-width character
+      is invisible inside a sentence, and a bidirectional override changes the order in
+      which text is displayed without changing the order in which it is read, so a
+      sentence can reach the model that a reviewer of the source does not see. Invariant
+      Labs describes tool descriptions as text "invisible to users but visible to AI
+      models" in its report on tool poisoning, and Pillar Security describes hidden
+      zero-width joiners and bidirectional text markers in a Cursor rule file.
+      Limits of this check: it tests code points and does not judge visible instructions
+      in a description. A leading byte order mark, a joiner between non-ASCII letters or
+      emoji, and a subdivision-flag emoji are exempt. Right-to-left prose that uses
+      bidirectional controls is flagged and is a false positive. A description built from
+      a variable or an f-string is not read, and an escape sequence written in the source
+      is not flagged. The finding does not repeat the characters.
+    fix: >
+      Delete the hidden characters from the docstring or description= argument and keep
+      the description in plain visible text. Check how the characters arrived, such as a
+      paste from a web page or a model reply, and review the other tool descriptions in
+      the file.
+
+  - id: MCP-037
+    title: TypeScript MCP tool description contains hidden characters
+    severity: medium
+    confidence: 0.5
+    language: typescript
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_description_has_hidden_text: true
+    explanation: >
+      The description string passed to registerTool or tool contains zero-width
+      characters, Unicode Tags-block characters or bidirectional override characters. A
+      client passes the description to the model as part of the tool definition, so a
+      character a reviewer cannot see can carry text the model reads. Invariant Labs
+      describes tool descriptions as text "invisible to users but visible to AI models"
+      in its report on tool poisoning.
+      Limits of this check: it tests code points in a string-literal description and does
+      not judge visible instructions. A description built from a template literal or a
+      variable is not read, and an escape sequence written in the source is not flagged.
+      The same exemptions as MCP-036 apply. The finding does not repeat the
+      characters.
+    fix: >
+      Delete the hidden characters from the description string and keep it in plain
+      visible text. Check how the characters arrived and review the other tool
+      descriptions in the file.

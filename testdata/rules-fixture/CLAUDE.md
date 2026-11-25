@@ -91,6 +91,7 @@ against. Pick values from the table for the scope you're targeting.
 | `adk_parallel_agent`      | `ParallelAgent(...)` from `google-adk`                        |
 | `adk_loop_agent`          | `LoopAgent(...)` from `google-adk`                            |
 | `adk_langgraph_agent`     | `LanggraphAgent(...)` from `google-adk`                       |
+| `langchain_deep_agent`    | `create_deep_agent(...)` from `deepagents` (Python)           |
 
 **`scope: repo`** — receives `RepoProfile` + `RepoInventory`. `applies_to`
 at this scope is matched against a fixed token list (the loader's
@@ -112,6 +113,7 @@ SDK enum values used by the `repo_has_sdk_in_code` predicate:
 | `raw_llm_sdk`      | Bare `anthropic` / `openai` client usage (no agent framework); category `raw_llm_sdk` loads unconditionally, the rule's own predicate gates |
 | `github_actions`   | Coding agents in GitHub Actions workflows (repo-root `.github/workflows/*.yml`); category `ci` loads unconditionally, the rule's own `repo_ci_agent_*` predicate gates. One finding per step that runs an offending agent (CI-003: per checkout step), carrying that step's file and line |
 | `agent_config`     | Pre-trust harness config committed to the repo (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`, `.codex/hooks.json`, `AGENTS.md`, staged harness guidance files, `permissions.allow` WebFetch rules in the Claude settings files); category `agent_config` loads unconditionally, the rule's own `repo_*` predicate gates. Findings carry the offending file and line |
+| `agent_server`     | Exposure of a server the repo runs for an agent (Spring `application*.properties` / `.yml` origin list, ADK Python and TypeScript origin options, compose and `docker run` lines for the OpenHands agent server image); category `agent_server` loads unconditionally, the rule's own `repo_*` predicate gates. Findings carry the offending file and line |
 
 Repo-scope rules typically combine `applies_to` with a `repo_has_sdk_in_code`
 predicate to narrow firing to repos that actually use the SDK in code (e.g.
@@ -144,6 +146,21 @@ field** — subagents are markdown frontmatter, not code, and the
 rules are CSDK-110 ("Subagent granted the built-in Bash tool"), CSDK-111
 ("Subagent granted filesystem-write or web-fetch built-ins"), CSDK-112 and
 CSDK-115, all in `claude_sdk/subagent_safety.yaml`.
+
+**`scope: slash_command`** — receives a `SlashCommandDef` (one
+`.claude/commands/*.md`, or a plugin `<root>/commands/*.md`). `applies_to` is
+matched against a fixed token:
+
+| `applies_to` value     | Matches                                         |
+| ---------------------- | ----------------------------------------------- |
+| `claude_slash_command` | A Claude Code slash command file (any path depth) |
+
+Slash command rules use the `slash_command_*` predicate family
+(`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+`slash_command_allows_unrestricted_tool`), which share their grant logic with
+the skill predicates. They carry **no `language:` field**. The shipped rules are
+CCMD-001..003 in `claude_skill/slash_command_safety.yaml`; the IDs sit outside
+the SDK-prefix convention, like AGCFG.
 
 ## "Add a rule for X"
 

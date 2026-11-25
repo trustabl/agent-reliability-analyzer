@@ -215,6 +215,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 	agents := analysis.DiscoverAgents(parsed)
 	agents = append(agents, analysis.DiscoverADKAgents(parsed)...)
 	agents = append(agents, analysis.DiscoverLangChainAgents(parsed)...)
+	agents = append(agents, analysis.DiscoverDeepAgents(parsed)...)
 	agents = append(agents, analysis.DiscoverLangGraphGraphs(parsed)...)
 	agents = append(agents, analysis.DiscoverCrewAIAgents(parsed)...)
 	agents = append(agents, analysis.DiscoverAutoGenAgents(parsed)...)
@@ -434,6 +435,12 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.CIWorkflows = analysis.DiscoverCIWorkflows(profile.Manifest)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
+	// MCP-203: MCP server code binding an HTTP transport to a literal wildcard host.
+	inventory.MCPServerBinds = analysis.DiscoverMCPServerBinds(parsed, tsFiles)
+	// Run-time callbacks (agent.invoke(..., config={"callbacks": [...]})) credit
+	// a LangChain agent the way a process-wide instrumentor does. Must follow
+	// both ApplyGlobalInstrumentation (whose credit it keeps) and the run calls.
+	analysis.ApplyRunCallInstrumentation(inventory.Agents, inventory.AgentRunCalls)
 	// Server-entrypoint fact (Python): must follow DiscoverAgentRunCalls, which
 	// supplies the run calls the reachability stamp is applied to.
 	inventory.Entrypoints = analysis.DiscoverEntrypoints(parsed)

@@ -208,10 +208,10 @@ implementation reference see [ARCHITECTURE.md](ARCHITECTURE.md); for the
 at-a-glance SDK coverage matrix see [COVERAGE.md](COVERAGE.md).
 
 <a id="what-it-analyzes--the-five-scope-model"></a>
-## What it analyzes — agent reliability across five scopes
+## What it analyzes — agent reliability across six scopes
 
 Agent Reliability Analyzer does not treat a repository as one undifferentiated
-blob. Every agent reliability rule is classified into exactly one of five scopes,
+blob. Every agent reliability rule is classified into exactly one of six scopes,
 and each scope receives a different typed input:
 
 - **`tool`** — fires once per tool definition. Input: a `ToolDef` (a
@@ -256,6 +256,16 @@ and each scope receives a different typed input:
   model-invocable while granting side-effecting tools (CSKILL-050). Skills
   are markdown, so skill rules carry no `language:`; the `claude_skill`
   pack loads whenever a `SKILL.md` is present.
+- **`slash_command`** — fires once per `.claude/commands/*.md` slash command.
+  Input: a `SlashCommandDef` (`allowed-tools` → `ToolGrants[]`,
+  `disable-model-invocation`). Claude Code treats a command file as a skill
+  that takes the same frontmatter, so the same grants matter: a command that
+  pre-approves unrestricted `Bash` (CCMD-001), pre-approves file writes while
+  the model can start it (CCMD-002), or pre-approves `WebSearch` or an
+  unrestricted `WebFetch` (CCMD-003). A scoped grant such as
+  `Bash(git status *)` or `WebFetch(domain:example.com)` is silent. Command
+  findings are not part of surface scoring yet, so a repo's score does not
+  change when it ships commands.
 - **`repo`** — fires once per scan against the whole inventory. Catches
   project-wide gaps such as the OpenAI Agents SDK being present with no
   custom trace processor configured.
@@ -478,7 +488,7 @@ files in the scanned repo. Fixes are applied only when you opt in with
 - **Observability signals** (`observability`) — the instrumentation found in
   code, one record per fact: the vendor (OpenTelemetry, Langfuse, Logfire,
   Phoenix/OpenInference, OpenLLMetry, Braintrust, Weave, AgentOps, MLflow,
-  Datadog LLM Observability, LangSmith) and whether it is merely **imported** or
+  Datadog LLM Observability, LangSmith, LangWatch) and whether it is merely **imported** or
   actually **initialized**, with the file and line. That distinction is the
   point: a repo that imports a tracing SDK and never starts it looks
   instrumented in its manifest and produces no traces at all. Detected
@@ -486,11 +496,12 @@ files in the scanned repo. Fixes are applied only when you opt in with
   runtime traces.
 - **Process labels** (`otel_labels`) — the `agent-reliability-otel-labels`
   calls found in code (import, `Run` construction, run start, tool-span label,
-  run end) and any `trustabl.*` label keys written by hand, with the file and
-  line and the facts the OBS-006..012 rules read: whether a `Run` is shared,
-  whether a label runs when the tool fails, whether `attempt` is a fixed
-  number, and the literal `side_effect` / `exit_reason` values. Python and
-  TypeScript/JavaScript only. Not folded into the scan ID.
+  run end, reasoning label) and any `trustabl.*` label keys written by hand, with
+  the file and line and the facts the OBS-006..014 rules read: whether a `Run` is
+  shared, whether a label runs when the tool fails, whether `attempt` is a fixed
+  number, the literal `side_effect` / `exit_reason` values, which model options
+  turn reasoning on, and whether a hand-written reasoning value could be the text
+  itself. Python and TypeScript/JavaScript only. Not folded into the scan ID.
 
 - **Server entrypoints** (`entrypoints`, omitted when none) — Python functions a
   server framework invokes for an external request or job: FastAPI and Flask
@@ -1143,6 +1154,7 @@ trustabl forge --policy google_adk --lang go
 | `claude_skill` | Claude Code skills (`SKILL.md`) |
 | `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework) |
 | `agent_config` | Harness config committed to a repo that runs code or grants authority before the folder is trusted (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`) |
+| `agent_server` | Exposure of a server the repo runs for an agent: a `*` origin list on a Google ADK server (Spring `application*.properties` / `.yml`, `get_fast_api_app`, `AdkApiServer`, `adk web --allow_origins`) and an OpenHands agent server bound to a non-loopback `--host` and published in compose or `docker run` with no session API key name |
 | `ci` | Coding agents run from GitHub Actions workflows (`.github/workflows/*.yml`) on events any GitHub user can cause |
 | `openshell` | Shell-invocation tools (no rules in the current pack) |
 
@@ -1178,6 +1190,10 @@ Multiple categories are comma-separated: `--policy openai_sdk,mcp`.
   Pydantic AI (Python), the OpenAI Agents SDK (Python, TypeScript),
   LangChain / LangGraph (Python), CrewAI (Python), AutoGen (Python), and MCP
   client sessions (Python). Other frameworks get the language block only.
+  When a dependency manifest declares LangWatch (Python or TypeScript), that
+  language's setup keeps the project's LangWatch setup call instead of adding
+  a second tracer provider, and shows how to send plain OpenTelemetry spans to
+  LangWatch over HTTP.
   Non-OpenTelemetry tracing stacks are not covered. The section is left out
   when no supported language is found, and when `claude_skill` is the only
   category (Agent Skills are `SKILL.md` files, not agent code to trace).

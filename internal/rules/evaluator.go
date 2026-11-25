@@ -84,6 +84,9 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentServerReachable != nil && PredAgentServerReachable(a, inv) != *e.AgentServerReachable {
 		return false
 	}
+	if e.AgentDeepAgentShellExecuteUngated != nil && PredAgentDeepAgentShellExecuteUngated(a) != *e.AgentDeepAgentShellExecuteUngated {
+		return false
+	}
 	if e.RepoLangGraphPlatformConfigPresent != nil && PredRepoLangGraphPlatformConfigPresent(inv) != *e.RepoLangGraphPlatformConfigPresent {
 		return false
 	}
@@ -220,6 +223,15 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoScriptRunsAgentCliWithBypassFlag != nil && (len(inv.ProjectConfig.ScriptAgentBypass) > 0) != *e.RepoScriptRunsAgentCliWithBypassFlag {
 		return false
 	}
+	if e.RepoAgentServerAllowsAnyOrigin != nil && (len(inv.ProjectConfig.AnyOriginServer) > 0) != *e.RepoAgentServerAllowsAnyOrigin {
+		return false
+	}
+	if e.RepoAgentServerExposedWithoutKey != nil && (len(inv.ProjectConfig.AgentServerNoKey) > 0) != *e.RepoAgentServerExposedWithoutKey {
+		return false
+	}
+	if e.RepoMCPServerBindsAllInterfacesUnprotected != nil && (len(inv.MCPServerBinds) > 0) != *e.RepoMCPServerBindsAllInterfacesUnprotected {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -254,6 +266,15 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 		return false
 	}
 	if e.RepoOtelLabelsRunEndSuccessOnly != nil && !PredRepoOtelLabelsRunEndSuccessOnly(*e.RepoOtelLabelsRunEndSuccessOnly, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsReasoningUnhashed != nil && !PredRepoOtelLabelsReasoningUnhashed(*e.RepoOtelLabelsReasoningUnhashed, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsReasoningLabelled != nil && !PredRepoOtelLabelsReasoningLabelled(*e.RepoOtelLabelsReasoningLabelled, inv) {
+		return false
+	}
+	if e.RepoModelReasoningEnabled != nil && !PredRepoModelReasoningEnabled(*e.RepoModelReasoningEnabled, inv) {
 		return false
 	}
 	if len(e.RepoClaudeDefaultModeIs) > 0 && !PredRepoClaudeDefaultModeIs(e.RepoClaudeDefaultModeIs, inv) {
@@ -401,6 +422,46 @@ func (e MatchExpr) EvaluateSkill(s models.SkillDef, inv models.RepoInventory) bo
 	return true
 }
 
+// EvaluateSlashCommand walks a MatchExpr against a slash command. Slash-command
+// predicates are dispatched here; predicates for other scopes return true
+// vacuously (a slash-command rule should only set slash-command predicates and
+// combinators).
+func (e MatchExpr) EvaluateSlashCommand(c models.SlashCommandDef, inv models.RepoInventory) bool {
+	for _, sub := range e.All {
+		if !sub.EvaluateSlashCommand(c, inv) {
+			return false
+		}
+	}
+	if len(e.Any) > 0 {
+		matched := false
+		for _, sub := range e.Any {
+			if sub.EvaluateSlashCommand(c, inv) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	if e.Not != nil && e.Not.EvaluateSlashCommand(c, inv) {
+		return false
+	}
+	if e.Always != nil && !*e.Always {
+		return false
+	}
+	if e.SlashCommandAllowsUnrestrictedShell != nil && PredSlashCommandAllowsUnrestrictedShell(c) != *e.SlashCommandAllowsUnrestrictedShell {
+		return false
+	}
+	if e.SlashCommandModelInvocable != nil && PredSlashCommandModelInvocable(c) != *e.SlashCommandModelInvocable {
+		return false
+	}
+	if len(e.SlashCommandAllowsUnrestrictedTool) > 0 && !PredSlashCommandAllowsUnrestrictedTool(c, e.SlashCommandAllowsUnrestrictedTool) {
+		return false
+	}
+	return true
+}
+
 // EvaluateTool walks a MatchExpr against a tool and returns whether it matches.
 //
 // Semantics:
@@ -515,6 +576,9 @@ func (e MatchExpr) EvaluateTool(t models.ToolDef, pf analysis.ParsedFile) bool {
 	if len(e.ToolClaimUse) > 0 && !PredToolClaimUse(e.ToolClaimUse, t) {
 		return false
 	}
+	if e.ToolDescriptionHasHiddenText != nil && PredToolDescriptionHasHiddenText(t) != *e.ToolDescriptionHasHiddenText {
+		return false
+	}
 
 	return true
 }
@@ -537,7 +601,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"param_name_matches": true, "call_without_kwarg": true,
 		"call_uses_unnormalized_path_param": true,
 		"tool_decorator_kwarg_value":        true, "tool_decorator_kwarg_present": true,
-		"tool_claim_use": true,
+		"tool_claim_use": true, "tool_description_has_hidden_text": true,
 	},
 	models.ScopeAgent: {
 		"agent_class": true, "agent_kwarg_present": true, "agent_kwarg_missing": true,
@@ -556,6 +620,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_kwargs_observed":                     true,
 		"agent_checkpointer_in_memory":              true,
 		"agent_server_reachable":                    true,
+		"agent_deep_agent_shell_execute_ungated":    true,
 		// Dual-scope (see EvaluateAgent): LangGraph Platform injects a checkpointer.
 		"repo_langgraph_platform_config_present": true,
 	},
@@ -584,53 +649,64 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"skill_description_has_text":                    true,
 		"skill_text_matches":                            true,
 	},
+	models.ScopeSlashCommand: {
+		"slash_command_allows_unrestricted_shell": true,
+		"slash_command_model_invocable":           true,
+		"slash_command_allows_unrestricted_tool":  true,
+	},
 	models.ScopeRepo: {
 		"repo_has_sdk_in_code":   true,
 		"repo_component_present": true, "repo_uses_default_tracing": true,
-		"repo_claude_default_mode_is":                  true,
-		"repo_claude_options_permission_mode_is":       true,
-		"repo_claude_options_max_turns_missing":        true,
-		"repo_claude_options_disallowed_tools_missing": true,
-		"repo_claude_options_mode_without_kwarg":       true,
-		"repo_has_observability":                       true,
-		"repo_observability_inspectable":               true,
-		"repo_observability_initialized":               true,
-		"repo_observability_declared":                  true,
-		"repo_observability_vendor":                    true,
-		"repo_observability_console_only":              true,
-		"repo_observability_captures_content":          true,
-		"repo_otel_labels_installed":                   true,
-		"repo_otel_labels_initialized":                 true,
-		"repo_otel_labels_implemented":                 true,
-		"repo_otel_labels_run_shared":                  true,
-		"repo_otel_labels_tool_span_failure_unsafe":    true,
-		"repo_otel_labels_attempt_constant":            true,
-		"repo_otel_labels_run_end_success_only":        true,
-		"repo_langgraph_platform_config_present":       true,
-		"repo_raw_anthropic_tool_output_in_system":     true,
-		"repo_raw_openai_tool_output_in_system":        true,
-		"repo_project_mcp_autoenable":                  true,
-		"repo_project_hook_runs_untrusted_command":     true,
-		"repo_workspace_env_overrides_trust":           true,
-		"repo_editor_agent_auto_approve":               true,
-		"repo_mcp_config_launches_local_command":       true,
-		"repo_mcp_config_launches_unpinned_package":    true,
-		"repo_mcp_config_unscoped_credential":          true,
-		"repo_mcp_config_remote_plain_http":            true,
-		"repo_codex_hook_runs_repo_command":            true,
-		"repo_agents_md_has_hidden_text":               true,
-		"repo_harness_guidance_has_hidden_text":        true,
-		"repo_guidance_file_has_hidden_text":           true,
-		"repo_ci_agent_untrusted_trigger_ungated":      true,
-		"repo_ci_agent_untrusted_trigger_privileged":   true,
-		"repo_ci_agent_checkout_persists_credentials":  true,
-		"repo_ci_agent_unrestricted_shell":             true,
-		"repo_ci_agent_no_egress_restriction":          true,
-		"repo_settings_preapprove_user_content_fetch":  true,
-		"repo_settings_allow_exec_capable_prefix":      true,
-		"repo_settings_env_redirects_model_endpoint":   true,
-		"repo_settings_allow_all_bash":                 true,
-		"repo_script_runs_agent_cli_with_bypass_flag":  true,
+		"repo_claude_default_mode_is":                      true,
+		"repo_claude_options_permission_mode_is":           true,
+		"repo_claude_options_max_turns_missing":            true,
+		"repo_claude_options_disallowed_tools_missing":     true,
+		"repo_claude_options_mode_without_kwarg":           true,
+		"repo_has_observability":                           true,
+		"repo_observability_inspectable":                   true,
+		"repo_observability_initialized":                   true,
+		"repo_observability_declared":                      true,
+		"repo_observability_vendor":                        true,
+		"repo_observability_console_only":                  true,
+		"repo_observability_captures_content":              true,
+		"repo_otel_labels_installed":                       true,
+		"repo_otel_labels_initialized":                     true,
+		"repo_otel_labels_implemented":                     true,
+		"repo_otel_labels_run_shared":                      true,
+		"repo_otel_labels_tool_span_failure_unsafe":        true,
+		"repo_otel_labels_attempt_constant":                true,
+		"repo_otel_labels_run_end_success_only":            true,
+		"repo_otel_labels_reasoning_unhashed":              true,
+		"repo_otel_labels_reasoning_labelled":              true,
+		"repo_model_reasoning_enabled":                     true,
+		"repo_langgraph_platform_config_present":           true,
+		"repo_raw_anthropic_tool_output_in_system":         true,
+		"repo_raw_openai_tool_output_in_system":            true,
+		"repo_project_mcp_autoenable":                      true,
+		"repo_project_hook_runs_untrusted_command":         true,
+		"repo_workspace_env_overrides_trust":               true,
+		"repo_editor_agent_auto_approve":                   true,
+		"repo_mcp_config_launches_local_command":           true,
+		"repo_mcp_config_launches_unpinned_package":        true,
+		"repo_mcp_config_unscoped_credential":              true,
+		"repo_mcp_config_remote_plain_http":                true,
+		"repo_codex_hook_runs_repo_command":                true,
+		"repo_agents_md_has_hidden_text":                   true,
+		"repo_harness_guidance_has_hidden_text":            true,
+		"repo_guidance_file_has_hidden_text":               true,
+		"repo_ci_agent_untrusted_trigger_ungated":          true,
+		"repo_ci_agent_untrusted_trigger_privileged":       true,
+		"repo_ci_agent_checkout_persists_credentials":      true,
+		"repo_ci_agent_unrestricted_shell":                 true,
+		"repo_ci_agent_no_egress_restriction":              true,
+		"repo_settings_preapprove_user_content_fetch":      true,
+		"repo_settings_allow_exec_capable_prefix":          true,
+		"repo_settings_env_redirects_model_endpoint":       true,
+		"repo_settings_allow_all_bash":                     true,
+		"repo_script_runs_agent_cli_with_bypass_flag":      true,
+		"repo_agent_server_allows_any_origin":              true,
+		"repo_agent_server_exposed_without_key":            true,
+		"repo_mcp_server_binds_all_interfaces_unprotected": true,
 	},
 }
 
@@ -669,6 +745,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.ToolDecoratorKwargValue != nil, "tool_decorator_kwarg_value")
 	add(len(e.ToolDecoratorKwargPresent) > 0, "tool_decorator_kwarg_present")
 	add(len(e.ToolClaimUse) > 0, "tool_claim_use")
+	add(e.ToolDescriptionHasHiddenText != nil, "tool_description_has_hidden_text")
 	// Agent scope
 	add(len(e.AgentClass) > 0, "agent_class")
 	add(len(e.AgentKwargPresent) > 0, "agent_kwarg_present")
@@ -689,6 +766,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentKwargsObserved != nil, "agent_kwargs_observed")
 	add(e.AgentCheckpointerInMemory != nil, "agent_checkpointer_in_memory")
 	add(e.AgentServerReachable != nil, "agent_server_reachable")
+	add(e.AgentDeepAgentShellExecuteUngated != nil, "agent_deep_agent_shell_execute_ungated")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
 	add(e.SubagentInheritsAllTools != nil, "subagent_inherits_all_tools")
@@ -712,6 +790,10 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(len(e.SkillNameHasText) > 0, "skill_name_has_text")
 	add(len(e.SkillDescriptionHasText) > 0, "skill_description_has_text")
 	add(e.SkillTextMatches != nil, "skill_text_matches")
+	// Slash-command scope
+	add(e.SlashCommandAllowsUnrestrictedShell != nil, "slash_command_allows_unrestricted_shell")
+	add(e.SlashCommandModelInvocable != nil, "slash_command_model_invocable")
+	add(len(e.SlashCommandAllowsUnrestrictedTool) > 0, "slash_command_allows_unrestricted_tool")
 	// Repo scope
 	add(len(e.RepoHasSDKInCode) > 0, "repo_has_sdk_in_code")
 	add(len(e.RepoComponentPresent) > 0, "repo_component_present")
@@ -743,6 +825,9 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoSettingsEnvRedirectsModelEndpoint != nil, "repo_settings_env_redirects_model_endpoint")
 	add(e.RepoSettingsAllowAllBash != nil, "repo_settings_allow_all_bash")
 	add(e.RepoScriptRunsAgentCliWithBypassFlag != nil, "repo_script_runs_agent_cli_with_bypass_flag")
+	add(e.RepoAgentServerAllowsAnyOrigin != nil, "repo_agent_server_allows_any_origin")
+	add(e.RepoAgentServerExposedWithoutKey != nil, "repo_agent_server_exposed_without_key")
+	add(e.RepoMCPServerBindsAllInterfacesUnprotected != nil, "repo_mcp_server_binds_all_interfaces_unprotected")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")
@@ -760,6 +845,9 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoOtelLabelsToolSpanFailureUnsafe != nil, "repo_otel_labels_tool_span_failure_unsafe")
 	add(e.RepoOtelLabelsAttemptConstant != nil, "repo_otel_labels_attempt_constant")
 	add(e.RepoOtelLabelsRunEndSuccessOnly != nil, "repo_otel_labels_run_end_success_only")
+	add(e.RepoOtelLabelsReasoningUnhashed != nil, "repo_otel_labels_reasoning_unhashed")
+	add(e.RepoOtelLabelsReasoningLabelled != nil, "repo_otel_labels_reasoning_labelled")
+	add(e.RepoModelReasoningEnabled != nil, "repo_model_reasoning_enabled")
 	return n
 }
 

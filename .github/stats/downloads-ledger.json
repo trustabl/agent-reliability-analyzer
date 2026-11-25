@@ -1,6 +1,6 @@
 {
  "description": "Weekly Trustabl downloads, one record per Monday x product x channel. total is cumulative; change is the growth since the Monday before (null when the channel was counted for the first time). Downloads count installs, CI runs and file fetches, not unique users.",
- "updated": "2026-11-16",
+ "updated": "2026-11-23",
  "channels": {
   "github": "GitHub release-file downloads (weekly snapshot). Analyzer includes checksums.txt; rules includes statement.json downloads carried over from replaced files.",
   "npm": "npm registry downloads.",
@@ -10,7 +10,8 @@
   "cursor-directory": "Cursor Directory installs, copied from the listing page.",
   "vscode-marketplace": "VS Code Marketplace installs.",
   "azure-devops-marketplace": "Azure DevOps Marketplace on-prem downloads (cloud installs are not public).",
-  "docker-hub": "Docker Hub pulls of trustabl/trustabl-pipe (Bitbucket pipe)."
+  "docker-hub": "Docker Hub pulls of trustabl/trustabl-pipe (Bitbucket pipe).",
+  "ghcr": "GHCR pulls of ghcr.io/trustabl/agent-reliability-analyzer, all versions, from the public package page."
  },
  "records": [
   {
@@ -428,6 +429,13 @@
   },
   {
    "week": "2026-11-16",
+   "product": "agent-dashboard",
+   "channel": "github",
+   "total": 0,
+   "change": null
+  },
+  {
+   "week": "2026-11-16",
    "product": "agent-network-access-probe",
    "channel": "cursor-directory",
    "total": 2,
@@ -544,6 +552,146 @@
    "channel": "pypi",
    "total": 832,
    "change": 174
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-dashboard",
+   "channel": "github",
+   "total": 0,
+   "change": 0
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-network-access-probe",
+   "channel": "cursor-directory",
+   "total": 2,
+   "change": 0
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-network-access-probe",
+   "channel": "github",
+   "total": 395,
+   "change": 78
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-network-access-probe",
+   "channel": "npm",
+   "total": 590,
+   "change": 39
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-network-access-probe",
+   "channel": "pypi",
+   "total": 549,
+   "change": 77
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "azure-devops-marketplace",
+   "total": 1,
+   "change": 0
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "claude-directory",
+   "total": 372,
+   "change": 0
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "claude-directory-apps",
+   "total": 342,
+   "change": 0
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "cursor-directory",
+   "total": 49,
+   "change": 1
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "docker-hub",
+   "total": 477,
+   "change": 2
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "ghcr",
+   "total": 2703,
+   "change": 484
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "github",
+   "total": 78818,
+   "change": 14923
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "npm",
+   "total": 650,
+   "change": 44
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "pypi",
+   "total": 1043,
+   "change": 45
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-analyzer",
+   "channel": "vscode-marketplace",
+   "total": 7,
+   "change": 2
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-rules",
+   "channel": "github",
+   "total": 8032,
+   "change": 715
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-skills",
+   "channel": "cursor-directory",
+   "total": 1,
+   "change": null
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-skills",
+   "channel": "github",
+   "total": 81,
+   "change": 32
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-skills",
+   "channel": "npm",
+   "total": 670,
+   "change": 64
+  },
+  {
+   "week": "2026-11-23",
+   "product": "agent-reliability-skills",
+   "channel": "pypi",
+   "total": 964,
+   "change": 100
   }
  ]
 }

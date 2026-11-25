@@ -427,7 +427,7 @@ flowchart TD
     score --> result
 ```
 
-The five scopes a rule can fire at — `tool`, `agent`, `subagent`, `skill`, `repo` —
+The six scopes a rule can fire at — `tool`, `agent`, `subagent`, `skill`, `slash_command`, `repo` —
 flow into `Registry.Run` from the same `RepoInventory`, but each detector consumes a
 different typed input:
 
@@ -498,8 +498,8 @@ matches each WebFetch allow entry against a fixed host list using the documented
 `domain:` rules (`webFetchCovers`), and a deny or ask rule in the same `.claude/`
 folder cancels it.
 `repo_settings_allow_exec_capable_prefix` (AGCFG-012) reads the same parsed rules:
-`execCapableAllowHits` flags a `Bash` allow entry that is a bare `git`, `xargs` or `npx`
-command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
+`execCapableAllowHits` flags a `Bash` allow entry that is a bare `git`, `xargs`, `npx`,
+`env`, `sed` or `awk` command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
 command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in the
 same `.claude/` folder cancels it (`coversExecPrefix`).
 `repo_settings_allow_all_bash` (AGCFG-016) reads the parsed `permissions` of each
@@ -528,6 +528,25 @@ read (CI-004 reads workflow steps on untrusted triggers only). The Reason names 
 binary and the flag; no other script text is kept. Hits land in
 `ProjectConfigFacts.ScriptAgentBypass`.
 
+**Agent server exposure (category `agent_server`, `schema_version` 43).** The walk records
+`application*.properties` in `ScanManifest.PropertiesFiles` and Dockerfiles, Makefiles and `*.sh` in
+`ScanManifest.ServerScriptFiles`; compose and Spring YAML files are read from `YAMLFiles`.
+`anyOriginServerHits` (`repo_agent_server_allows_any_origin`, AGSRV-001) reads the
+`adk.web.cors.origins` key (properties and YAML), a `get_fast_api_app(...)` call's `allow_origins`
+list in a Python file that imports `google.adk`, an `AdkApiServer(...)` call's `allowOrigins` in a
+TS/JS file that imports `@google/adk-devtools` (both outside `pathclass` test paths, and only where the call starts in code: `codeMask` skips
+comments, docstrings and string literals; `#` comment lines of script files are skipped too), and an
+`--allow_origins` option of `adk web` / `adk api_server` on a command line in a script file, compose
+`command` / `entrypoint` or package.json script; only a `*` entry counts. `agentServerNoKeyHits`
+(`repo_agent_server_exposed_without_key`, AGSRV-002) reads compose services and `docker run` lines
+whose image is `ghcr.io/openhands/agent-server` (or the default inside `${VAR:-default}`) and all
+three hold: a port is published without a loopback host address; `--host` in the compose
+`entrypoint` / `command` (or after the image in a `docker run` line) is a non-loopback IP literal
+(`hostFlagNonLoopback`; a name or `${VAR}` is not judged); and no `OH_SESSION_API_KEYS_*` /
+`SESSION_API_KEY` key name is set (`env_file` makes the service unjudged). The server binds loopback
+when it is given no `--host` and no key, so a published port alone does not fire. Hits are static-text `ConfigHit`s in
+`ProjectConfigFacts.AnyOriginServer` and `.AgentServerNoKey`. Code: `internal/analysis/agent_server_exposure.go`.
+
 `repo_settings_env_redirects_model_endpoint` (AGCFG-014) reads the `env` object of each
 parsed `.claude/settings.json` and `settings.local.json`: `modelEndpointOverrideHits`
 takes the `ANTHROPIC_BASE_URL` string and passes it to `modelEndpointClass`, which parses
@@ -551,7 +570,10 @@ Settings files are parsed as JSONC (comments and trailing commas stripped), Code
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set
 (`GEMINI_SANDBOX*`, `*_PROXY_COMMAND`); `.gemini/.env` and `.codex/config.toml`
-also check `*_BASE_URL`, `NODE_OPTIONS` and `LD_PRELOAD`. Unlike other repo-scope
+also check `NODE_OPTIONS` and `LD_PRELOAD`, and `.gemini/.env` also checks the two endpoint
+variables Gemini CLI reads (`GOOGLE_GEMINI_BASE_URL`, `GOOGLE_VERTEX_BASE_URL`, named in
+`geminiEndpointKeys`). No other `*_BASE_URL` key is judged: Codex ignores them in a project
+file and Gemini CLI does not read them. Unlike other repo-scope
 rules, an `agent_config` finding is attributed to the first path-sorted hit's
 file and line (`configHitLocation` in `rule_detector.go`), so `pathclass` can tag
 a vendored fixture as test-origin. The pack loads unconditionally and the
@@ -662,7 +684,7 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   Python and TS/JS files emitting a typed `ObservabilitySignal` per
   observability fact found: the vendor (`otel`, `langfuse`, `logfire`,
   `openinference`, `openllmetry`, `braintrust`, `weave`, `agentops`, `mlflow`,
-  `datadog_llmobs`, `langsmith`, `opik`, `native`) and a `Kind` grading the
+  `datadog_llmobs`, `langsmith`, `opik`, `langwatch`, `native`) and a `Kind` grading the
   evidence — `import` (module imported), `init` (provider set or vendor client
   constructed), `exporter` (span exporter, normalized to its sink: `console`,
   `otlp`, `jaeger`, `zipkin`, `memory`), `content_capture` (a switch sending
@@ -719,6 +741,42 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   kwarg as set. Vercel AI has no process-wide switch (`experimental_telemetry`
   is per call), so VAI-101 is unaffected. `opik` is a vendor on both the Python
   and TS sides (and a recon dep needle).
+
+  Two more shapes credit LangChain's `callbacks`. `langwatch.setup(instrumentors=
+  [LangChainInstrumentor()])` adds a second init signal,
+  `langwatch.setup.langchaininstrumentor`, which `globalInstrumentors` maps to
+  LangChain (LangWatch calls `.instrument()` on each instrumentor it is given; a
+  list passed by name is not read). And `analysis.ApplyRunCallInstrumentation`
+  (`run_call_instrumentation.go`, called in `scanner.go` right after
+  `DiscoverAgentRunCalls`) credits a LangChain agent whose run call passes
+  callbacks at run time — `agent.invoke(..., config={"callbacks": [...]})` or
+  `config=RunnableConfig(callbacks=[...])`, the wiring LangWatch, Langfuse and
+  LangSmith document. The run call is matched to its agent as
+  `agent_server_reachable` does (SDK, variable name, defining file); a config
+  passed by name, an empty list and `None` are not evidence, and an agent
+  already credited by a process-wide call keeps that credit. `Call` reads
+  `<callee> config callbacks`, e.g. `agent.invoke config callbacks`.
+
+  **LangWatch** is a vendor on both sides and a recon dep needle. In Python,
+  `langwatch.setup()` and `@langwatch.trace()` / `@langwatch.span()` (call,
+  bare-decorator and context-manager forms) are init signals: the decorators
+  call the SDK's `ensure_setup()`, which builds a client from
+  `LANGWATCH_API_KEY` when `setup()` was never called. Those names are generic,
+  so they count only when they resolve through the file's `langwatch` import
+  bindings (`import langwatch as lw`, `from langwatch import trace as t`),
+  collected by `pyImportAliases` (`py_import_aliases.go`, shared with the
+  otel-labels pass). In TS, `setupObservability` (`langwatch/observability/node`)
+  and `LangWatchTraceExporter` are init; `getLangWatchTracer` is not. TS init
+  matching follows a renamed import for every vendor (`import { NodeSDK as SDK }`
+  then `new SDK()`), and `trace.setGlobalTracerProvider` counts as an OTel init,
+  the twin of Python's `set_tracer_provider`. A provider used directly and never
+  registered is still not recognized. Both LangWatch SDKs emit OpenTelemetry
+  spans (Python builds an SDK `TracerProvider` with an HTTP OTLP exporter; TS
+  starts a `NodeSDK`). Its dep needle matches only the whole package name
+  (`obsDepWholeNames`): LangWatch's agent-testing library, `langwatch-scenario`
+  (PyPI) and `@langwatch/scenario` (npm), is not its tracing SDK, so a repo
+  declaring only that library gets neither `OBS-005` nor Forge's LangWatch
+  setup.
 
   The **declared** half of the picture comes from recon, not this pass:
   `detectObsDeps` (`internal/ingestion/normalizer.go`) needle-scans the root
@@ -807,6 +865,24 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   an empty location. Hand-written `trustabl.*` keys credit the `OBS-006..008`
   ladder but are not read by these four.
 
+  Three more back `OBS-013..014`, for the reasoning labels
+  (`internal/analysis/otel_labels_reasoning.go`).
+  `repo_otel_labels_reasoning_unhashed` reads a hand-written `trustabl.cot.*`
+  key, known to the library or not, whose value could be the reasoning itself
+  (`ValueUnhashed`: a runtime value that is not visibly a hash). It does not
+  credit a hand-written key the way the ladder does, because it asks what the
+  key was given, not whether it exists. `repo_otel_labels_reasoning_labelled`
+  reads a `reasoning` signal (`mark_reasoning` / `markReasoning`) or any
+  hand-written `trustabl.cot.*` key. `repo_model_reasoning_enabled` reads a
+  `reasoning_config` signal, a model option such as `thinking` or
+  `reasoning_effort`, recorded only in a repo that already carries labels so a
+  repo without them keeps its report as it was. All three drop test-file signals,
+  and findings carry the file and line. The vendored
+  `testdata/forge/otel/otel-spec-keys.json` and `otelLabelsKeys` stay at profile
+  1.0.0 until the library release that has `mark_reasoning`, because forge's
+  recipe must not name a call the published package lacks; the `trustabl.cot.`
+  prefix check does not need that table.
+
 - **DiscoverSubagents** (`subagents.go`) — **hybrid** discovery in two passes.
   Pass 1 reads every `.claude/agents/*.md` component (matched at any path depth
   — monorepos that nest agent projects under `agent/.claude/agents/` or
@@ -847,12 +923,11 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   reads, and any file for a committed secret literal (an AWS/GitHub/Slack/Google
   token or a private-key header) — the payload-in-aux-file surface that scanning
   `SKILL.md` alone misses. No frontmatter or no `name` → skipped.
-  CSKILL-080/081 (claimed crypto operations / sensitive-data handling) use
-  `skill_text_matches`, not the raw-substring `skill_*_has_text` family — a
-  sentence-scoped, word-boundary predicate added to fix confirmed false
-  positives a bare substring match produces (a term inside an unrelated word,
-  or a data class merely being *named* rather than actually handled).
-  CSKILL-082..087 still use the raw-substring predicates unmodified. See
+  CSKILL-080/081/084/085/086 use `skill_text_matches`, not the raw-substring
+  `skill_*_has_text` family: a sentence-scoped, word-boundary predicate added to fix
+  confirmed false positives a bare substring match produces (a term inside an unrelated
+  word, or a data class merely being *named* rather than actually handled). CSKILL-082,
+  083 and 087 still use the raw-substring predicates unmodified. See
   `PredSkillTextMatches` in `internal/rules/predicates.go`.
 - **DiscoverDependencies** (`deps.go`) — walks the repo (skipping vendored /
   installed trees: `node_modules`, `vendor`, `.venv`, `target`, …) for the
@@ -891,6 +966,19 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   snapshot version is folded into `ScanID` **only** when `--vuln-scan` is on,
   leaving default scans byte-identical. Coverage is honest about its bound: a
   declared range (no lockfile to pin it) is skipped, not guessed.
+- **Slash command rules (CCMD-*)** — `slash_command` scope. `Registry.Run`
+  visits each `SlashCommandDef` in `RepoInventory.SlashCommands` with the
+  `SlashCommandDetector`s attached through `Registry.WithSlashCommand`;
+  `applies_to` is `claude_slash_command`. The three predicates
+  (`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+  `slash_command_allows_unrestricted_tool`) share `grantsUnrestrictedShell` /
+  `grantsUnrestrictedTool` with the skill predicates, so a command file and a
+  `SKILL.md` read one grant rule. Findings carry `scope: slash_command`, the
+  command's file and frontmatter line, and the command name as `ToolName`. A
+  command under a test path is tagged test-origin by `internal/pathclass` like
+  any finding. Command findings are NOT a scored surface: `analysis.Score`
+  ignores the scope, so command findings change no score (scoring is a
+  follow-up).
 - **DiscoverSlashCommands** (`slash_commands.go`) — emits one
   `SlashCommandDef` per `ComponentSlashCommand` component. Recon tags those
   at two path shapes: the canonical `.claude/commands/*.md` (any depth) AND
@@ -1012,15 +1100,16 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   arbitrary identifier: it must be a compiled-graph variable
   (`app = builder.compile(...)`, from `discoverLangGraphGraphsInFile`'s compile
   map), the direct chain `builder.compile(...).invoke(...)`, or the variable of a
-  prebuilt `create_react_agent` / `create_agent`. `AgentVarName` is the builder
-  variable. A module-level graph imported into another file (`from graph import
+  prebuilt `create_react_agent` / `create_agent` or an `AgentExecutor`.
+  `AgentVarName` is the builder variable. A module-level graph imported into another file (`from graph import
   app`) is recorded with `AgentFilePath` (in-memory) set to the defining file.
   `AgentDef.CheckpointerClass` (in-memory) carries the `checkpointer=` class of
   `compile()` / the prebuilt helpers, resolved through its langgraph import;
   unresolved names, local classes and conflicting bindings leave it empty.
   `agent_checkpointer_in_memory` (`MemorySaver` / `InMemorySaver`) and
   `agent_server_reachable` (a correlated run call with a `ServerReachable`
-  stamp; test paths ignored) back LC-116. Run calls are not in the JSON report.
+  stamp; test paths ignored) back LC-116; `ApplyRunCallInstrumentation` reads
+  their `config` kwarg. Run calls are not in the JSON report.
 - **DiscoverLangGraphNodes** (`langgraph_nodes.go`) — a function registered via
   `<builder>.add_node("name", func)` / `add_node(func)` is not a `@tool` but runs
   on every graph visit. Same-file, undecorated, top-level functions are emitted
@@ -1091,6 +1180,25 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   mis-attributed. Emitting `KindMCPTool` routes through the existing
   `SDKMCP` → `mcp` pack plumbing. Low-level `Server` + `setRequestHandler`
   tools are not extracted (gap).
+- **DiscoverMCPServerBinds** (`mcp_server_binds.go`) — the fact behind MCP-203, over the
+  Python and TS/JS parsed files (test paths skipped via `pathclass`). Python: a variable bound in
+  the same file to `FastMCP(...)` / `MCPServer(...)` imported from `mcp.server.fastmcp`,
+  `mcp.server.mcpserver`, `mcp.server` or `fastmcp`, whose `.run(transport=<sse|http|streamable-http>,
+  host=<literal>)` (or, SDK v1, a constructor `host=`) names a literal `0.0.0.0` / `::` / `[::]`,
+  with no `auth` / `token_verifier` / `auth_server_provider` / `transport_security` argument and no
+  `**kwargs` splat. TypeScript: `createMcpExpressApp({ host })` imported from
+  `@modelcontextprotocol/sdk/server/express.js` with a literal wildcard host, no `allowedHosts`
+  key or spread, and no import from `@modelcontextprotocol/sdk/server/auth/`. Each hit is a
+  `models.MCPServerBind` in `RepoInventory.MCPServerBinds` (sorted by path and line); the host text
+  is reduced to the judgment and not stored. The Python receiver of `.run(...)` (also
+  `run_sse_async` / `run_streamable_http_async`) is a variable bound in the file to the constructor,
+  the constructor call itself, or a call to a one-hop same-file factory (a top-level, undecorated
+  function with a single `return` of the constructor or of a variable assigned once to it). TypeScript SDK v2 packages and ASGI launches
+  (`uvicorn.run(mcp.http_app(), host=...)`) are not read.
+- **MCP tool description hidden text** (`hidden_text.go`, `rules.PredToolDescriptionHasHiddenText`)
+  — `tool_description_has_hidden_text` runs `analysis.HasHiddenText` (the AGCFG-009/013 zero-width
+  U+200B/200C/200D/FEFF, Tags-block and bidi test, with the same exemptions) over `ToolDef.Description`
+  and the Python `description=` decorator kwarg held in `ToolDef.Config` (MCP-036 / MCP-037).
 - **DiscoverTSOpenAITools** (`ts_openai_tools.go`) — `tool({...})` factory calls
   from `@openai/agents` / `-core` / `-openai`. Captures `name`/`description`
   (registered name), `parameters` top-level keys as `ParamNames`, handler body
@@ -1148,6 +1256,22 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   synthetic kwarg. `langchain_hosted_tools.go` classifies the `PythonREPLTool` /
   `PythonAstREPLTool` / `ShellTool` / `Requests*` built-ins in an agent's tool list
   as `HostedToolDef`s (SDK `langchain`).
+- **DiscoverDeepAgents** (`deepagents_agents.go`) — Python Deep Agents. One
+  `create_deep_agent(...)` call bound to the `deepagents` package by import
+  (`from deepagents import create_deep_agent [as X]`, `deepagents.create_deep_agent`)
+  → `AgentDef` SDK `langchain`, Class `DeepAgent`. The Class is separate from
+  `ReactAgent` / `CreateAgent` so the `langchain_agent` rules do not match it; rules
+  target it with `applies_to: langchain_deep_agent`. Two in-memory facts are stamped
+  for LC-118: `DeepShellBackend` (`backend=` resolves in the same file to a host
+  shell: `LocalShellBackend(...)`, a variable bound once and unconditionally to it, a
+  `CompositeBackend` whose default is one — a LocalShellBackend only inside `routes`
+  does not expose `execute` — or a same-file subclass that does not override
+  `execute` / `aexecute`) and `DeepExecuteGate` (what a literal `interrupt_on` dict
+  says about `"execute"`; `unjudged` when middleware, a harness profile, a splat or a
+  non-literal value could change it). Factories, lambdas, other-module backends and
+  subagent `interrupt_on` overrides are not resolved. `async_create_deep_agent` is not
+  matched (the library does not define it). `PredAgentDeepAgentShellExecuteUngated`
+  reads the two facts.
 - **DiscoverLangGraphGraphs** (`langgraph_graph.go`) — Python raw LangGraph
   graphs. The imperative `StateGraph(...)` → `.add_node` / `.add_edge` →
   `.compile()` builder is emergent across many call sites, so the single-call
@@ -2206,7 +2330,7 @@ Discipline rules:
   is legacy/uninitialized and the human renderer collapses such records to
   `file:N` form. Rule detectors that emit a `Finding` MUST propagate the
   entity's `Line` to `Finding.Line` so jump-to-source works from a finding —
-  this is currently done for all five scopes (tool, agent, subagent, skill, repo).
+  this is currently done for all six scopes (tool, agent, subagent, skill, slash_command, repo).
 - **No source-text storage.** The inventory is a structured *index of
   locations*; consumers fetch source by reading the file at
   `(FilePath, Line, EndLine)`. `RawSource` is deliberately **not** included
@@ -2341,8 +2465,8 @@ internal/
 ├── forge/                       Pre-coding SKILL.md generator (trustabl forge).
 │   ├── detect.go                Detect (dep-manifest recon → categories + (category, language) pairs),
 │   │                            DetectCategories, MergeCategories (dedup + sort two category slices),
-│   │                            SelectTracing (languages + pairs for the Runtime Tracing section).
-│   ├── tracing.go               emitRuntimeTracing + the languageBlocks / frameworkRecipes tables.
+│   │                            SelectTracing (languages + pairs + backends for the Runtime Tracing section).
+│   ├── tracing.go               emitRuntimeTracing + the languageBlocks / frameworkRecipes / backendBlocks tables.
 │   ├── tracingtext/             Embedded markdown text of the Runtime Tracing section.
 │   ├── claims.go                emitToolCallClaims + the claimPlacements table.
 │   ├── claimtext/               Embedded markdown text of the Tool-Call Claims section.
@@ -2876,14 +3000,17 @@ writing any SDK code.
 
 1. **Detect** (`internal/forge/detect.go`) — calls `ingestion.Resolve` and
    `ingestion.Recon` against the target directory to obtain
-   `RepoProfile.SDKDeps`, then maps each dep name through a local
+   `RepoProfile.SDKDeps` and `RepoProfile.ObsDeps`, then maps each dep name through a local
    `depCategoryMap` table (mirrors `scanner.depNameToSDK`, plus the recon-only
    `google-adk-go`) to produce a sorted, deduplicated
    `[]models.DetectorCategory`. Each dep's `Source` manifest is mapped through
    `ingestion.ManifestLanguage` to a language, yielding `(category, language)`
    pairs for Python, TypeScript and Go. A category declared in a manifest with
    no known language (`composer.json`, say) is also recorded in
-   `Detection.Unplaced`. `DetectCategories` returns the categories alone.
+   `Detection.Unplaced`. An observability dep whose vendor has a row in
+   `backendBlocks` (LangWatch, Python and TypeScript), declared in a hand-edited
+   manifest (not a lock file), becomes a `TracingBackend{Vendor, Language}` in
+   `Detection.Backends`. `DetectCategories` returns the categories alone.
 
 2. **MergeCategories** — deduplicates and sorts the auto-detected slice with
    any categories supplied via `--policy`. Explicit additions are additive, not
@@ -2896,7 +3023,8 @@ writing any SDK code.
    not already place it: a category with no detected pair pairs with every
    selected language, and a language that was not detected pairs with every
    category. Repeating something detection already found changes nothing.
-   When `claude_skill` is the only category, `TracingApplies` is false and the
+   A detected backend is kept when its language is selected; `--lang` never
+   adds one. When `claude_skill` is the only category, `TracingApplies` is false and the
    selection is empty, so neither the section nor the stderr "pass --lang"
    note appears. With no category at all forge exits 1 before this step; if
    `--lang` was given, that message says `--lang` does not select a rule pack.
@@ -2932,8 +3060,14 @@ writing any SDK code.
    the selected languages: Step 1 sets up OpenTelemetry, Step 2 places the
    `agent-reliability-otel-labels` labels, Step 3 says how to choose their
    values, Step 4 lists checks. The text is embedded from
-   `internal/forge/tracingtext/`; two small tables (`languageBlocks`,
-   `frameworkRecipes`) fix what exists and in what order. The section is
+   `internal/forge/tracingtext/`; three small tables (`languageBlocks`,
+   `frameworkRecipes`, `backendBlocks`) fix what exists and in what order. A
+   selected backend's `tracingtext/backends/<vendor>_<language>_setup.md`
+   replaces that language's generic setup block, which would create a second
+   provider, under a `#### <Language> (<Vendor>)` heading, and its `_traps.md`
+   follows the language traps in Step 4; the recipes and Steps 2 and 3 are
+   shared. The LangWatch text gives its OTLP endpoint as scheme, host and path,
+   never one URL, because a URL in a skill body trips CSKILL-020. The section is
    omitted when no selected language has a block. It drops each rule whose
    `language` the category is not used in, through `RuleDef.AppliesToLanguage`
    (the scanner's own language gate, so TypeScript keeps JavaScript rules and
@@ -2950,9 +3084,10 @@ writing any SDK code.
 
 **matchConditionForScope** dispatches "When this applies" text by scope: tool →
 "When defining a tool.", agent → "When declaring an agent.", repo → "For any
-repo using this SDK.", subagent → "When declaring a subagent.", skill →
+repo using this SDK.", subagent → "When declaring a subagent.", slash_command → "When declaring a
+slash command.", skill →
 delegates to the existing `matchCondition` predicate switch. This keeps the
-generated prose accurate for all five scopes without enumerating 15+ predicates.
+generated prose accurate for all six scopes without enumerating 15+ predicates.
 
 **Output.** A valid `SKILL.md` (`allowed-tools: Read`,
 `disable-model-invocation: false`) intended to be dropped into

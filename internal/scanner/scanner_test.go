@@ -1547,6 +1547,48 @@ func TestScan_PermissionBypassFixture(t *testing.T) {
 	}
 }
 
+// End to end: the agent-server fixture has a * origin in Spring config and a Python
+// call, and a compose service that publishes the OpenHands agent server on all
+// interfaces with no session key name. AGSRV-001 and AGSRV-002 each fire once. The
+// test-path file and everything under safe/ stay silent, and the findings hold no
+// port or origin value.
+func TestScan_AgentServerExposureFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "agent-server-exposure-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string][]models.Finding{}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "AGSRV-") {
+			got[f.RuleID] = append(got[f.RuleID], f)
+		} else if strings.HasPrefix(f.RuleID, "AGCFG-") || strings.HasPrefix(f.RuleID, "MCPCFG-") {
+			t.Errorf("%s fired on the agent-server fixture (%s:%d)", f.RuleID, f.FilePath, f.StartLine)
+		}
+	}
+	for id, want := range map[string]struct {
+		file string
+		line int
+	}{
+		"AGSRV-001": {"serve.py", 3},
+		"AGSRV-002": {"docker-compose.yml", 3},
+	} {
+		if len(got[id]) != 1 {
+			t.Fatalf("%s fired %d times, want once; findings: %v", id, len(got[id]), res.Findings)
+		}
+		f := got[id][0]
+		if !strings.HasSuffix(f.FilePath, want.file) || strings.Contains(f.FilePath, "safe/") || f.StartLine != want.line {
+			t.Errorf("%s attributed to %s:%d, want %s:%d", id, f.FilePath, f.StartLine, want.file, want.line)
+		}
+		for _, s := range []string{"8010"} {
+			if strings.Contains(f.Explanation+f.Title, s) {
+				t.Errorf("%s text holds %q", id, s)
+			}
+		}
+	}
+}
+
 // A husky hook file is read: the generated .husky/_ helper directory is not.
 func TestScan_PermissionBypassHuskyHook(t *testing.T) {
 	dir := t.TempDir()
@@ -2099,6 +2141,156 @@ const (
 `
 )
 
+// TestScan_ReasoningLabels runs real source through the full scanner for the
+// reasoning rules, so a discovery failure cannot hide behind the hand-built
+// inventories in policies_test.go.
+func TestScan_ReasoningLabels(t *testing.T) {
+	const thinkingOn = `
+
+def call_model(client, prompt):
+    return client.messages.create(model="m", messages=[], thinking={"type": "enabled", "budget_tokens": 1024})
+`
+	labelled := otelCorrectnessSrc("", otelGoodRun, otelGoodAttempt, otelGoodTool, otelGoodRunEnd)
+	cases := []struct {
+		name     string
+		src      string
+		testFile string
+		want     []string
+		wantLine string // a line of src the single finding must point at
+	}{
+		{"labelled, model does not reason", labelled, "", nil, ""},
+		{"labelled, model reasons, no reasoning label", labelled + thinkingOn, "", []string{"OBS-014"}, "thinking="},
+		{"labelled, model reasons, labelled through the library", labelled + thinkingOn + `
+
+def label_call(span, text):
+    from agent_reliability_otel_labels import mark_reasoning
+    mark_reasoning(span, text=text, mode="explicit_cot")
+`, "", nil, ""},
+		{"raw reasoning text written by hand", labelled + thinkingOn + `
+
+def label_call(span, text):
+    span.set_attribute("trustabl.cot.text_fp", text)
+`, "", []string{"OBS-013"}, `span.set_attribute("trustabl.cot.text_fp", text)`},
+		{"a fingerprint written by hand", labelled + thinkingOn + `
+
+def label_call(span, text):
+    span.set_attribute("trustabl.cot.text_fp", canonical_fp(text))
+`, "", nil, ""},
+		{"raw text only in a test file", labelled, `def test_label(span, text):
+    span.set_attribute("trustabl.cot.text_fp", text)
+`, nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			manifest := "[project]\nname = \"f\"\ndependencies = [\"openai-agents\", \"opentelemetry-sdk\", \"agent-reliability-otel-labels\"]\n"
+			files := map[string]string{"pyproject.toml": manifest, "agent.py": tc.src}
+			if tc.testFile != "" {
+				files["tests/test_agent.py"] = tc.testFile
+			}
+			for name, body := range files {
+				p := filepath.Join(dir, name)
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scanner.Run: %v", err)
+			}
+			var got []string
+			var hit models.Finding
+			for _, f := range res.Findings {
+				if f.RuleID == "OBS-013" || f.RuleID == "OBS-014" {
+					got = append(got, f.RuleID)
+					hit = f
+				}
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("reasoning findings: got %v, want %v", got, tc.want)
+			}
+			if tc.wantLine == "" {
+				return
+			}
+			wantLine := 0
+			for i, line := range strings.Split(tc.src, "\n") {
+				if strings.Contains(line, tc.wantLine) {
+					wantLine = i + 1
+					break
+				}
+			}
+			if hit.FilePath != "agent.py" || hit.StartLine != wantLine {
+				t.Errorf("finding at %s:%d, want agent.py:%d", hit.FilePath, hit.StartLine, wantLine)
+			}
+		})
+	}
+}
+
+// The TypeScript leg of TestScan_ReasoningLabels: the option sits deep inside
+// providerOptions, where only the object-key walk finds it.
+func TestScan_ReasoningLabelsTypeScript(t *testing.T) {
+	const src = `import { generateText, tool } from "ai";
+import { z } from "zod";
+import { Run, markReasoning, markRunEnd, markToolSpan } from "@trustabl/agent-reliability-otel-labels";
+
+export const search = tool({
+  description: "Search flights from an airport.",
+  inputSchema: z.object({ origin: z.string() }),
+  execute: async ({ origin }) => origin,
+});
+
+export async function runAgent(root, span, model) {
+  const run = new Run();
+  run.markStart(root);
+  const out = await generateText({
+    model,
+    prompt: "x",
+    tools: { search },
+    providerOptions: { anthropic: { thinking: { type: "adaptive" } } },
+  });
+  markToolSpan(span, { args: {}, result: out, attempt: 1 });
+  LABEL
+  markRunEnd(root, "final_answer");
+  return out;
+}
+`
+	cases := []struct{ name, label, want string }{
+		{"model reasons, no reasoning label", "", "OBS-014"},
+		{"labelled through the library", "markReasoning(span, { text: out.reasoningText });", ""},
+		{"raw reasoning text written by hand", `span.setAttribute("trustabl.cot.text_fp", out.reasoningText);`, "OBS-013"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			files := map[string]string{
+				"package.json": `{"dependencies": {"ai": "^5.0.0", "@trustabl/agent-reliability-otel-labels": "^0.1.1"}}`,
+				"agent.ts":     strings.Replace(src, "LABEL", tc.label, 1),
+			}
+			for name, body := range files {
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scanner.Run: %v", err)
+			}
+			var got []string
+			for _, f := range res.Findings {
+				if f.RuleID == "OBS-013" || f.RuleID == "OBS-014" {
+					got = append(got, f.RuleID)
+				}
+			}
+			if strings.Join(got, ",") != tc.want {
+				t.Errorf("reasoning findings: got %v, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestScan_OtelLabelsCorrectness(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -2251,6 +2443,298 @@ export const agent = new Agent({ name: "travel-booker" });
 				for _, f := range res.Findings {
 					if strings.HasPrefix(f.RuleID, "OBS-0") && f.RuleID >= "OBS-006" && f.RuleID <= "OBS-012" {
 						t.Errorf("forge's own %s label block %d trips %s at %s:%d\n%s", s.lang, i, f.RuleID, f.FilePath, f.StartLine, b)
+					}
+				}
+			})
+		}
+	}
+}
+
+// End to end: the slash-command fixture holds five command files at the repo
+// root and one under tests/fixtures/. CCMD-001 fires on the bare Bash command,
+// CCMD-002 on the model-invocable Write command, CCMD-003 on the WebSearch
+// command; the scoped-grant and disable-model-invocation commands are silent.
+// The test-path command fires CCMD-001 but is tagged test-origin, so it stays
+// out of scoring and the exit-code gate. Findings are attributed to the command.
+func TestScan_SlashCommandFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "slash-command-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string]bool{}
+	for _, f := range res.Findings {
+		if !strings.HasPrefix(f.RuleID, "CCMD-") {
+			continue
+		}
+		if f.Scope != models.ScopeSlashCommand {
+			t.Errorf("%s scope = %q, want slash_command", f.RuleID, f.Scope)
+		}
+		got[f.RuleID+" "+f.FilePath+" "+f.ToolName] = true
+		if strings.HasPrefix(f.FilePath, "tests/") != (f.Origin == models.OriginTest) {
+			t.Errorf("%s on %s: origin %q does not match the path", f.RuleID, f.FilePath, f.Origin)
+		}
+	}
+	want := []string{
+		"CCMD-001 .claude/commands/unrestricted-shell.md unrestricted-shell",
+		"CCMD-001 tests/fixtures/workspace/.claude/commands/test-path-shell.md test-path-shell",
+		"CCMD-002 .claude/commands/write-model-invocable.md write-model-invocable",
+		"CCMD-003 .claude/commands/web-search.md web-search",
+	}
+	for _, w := range want {
+		if !got[w] {
+			t.Errorf("missing finding %q; got %v", w, got)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("CCMD findings = %d, want %d: %v", len(got), len(want), got)
+	}
+	for _, silent := range []string{"manual-write-silent", "manual-write-quoted-silent", "manual-write-yes-silent", "scoped-silent"} {
+		for k := range got {
+			if strings.HasSuffix(k, " "+silent) {
+				t.Errorf("finding on %s, which opts out of model invocation or is scoped: %s", silent, k)
+			}
+		}
+	}
+	again, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil || again.ScanID != res.ScanID {
+		t.Errorf("ScanID not stable across runs: %v %q vs %q", err, res.ScanID, again.ScanID)
+	}
+	// Slash commands are not a scored surface in this release.
+	for _, s := range res.Surfaces {
+		if s.Kind == models.ScopeSlashCommand {
+			t.Errorf("slash command surface scored: %+v", s)
+		}
+	}
+}
+
+// End to end: the MCP server fixture holds invisible characters in tool descriptions and HTTP
+// servers bound to 0.0.0.0. MCP-036 and MCP-037 fire on the tool descriptions, MCP-203 on the
+// two unprotected binds, and nothing fires from safe/. Findings under tests/ stay out of the
+// readiness score but are still reported, so the test pins where each rule lands.
+func TestScan_MCPServerToolsFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "mcp-server-tools-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string][]string{}
+	for _, f := range res.Findings {
+		switch f.RuleID {
+		case "MCP-036", "MCP-037", "MCP-203":
+			got[f.RuleID] = append(got[f.RuleID], f.FilePath)
+			if f.StartLine < 1 {
+				t.Errorf("%s has no line (%s)", f.RuleID, f.FilePath)
+			}
+			if strings.Contains(f.Explanation+f.Title+f.FilePath, "\u200b") {
+				t.Errorf("%s echoed a hidden character", f.RuleID)
+			}
+		}
+	}
+	has := func(id, suffix string, want int) {
+		n := 0
+		for _, p := range got[id] {
+			if p == suffix {
+				n++
+			}
+		}
+		if n != want {
+			t.Errorf("%s on %s: %d findings, want %d; all: %v", id, suffix, n, want, got)
+		}
+	}
+	has("MCP-036", "server.py", 2) // docstring and description= argument
+	has("MCP-037", "server.ts", 1)
+	has("MCP-203", "server.py", 1)
+	has("MCP-203", "server.ts", 1)
+	has("MCP-203", "factory_server.py", 1) // run on a one-hop factory result
+	for id, paths := range got {
+		for _, p := range paths {
+			if strings.Contains(p, "safe/") {
+				t.Errorf("%s fired under safe/: %s", id, p)
+			}
+		}
+	}
+	for _, p := range got["MCP-203"] {
+		if strings.Contains(p, "tests/") {
+			t.Errorf("MCP-203 fired under tests/: %s", p)
+		}
+	}
+	// Determinism: a second scan gives the same ScanID and the same finding order.
+	res2, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("rescan: %v", err)
+	}
+	if res.ScanID != res2.ScanID || len(res.Findings) != len(res2.Findings) {
+		t.Errorf("scan is not stable: %s/%d vs %s/%d", res.ScanID, len(res.Findings), res2.ScanID, len(res2.Findings))
+	}
+}
+
+// End to end: LangWatch is an observability vendor. Each sub-repo of the
+// langwatch fixture is scanned on its own. The absence rules stay silent where
+// LangWatch is wired, OBS-001 never fires (setup or a trace decorator is init),
+// and the otel-labels ladder runs (OBS-006). A dep-only repo gets OBS-005, and
+// repos with no observability at all still get the absence rule.
+func TestScan_LangWatchFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "langwatch-fixture")
+	cases := []struct {
+		dir          string
+		want, absent []string
+	}{
+		// No LangChain callback wired: the executor's internal steps are not
+		// traced, so LC-112 is a true positive here and the control for the
+		// two cases below.
+		{"python-langchain", []string{"OBS-006", "LC-112"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		// LangWatch's documented wiring: the callback in the run call's config.
+		{"python-langchain-callback", []string{"OBS-006"}, []string{"LC-112", "LC-202", "OBS-001", "OBS-005"}},
+		// LangChain instrumented process-wide through langwatch.setup().
+		{"python-langchain-instrumentor", []string{"OBS-006"}, []string{"LC-112", "LC-202", "OBS-001", "OBS-005"}},
+		{"python-alias", []string{"OBS-006"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		{"ts-langchain", []string{"OBS-006"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		{"python-openai-agents", []string{"OBS-006"}, []string{"OAI-203", "OBS-001", "OBS-005"}},
+		{"otlp-only", []string{"OBS-006"}, []string{"LC-202", "OBS-001", "OBS-005"}},
+		{"dep-only", []string{"OBS-005"}, []string{"LC-202", "OBS-001", "OBS-006"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.dir, func(t *testing.T) {
+			res, err := scanner.Run(scanner.Config{Target: filepath.Join(root, tc.dir), RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scan: %v", err)
+			}
+			fired := map[string]bool{}
+			for _, f := range res.Findings {
+				fired[f.RuleID] = true
+			}
+			for _, id := range tc.want {
+				if !fired[id] {
+					t.Errorf("%s did not fire; fired: %v", id, fired)
+				}
+			}
+			for _, id := range tc.absent {
+				if fired[id] {
+					t.Errorf("%s fired", id)
+				}
+			}
+		})
+	}
+	// Negative controls: the same agents with no observability still get the
+	// absence rule, so the silences above are not vacuous.
+	controls := map[string]map[string]string{
+		"python": {
+			"requirements.txt": "langchain==0.3.25\nlangchain-openai==0.3.18\n",
+			"agent.py":         readLangWatchFixture(t, root, "dep-only/agent.py"),
+		},
+		"typescript": {
+			"package.json": `{"name": "control", "dependencies": {"@langchain/langgraph": "0.2.0", "@langchain/openai": "0.3.0"}}`,
+			"agent.ts":     readLangWatchFixture(t, root, "ts-langchain/agent.ts"),
+		},
+	}
+	for name, files := range controls {
+		t.Run("control/"+name, func(t *testing.T) {
+			dir := t.TempDir()
+			for rel, body := range files {
+				// The control is the fixture with every LangWatch line removed.
+				var kept []string
+				for _, line := range strings.Split(body, "\n") {
+					if !strings.Contains(strings.ToLower(line), "langwatch") && !strings.Contains(line, "setupObservability") {
+						kept = append(kept, line)
+					}
+				}
+				if err := os.WriteFile(filepath.Join(dir, rel), []byte(strings.Join(kept, "\n")), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+			if err != nil {
+				t.Fatalf("scan: %v", err)
+			}
+			for _, f := range res.Findings {
+				if f.RuleID == "LC-202" {
+					return
+				}
+			}
+			t.Errorf("LC-202 did not fire on a %s LangChain repo with no observability", name)
+		})
+	}
+}
+
+func readLangWatchFixture(t *testing.T, root, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(root, rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// Forge tells a coding model how to wire LangWatch and scan judges the result.
+// Each code block in forge's backend setup text, written into a LangChain repo
+// that declares LangWatch, must scan as initialized tracing: no OBS-001, no
+// LC-202, no OBS-005. A block with no LangWatch call changes the exporter of a
+// provider the project already has, so forge's generic setup block stands in
+// for that provider.
+func TestScan_ForgeBackendSetupScansAsInstrumented(t *testing.T) {
+	fence := regexp.MustCompile("(?s)```(python|typescript)\n(.*?)```")
+	generic := map[string]string{}
+	for _, lang := range []string{"python", "typescript"} {
+		raw, err := os.ReadFile("../forge/tracingtext/" + lang + "_setup.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := fence.FindStringSubmatch(string(raw))
+		if m == nil {
+			t.Fatalf("no code block in %s_setup.md", lang)
+		}
+		generic[lang] = m[2]
+	}
+	repos := map[string]struct{ ext, manifestName, manifest, agent string }{
+		"python": {".py", "requirements.txt",
+			"langchain==0.3.25\nlangchain-openai==0.3.18\nlangwatch==1.4.0\nopentelemetry-sdk\nopentelemetry-exporter-otlp-proto-http\n",
+			"from langchain.agents import AgentExecutor\n\nexecutor = AgentExecutor(agent=None, tools=[])\n"},
+		"typescript": {".ts", "package.json",
+			`{"name": "f", "dependencies": {"@langchain/langgraph": "0.2.0", "@langchain/openai": "0.3.0", "langwatch": "2.2.0", "@opentelemetry/api": "1.9.0"}}`,
+			"import { createReactAgent } from \"@langchain/langgraph/prebuilt\";\nimport { ChatOpenAI } from \"@langchain/openai\";\n\nexport const agent = createReactAgent({ llm: new ChatOpenAI({}), tools: [] });\n"},
+	}
+	paths, _ := filepath.Glob("../forge/tracingtext/backends/*_setup.md")
+	if len(paths) == 0 {
+		t.Fatal("no backend setup text found under internal/forge/tracingtext/backends")
+	}
+	for _, p := range paths {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, m := range fence.FindAllStringSubmatch(string(raw), -1) {
+			lang, block := m[1], m[2]
+			r := repos[lang]
+			t.Run(fmt.Sprintf("%s/%d", filepath.Base(p), i), func(t *testing.T) {
+				dir := t.TempDir()
+				files := map[string]string{r.manifestName: r.manifest, "agent" + r.ext: r.agent, "tracing" + r.ext: block}
+				if !strings.Contains(block, "langwatch") {
+					files["provider"+r.ext] = generic[lang]
+				}
+				for rel, body := range files {
+					if err := os.WriteFile(filepath.Join(dir, rel), []byte(body), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				res, err := scanner.Run(scanner.Config{Target: dir, RulesFS: rulesFixture(t)})
+				if err != nil {
+					t.Fatalf("scanner.Run: %v", err)
+				}
+				var initialized bool
+				for _, o := range res.Observability {
+					initialized = initialized || o.Kind == models.ObsSignalInit
+				}
+				if !initialized {
+					t.Fatalf("block did not scan as initialized tracing:\n%s", block)
+				}
+				for _, f := range res.Findings {
+					switch f.RuleID {
+					case "OBS-001", "LC-202", "OBS-005":
+						t.Errorf("forge's backend block trips %s at %s:%d\n%s", f.RuleID, f.FilePath, f.StartLine, block)
 					}
 				}
 			})

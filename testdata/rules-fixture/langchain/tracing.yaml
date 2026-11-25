@@ -52,5 +52,8 @@ rules:
       through. The resulting trace view looks complete while silently omitting
       this agent's runs.
     fix: >
-      Pass the project's handler in this constructor — callbacks=[handler] — or
-      configure a global handler so every chain and agent inherits it.
+      Pass the project's handler to this agent, in the constructor
+      (callbacks=[handler]) or in the run call's config
+      (agent.invoke(..., config={"callbacks": [handler]})), or configure a
+      global handler, such as an instrumentor, so every chain and agent
+      inherits it.

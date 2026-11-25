@@ -6,6 +6,12 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+Rule schema 41 → 46 (`rules.SupportedSchemaVersion`; 42 to 45 are merged from main, 46 is provisional). The rules fixture
+goes from 389 to 400 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003 and MCP-036/037/203). `ScanID` changes, as with every
+schema bump, because it folds the engine's supported schema version. Engines without schema 46
+skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
+upgraded.
+
 ### Fixed
 
 - A skill whose frontmatter Claude Code accepts is no longer dropped by a strict
@@ -29,10 +35,105 @@ to follow Semantic Versioning once it reaches 1.0.
 - No rule or schema change. On the in-repo corpus and 38 public repositories
   (2,178 SKILL.md files) no finding changed; the sample held no quoted boolean.
 
+- **AGCFG-006 no longer flags endpoint keys the tool does not read** (no schema change). A `*_BASE_URL` key was flagged by suffix in `.gemini/.env` and `.codex/config.toml`.
+  `.gemini/.env` now judges `GOOGLE_GEMINI_BASE_URL` and `GOOGLE_VERTEX_BASE_URL`, the two
+  variables Gemini CLI reads, so `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` there are
+  silent. `.codex/config.toml` judges no endpoint key, because Codex ignores
+  `openai_base_url`, `chatgpt_base_url`, `model_provider`, `model_providers` and `profiles`
+  in a project file. Severity stays critical. Key names are read; no value is.
+  `*_PROXY_COMMAND` and `GEMINI_SANDBOX*` in `config.toml` are unchanged. Findings
+  that change: a `.gemini/.env` or `.codex/config.toml` whose sole hit was a suffix-matched
+  `*_BASE_URL` key loses that hit. The corpus and 120 public `.codex/config.toml` files
+  changed by none; `.gemini/.env` files in public repos were not sampled.
+
+### Added
+
+- **AGCFG-012 judges `env`, `sed` and `awk` prefixes** (no schema change). A `Bash` allow
+  rule that is a bare `env`, `sed` or `awk` followed by a trailing wildcard now fires, from
+  the GNU manuals (`env` runs its command operand; `sed` runs a program through `e`;
+  `awk` through `system()` or a pipe). Claude Code may prompt for some of these forms in
+  ways its documentation does not describe.
+
+- **Deep Agent with a host-shell backend and no approval on execute (rule schema 43 → 44,
+  provisional).** One new agent-scope predicate, `agent_deep_agent_shell_execute_ungated`, one
+  new `applies_to` token, `langchain_deep_agent`, and rule **LC-118** (high, 0.6, pack file
+  `langchain/deep_agent_shell.yaml`). It flags a Python `create_deep_agent(...)` call from the
+  `deepagents` package whose `backend=` is a `LocalShellBackend` and whose `interrupt_on` is
+  missing, `None`, `{}`, a dict with no `"execute"` key, or sets `"execute"` to `False`. The
+  backend counts as a host shell when it is `LocalShellBackend(...)` directly, a variable bound
+  once and unconditionally to it in the call's function or at module level, a `CompositeBackend`
+  whose default is one (a `LocalShellBackend` only in `routes` does not expose `execute`), or a
+  same-file subclass that overrides neither `execute` nor `aexecute`. Not judged: a backend built
+  by a factory, a lambda or another module; a `middleware=` value that is not a literal list of
+  calls or that holds a `HumanInTheLoopMiddleware(...)` call; a harness profile or
+  `excluded_tools` in the file; an `interrupt_on` that is not a literal dict; an `execute`
+  entry given as a config (treated as a gate, its `when` predicate is not read); and a subagent
+  dict that sets its own `interrupt_on`. A local developer tool is matched the same way as a
+  deployed service. There is no Critical tier: the engine cannot link a Deep Agent to a server
+  entrypoint. `async_create_deep_agent` is not matched, because the library does not define it.
+  New discovery `DiscoverDeepAgents` (`internal/analysis/deepagents_agents.go`) emits one
+  `AgentDef` (SDK `langchain`, Class `DeepAgent`) per call bound to `deepagents` by import; the
+  new Class keeps the `langchain_agent` rules from matching it. Backed by the in-memory
+  `AgentDef.DeepShellBackend` and `AgentDef.DeepExecuteGate`. Primary source: CVE-2026-77926.
+
+- **Slash command rules (rule schema 44 → 45, provisional).** New `slash_command` scope
+  (`applies_to: [claude_slash_command]`) over the existing `.claude/commands/*.md` discovery,
+  three predicates (`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+  `slash_command_allows_unrestricted_tool`) and rules **CCMD-001** (high, 0.9; a bare `Bash`,
+  `Bash(*)` or `Bash(:*)` grant in `allowed-tools`), **CCMD-002** (high, 0.8; a command the
+  model can start that pre-approves `Write`, `Edit`, `MultiEdit` or `NotebookEdit` with no
+  restricting pattern) and **CCMD-003** (medium, 0.7; `WebSearch` or a `WebFetch` with no
+  domain pattern), pack file `claude_skill/slash_command_safety.yaml`. Claude Code treats a
+  command file as a skill, so the predicates share their grant logic with the skill predicates;
+  a scoped grant such as `Bash(git status *)`, `Edit(docs/**)` or
+  `WebFetch(domain:example.com)` is silent. `disable-model-invocation` is read leniently
+  (`true`, `yes`, `on`, `y`, `1`, quoted or not), so a quoted value no longer drops a command's
+  whole frontmatter. The rules first shipped in rules #138 and were reverted in #139 with the
+  rest of that bulk reconcile. Command findings are not a scored surface, so no score changes;
+  a command under a test path is tagged test-origin like any finding. Not read: command bodies,
+  `~/.claude/commands`, MCP fetch tools.
+
+- **MCP tool descriptions with hidden characters, and MCP servers bound to all interfaces (rule
+  schema 45 → 46, provisional; +3 rules, 400 in the fixture).** Two new predicates, one tool
+  scope and one repo scope. **MCP-036** (Python) and **MCP-037** (TypeScript) (medium, 0.5, pack
+  file `mcp/tool_description_hidden_text.yaml`, predicate `tool_description_has_hidden_text`) flag
+  an MCP tool description that holds a zero-width character, a Unicode Tags-block character or a
+  bidirectional override, using the code-point test and exemptions the guidance-file rules
+  (AGCFG-009/013) use; no phrase or HTML-comment marker is tested. Python reads the docstring and
+  a `description=` decorator argument; TypeScript reads the string-literal description of
+  `registerTool` / `tool`. The finding does not repeat the characters. **MCP-203** (high, 0.6,
+  repo scope, pack file `mcp/server_exposure.yaml`, predicate
+  `repo_mcp_server_binds_all_interfaces_unprotected`) flags a run call that starts an MCP server
+  on `sse`, `http` or `streamable-http` with a literal wildcard host (on a same-file server
+  variable, the constructor call itself, or the result of a one-hop same-file factory function) (`0.0.0.0`, `::`, `[::]`), or
+  a `createMcpExpressApp({ host })` call with one, when the same file names no `auth`,
+  `token_verifier`, `auth_server_provider`, `transport_security`, `allowedHosts` or SDK auth import.
+  A host from a variable or an environment lookup, a default or loopback host, and test paths are
+  not judged. Backed by the new `RepoInventory.MCPServerBinds` (`analysis.DiscoverMCPServerBinds`),
+  one finding per bind; the host text is reduced to the judgment and never stored. Not built:
+  phrase markers, an HTTP-transport-without-auth check, a uvicorn launch of an MCP app, TypeScript
+  SDK v2 packages. The annotation-contradiction rule (`readOnlyHint`) was reviewed and moved to the
+  backlog. Rulebook docs: `docs/Policy/mcp/tool_description_hidden_text.md`, `server_exposure.md`.
+
+### Changed
+
+- **CSKILL-081, 084, 085, 086: fewer false positives (rules change, no schema bump).** The
+  four rules in `claude_skill/skill_quality_text.yaml` now use the word-boundary predicate
+  `skill_text_matches`. 081 matches credential-type token phrases (api, access, auth,
+  authentication, bearer, refresh, session, oauth, secret token) instead of the bare word
+  "token". 084 matches whole-collection phrases and no longer matches "entire" inside
+  "entirely" or "all files" inside "small files". 085 recognises purpose and trigger words
+  ("to", "for", "when", "use", ...) where it recognised seven phrases. 086 no longer matches
+  "log" inside "logic" or "methodology", and "record" and "database" are no longer terms.
+  Severity and confidence are unchanged. On 43 public repositories (1,820 skills) the four
+  rules go from 3,938 to 1,656 findings; false-positive counts are model-assisted judgments,
+  and the 086 count is understated (see `COVERAGE.md`). A bare "token" with no credential
+  qualifier no longer matches in 081.
+
 ## [0.1.16] - 2026-11-09
 
-Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 343 to 389 rules. `ScanID` changes, as with every schema bump, because it
+Rule schema 26 → 43 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 343 to 393 rules. `ScanID` changes, as with every schema bump, because it
 folds the engine's supported schema version. Engines older than 0.1.16 skip the
 rules that need the new predicates and report a degraded scan ("rules skipped")
 until they are upgraded. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
@@ -42,6 +143,22 @@ ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
 side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
+
+- **Agent server exposure (rule schema 42 → 43, provisional; new category `agent_server`).** Two
+  new repo-scope predicates and rules, loaded unconditionally. **AGSRV-001** (high, 0.6, pack file
+  `agent_server/any_origin.yaml`, predicate `repo_agent_server_allows_any_origin`) flags a `*` origin
+  list on a Google ADK server: the `adk.web.cors.origins` key of Spring `application*.properties` /
+  `.yml` / `.yaml`, the `allow_origins` list of a `get_fast_api_app(...)` call, the `allowOrigins`
+  option of an `AdkApiServer(...)` call, or an `--allow_origins` option of `adk web` / `adk api_server`
+  in a Dockerfile, Makefile, shell script, compose command or package.json script. **AGSRV-002**
+  (critical, 0.7, pack file `agent_server/unauthenticated_publish.yaml`, predicate
+  `repo_agent_server_exposed_without_key`) flags a Docker Compose service or `docker run` line that
+  runs `ghcr.io/openhands/agent-server`, sets the server's `--host` to a non-loopback IP literal,
+  publishes its port on all host interfaces and names neither `OH_SESSION_API_KEYS_0` nor
+  `SESSION_API_KEY` (the server binds loopback when given no `--host` and no key). New manifest lists `PropertiesFiles` and
+  `ServerScriptFiles`. Environment keys are read by name; no origin list, port or value is stored. Java
+  source (`setAllowedOrigins`) is not parsed. Not judged: a server version, Kubernetes Services,
+  `ApptainerWorkspace`.
 
 - **Permission bypass committed in the repo (rule schema 40 → 41, provisional).** Two new
   repo-scope predicates and rules. **AGCFG-015** (high, 0.6, pack file
