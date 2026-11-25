@@ -1157,6 +1157,11 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   — `tool_description_has_hidden_text` runs `analysis.HasHiddenText` (the AGCFG-009/013 zero-width
   U+200B/200C/200D/FEFF, Tags-block and bidi test, with the same exemptions) over `ToolDef.Description`
   and the Python `description=` decorator kwarg held in `ToolDef.Config` (MCP-036 / MCP-037).
+- **Static batch 3 rules** (`testdata/rules-fixture/{claude_skill,mcp,openai_sdk}/`) — nine rules with no
+  engine change. They read existing facts: `SkillDef.Description` / `Body` (`skill_text_matches`),
+  `ToolDef.Description` (`has_description_text`), the tool body text and the shell, code-execution
+  and write facts (`has_body_text`, `has_shell_call`, `has_code_exec_call`, `has_write_call`), the
+  handoff graph (`agent_is_subagent_of_any`), .
 - **DiscoverTSOpenAITools** (`ts_openai_tools.go`) — `tool({...})` factory calls
   from `@openai/agents` / `-core` / `-openai`. Captures `name`/`description`
   (registered name), `parameters` top-level keys as `ParamNames`, handler body

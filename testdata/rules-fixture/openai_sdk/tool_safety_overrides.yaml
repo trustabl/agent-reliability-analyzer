@@ -1,0 +1,125 @@
+policy:
+  id: openai_sdk_tool_safety_overrides
+  name: OpenAI Agents SDK tools with model-settable overrides and unbounded orders
+  category: openai_sdk
+  description: >
+    Tool-scoped rules for @function_tool functions: a tool that reaches a shell, code
+    execution or a file write and lets the model set a parameter named like a safety
+    override, and an order-placing tool for options that checks no loss or size limit. Both
+    read the function body and its parameter names.
+
+rules:
+  - id: OAI-208
+    title: Tool that reaches shell, code or write calls takes a model-settable override parameter
+    severity: high
+    confidence: 0.5
+    language: python
+    applies_to:
+      - openai_tool
+    scope: tool
+    match:
+      all:
+        - param_name_matches:
+            exact:
+              - confirm
+              - confirmed
+              - force
+              - unsafe
+              - allow_dangerous
+              - no_confirm
+            prefixes:
+              - confirm_
+              - bypass_
+              - dangerously_
+              - skip_confirm
+              - skip_check
+              - skip_valid
+              - skip_safety
+              - skip_approval
+        - any:
+            - has_shell_call: true
+            - has_code_exec_call: true
+            - has_write_call: true
+    explanation: >
+      This @function_tool runs a shell command, executes code or writes a file, and takes a
+      parameter whose name reads as a safety override, such as confirm, force, bypass_checks or
+      dangerously_skip_validation. The parameter is part of the tool schema, so the model
+      chooses its value, and so does any text that steers the model. GitHub advisory
+      GHSA-qjx4-hg6g-2f34 (strands-agents-tools) reports a tool whose masked parameter, which
+      controlled secret masking, was declared in the input schema so the model could set it,
+      and an actor who placed instructions in content the agent processed could turn the
+      protection off. The same shape applies to a flag that skips a confirmation or a
+      validation before a shell command.
+      Limits of this check: it reads parameter names and the presence of a shell, code
+      execution or write call in the body. It does not check that the body uses the parameter
+      to skip anything, so a force flag that changes how a file is overwritten matches. A
+      differently named override, a model-settable parameter that is a string or an enum, a
+      tool that reaches a sink through a helper function, and the advisory's own masked
+      parameter name are not matched.
+    fix: >
+      Take the override out of the tool schema. Let the harness decide: gate the tool with
+      needs_approval=True and keep any confirmation in the application that runs the agent, with
+      a value the model cannot supply. If the flag must exist, set it in code, outside the
+      parameters the model fills in.
+
+  - id: OAI-209
+    title: Options order tool has no loss or size limit and no approval gate
+    severity: high
+    confidence: 0.5
+    language: python
+    applies_to:
+      - openai_tool
+    scope: tool
+    match:
+      all:
+        - name_has_prefix:
+            - place_order
+            - submit_order
+            - place_option
+            - buy_
+            - sell_
+            - trade_
+            - open_position
+        - param_name_matches:
+            contains:
+              - strike
+              - expir
+            exact:
+              - legs
+        - not:
+            has_body_text:
+              - max_loss
+              - MAX_LOSS
+              - max_notional
+              - MAX_NOTIONAL
+              - notional_limit
+              - risk_limit
+              - RISK_LIMIT
+              - defined_risk
+        - any:
+            - not:
+                tool_decorator_kwarg_present:
+                  - needs_approval
+            - tool_decorator_kwarg_value:
+                kwarg: needs_approval
+                value: "False"
+    explanation: >
+      This @function_tool has the name of an order action (place_order, submit_order, buy_,
+      sell_, trade_, open_position) and takes option-contract parameters (strike, expiry or
+      legs), and its body names no loss or size limit and the decorator sets no needs_approval
+      gate. Wang and Saxena (arXiv:2610.24289) score 26 options-trading agents, report that 17
+      can execute with no mandatory human step, that 13 can reach unbounded loss, and that 10
+      of the 22 systems that can place orders enforce a pre-trade limit outside the model.
+      An order tool that takes its strike, expiry and legs from the model, and has neither a
+      limit in code nor a person in the loop, leaves the size of the loss to the model's output.
+      Limits of this check: it reads the tool name, the parameter names, a fixed list of limit
+      words in the body and the decorator. A limit enforced in a helper function, a broker
+      client or another module is not seen, and neither is a limit with a different name. A
+      tool whose order action has another name, and one that takes no strike, expiry or legs
+      parameter, are not judged. The rule does not check whether a short option leg can be
+      reached, so it does not grade by the size of the possible loss.
+    fix: >
+      Check the order against a limit in code before the broker call: a maximum loss or
+      notional value, a defined-risk structure, or a cap on contracts, with the limit held in
+      configuration the model cannot set. Pass needs_approval=True to the @function_tool
+      decorator so a person confirms each order, and reject legs that leave the loss open.

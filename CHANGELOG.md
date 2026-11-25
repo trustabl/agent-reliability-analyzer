@@ -27,6 +27,23 @@ upgraded.
 
 ### Added
 
+- **Nine static rules, rules without engine changes (no schema change; 409 in the fixture).** **CSKILL-092** (low,
+  0.5) and **CSKILL-093** (high, 0.5), pack file `claude_skill/skill_selection_and_decoding.yaml`:
+  a skill description that tells the agent to choose this skill over others, and a skill body
+  sentence that names a decoding step and a word for following the result. **MCP-211** (Python) and
+  **MCP-213** (TypeScript) (high, 0.5, `mcp/tool_description_directives.yaml`): phrases aimed at the
+  model in a tool description (an `<IMPORTANT>` block, an order not to tell the user, override
+  phrasing, a request to read `~/.ssh` or `mcp.json`). **MCP-212** (Python) and **MCP-214**
+  (TypeScript) (high, 0.5, `mcp/elicitation.yaml`): a tool that calls `elicit(` or `elicitInput`,
+  reaches a shell, code-execution or file-write call, and has no `accept` in the body. **OAI-206**
+  (high, 0.7), `openai_sdk/agent_tool_wiring.yaml`: a handoff target that holds a shell tool
+  (re-land of the ID removed in the 2026-09-11 bulk revert). **OAI-208** and **OAI-209** (high, 0.5,
+  `openai_sdk/tool_safety_overrides.yaml`): a tool that reaches a shell, code or write call and takes
+  a model-settable override parameter, and an options order tool with no limit and no approval. All
+  reuse existing predicates. OAI-208 and OAI-209 are built for the OpenAI pack and no other. Field check: 60+ public repositories; see COVERAGE. Rulebook docs:
+  `docs/Policy/claude_skill/skill_selection_and_decoding.md`, `mcp/tool_description_directives.md`,
+  `mcp/elicitation.md`, `openai_sdk/agent_tool_wiring.md`, `openai_sdk/tool_safety_overrides.md`.
+
 - **AGCFG-012 judges `env`, `sed` and `awk` prefixes** (no schema change). A `Bash` allow
   rule that is a bare `env`, `sed` or `awk` followed by a trailing wildcard now fires, from
   the GNU manuals (`env` runs its command operand; `sed` runs a program through `e`;
