@@ -92,6 +92,12 @@ If Agent Reliability Analyzer saves you a production incident, please ⭐ the re
 
 ---
 
+<p align="center">
+  <a href="https://www.star-history.com/#trustabl/agent-reliability-analyzer&Date">
+    <img src="https://api.star-history.com/svg?repos=trustabl/agent-reliability-analyzer&type=Date" alt="GitHub stars over time for trustabl/agent-reliability-analyzer" width="800">
+  </a>
+</p>
+
 Trustabl scans an agent repository for the gaps that break agents in production:
 tool descriptions too vague for a model to know when to use them, missing retry
 and timeout handling, untyped parameters, absent guardrails, and tool grants that
@@ -480,11 +486,12 @@ files in the scanned repo. Fixes are applied only when you opt in with
   runtime traces.
 - **Process labels** (`otel_labels`) — the `agent-reliability-otel-labels`
   calls found in code (import, `Run` construction, run start, tool-span label,
-  run end) and any `trustabl.*` label keys written by hand, with the file and
-  line and the facts the OBS-006..012 rules read: whether a `Run` is shared,
-  whether a label runs when the tool fails, whether `attempt` is a fixed
-  number, and the literal `side_effect` / `exit_reason` values. Python and
-  TypeScript/JavaScript only. Not folded into the scan ID.
+  run end, reasoning label) and any `trustabl.*` label keys written by hand, with
+  the file and line and the facts the OBS-006..014 rules read: whether a `Run` is
+  shared, whether a label runs when the tool fails, whether `attempt` is a fixed
+  number, the literal `side_effect` / `exit_reason` values, which model options
+  turn reasoning on, and whether a hand-written reasoning value could be the text
+  itself. Python and TypeScript/JavaScript only. Not folded into the scan ID.
 
 - **Server entrypoints** (`entrypoints`, omitted when none) — Python functions a
   server framework invokes for an external request or job: FastAPI and Flask

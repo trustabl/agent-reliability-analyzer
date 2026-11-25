@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -28,10 +29,17 @@ func TestReleaseURLs(t *testing.T) {
 }
 
 type fakeGetter struct {
-	resp map[string][]byte // url -> 200 body; absent => 404
+	resp   map[string][]byte // url -> 200 body; absent => 404
+	status map[string]int    // url -> forced non-200 status
+	calls  []string          // "url accept" per request, in order
 }
 
-func (f *fakeGetter) Get(url string) (*http.Response, error) {
+func (f *fakeGetter) Do(req *http.Request) (*http.Response, error) {
+	url := req.URL.String()
+	f.calls = append(f.calls, strings.TrimSpace(url+" "+req.Header.Get("Accept")))
+	if code, ok := f.status[url]; ok {
+		return &http.Response{StatusCode: code, Status: strconv.Itoa(code) + " " + http.StatusText(code), Body: io.NopCloser(strings.NewReader(""))}, nil
+	}
 	if body, ok := f.resp[url]; ok {
 		return &http.Response{StatusCode: 200, Status: "200 OK", Body: io.NopCloser(bytes.NewReader(body))}, nil
 	}
@@ -96,6 +104,45 @@ func TestGitHubTransport_Non200(t *testing.T) {
 	tr := &githubTransport{client: &fakeGetter{}} // every URL 404s
 	if _, err := tr.FetchStatement("https://example.com/rules", "production"); err == nil {
 		t.Fatal("want error on 404")
+	}
+}
+
+// TestGitHubTransport_APIFallback: a 5xx from the web download route retries
+// through the REST API asset endpoint; a 404, or a non-GitHub host, does not.
+func TestGitHubTransport_APIFallback(t *testing.T) {
+	const repo = "https://github.com/o/r"
+	web := statementURL(repo, "production")
+	rel := "https://api.github.com/repos/o/r/releases/tags/channel-production"
+	asset := "https://api.github.com/repos/o/r/releases/assets/7"
+	meta := []byte(`{"assets":[{"name":"other","url":"https://api.github.com/x"},{"name":"statement.json","url":"` + asset + `"}]}`)
+
+	f := &fakeGetter{
+		status: map[string]int{web: http.StatusGatewayTimeout},
+		resp:   map[string][]byte{rel: meta, asset: []byte(`{"ok":1}`)},
+	}
+	got, err := (&githubTransport{client: f}).FetchStatement(repo, "production")
+	if err != nil || string(got) != `{"ok":1}` {
+		t.Fatalf("504 should fall back to the API: got %q, %v", got, err)
+	}
+	want := []string{web, rel + " application/vnd.github+json", asset + " application/octet-stream"}
+	if strings.Join(f.calls, "\n") != strings.Join(want, "\n") {
+		t.Errorf("calls:\n%s\nwant:\n%s", strings.Join(f.calls, "\n"), strings.Join(want, "\n"))
+	}
+
+	f = &fakeGetter{resp: map[string][]byte{rel: meta, asset: []byte("x")}} // web URL 404s
+	if _, err := (&githubTransport{client: f}).FetchStatement(repo, "production"); err == nil || len(f.calls) != 1 {
+		t.Errorf("404 must be final, no fallback: err=%v calls=%v", err, f.calls)
+	}
+
+	f = &fakeGetter{status: map[string]int{statementURL("https://example.com/r", "production"): 503}}
+	if _, err := (&githubTransport{client: f}).FetchStatement("https://example.com/r", "production"); err == nil || len(f.calls) != 1 {
+		t.Errorf("non-GitHub host must not fall back: err=%v calls=%v", err, f.calls)
+	}
+
+	f = &fakeGetter{status: map[string]int{web: http.StatusGatewayTimeout, rel: http.StatusForbidden}}
+	if _, err := (&githubTransport{client: f}).FetchStatement(repo, "production"); err == nil ||
+		!strings.Contains(err.Error(), "504") || !strings.Contains(err.Error(), "API fallback") {
+		t.Errorf("both routes failing should report both: %v", err)
 	}
 }
 

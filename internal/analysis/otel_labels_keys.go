@@ -40,15 +40,17 @@ func OtelLabelsAttributeKeys() []string {
 // setAttribute, or a key of the dict / object literal passed to set_attributes
 // / setAttributes. A bare string anywhere else writes nothing and is not a
 // label. Runs whether or not the library is imported: writing the keys without
-// it is the case this exists for.
+// it is the case this exists for. Any key under trustabl.cot.* counts, known or
+// not, and so does one of the library's constants for those keys. Such a signal
+// carries ValueUnhashed when its value could be the reasoning itself.
 func otelLabelsAttrSignals(pf ParsedFile, lang models.Language, test bool) []models.OtelLabelsSignal {
 	callType, single, multi := "call", "set_attribute", "set_attributes"
 	if lang == models.LanguageTypeScript {
 		callType, single, multi = "call_expression", "setAttribute", "setAttributes"
 	}
 	var out []models.OtelLabelsSignal
-	emit := func(call *sitter.Node, key string) {
-		if !otelLabelsKeys[key] {
+	emit := func(call *sitter.Node, key string, value *sitter.Node) {
+		if !otelLabelsKeys[key] && !strings.HasPrefix(key, otelLabelsCoTPrefix) {
 			return
 		}
 		out = append(out, models.OtelLabelsSignal{
@@ -59,6 +61,8 @@ func otelLabelsAttrSignals(pf ParsedFile, lang models.Language, test bool) []mod
 			Language:   lang,
 			TestOrigin: test,
 			Key:        key,
+
+			ValueUnhashed: otelLabelsValueUnhashed(key, value, pf.Source, lang),
 		})
 	}
 	astutil.Walk(pf.Tree.RootNode(), func(n *sitter.Node) bool {
@@ -82,8 +86,8 @@ func otelLabelsAttrSignals(pf ParsedFile, lang models.Language, test bool) []mod
 			return true
 		}
 		if name == single {
-			if key, ok := otelLabelsStringLiteral(first, pf.Source, lang); ok {
-				emit(n, key)
+			if key, ok := otelLabelsAttrKey(first, pf.Source, lang); ok {
+				emit(n, key, otelLabelsSingleValue(args, pf.Source))
 			}
 			return true
 		}
@@ -95,8 +99,8 @@ func otelLabelsAttrSignals(pf ParsedFile, lang models.Language, test bool) []mod
 			if p.Type() != "pair" {
 				continue
 			}
-			if key, ok := otelLabelsStringLiteral(p.ChildByFieldName("key"), pf.Source, lang); ok {
-				emit(n, key)
+			if key, ok := otelLabelsAttrKey(p.ChildByFieldName("key"), pf.Source, lang); ok {
+				emit(n, key, p.ChildByFieldName("value"))
 			}
 		}
 		return true

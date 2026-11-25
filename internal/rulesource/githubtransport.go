@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -46,9 +47,10 @@ type githubTransport struct {
 }
 
 // httpGetter is the minimal HTTP surface the transport needs, narrowed so a
-// test can substitute a fake without a real server.
+// test can substitute a fake without a real server. Do (not Get) so the API
+// fallback can set its Accept header.
 type httpGetter interface {
-	Get(url string) (*http.Response, error)
+	Do(req *http.Request) (*http.Response, error)
 }
 
 func newGitHubTransport() *githubTransport {
@@ -56,11 +58,11 @@ func newGitHubTransport() *githubTransport {
 }
 
 func (t *githubTransport) FetchStatement(repoURL, channel string) ([]byte, error) {
-	return t.get(statementURL(repoURL, channel), maxStatementBytes)
+	return t.download(statementURL(repoURL, channel), maxStatementBytes)
 }
 
 func (t *githubTransport) FetchBundle(repoURL, digest string) (fs.FS, error) {
-	raw, err := t.get(bundleURL(repoURL, digest), maxBundleBytes)
+	raw, err := t.download(bundleURL(repoURL, digest), maxBundleBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -81,25 +83,100 @@ func bundleURL(repoURL, digest string) string {
 	return repoWebBase(repoURL) + "/releases/download/bundle-" + digest + "/bundle.tar.gz"
 }
 
-// get fetches url, enforcing a 200 status and a hard byte ceiling so a hostile
-// endpoint cannot stream an unbounded body into memory.
-func (t *githubTransport) get(url string, maxBytes int64) ([]byte, error) {
-	resp, err := t.client.Get(url)
+// download fetches a release asset by its web download URL. When that route
+// answers 5xx or fails in transit, it tries once more through the REST API
+// asset endpoint, a separate route to the same blob: github.com has served an
+// instant, path-keyed 504 for some /releases/download/ paths (our production
+// statement and bundle among them) while the API served both. A 404 or any
+// other 4xx is final. The route is not a trust input: the caller checks the
+// statement's signature and the bundle's digest after download.
+func (t *githubTransport) download(webURL string, maxBytes int64) ([]byte, error) {
+	data, status, err := t.get(webURL, "", maxBytes)
+	if err == nil || (status != 0 && status < 500) {
+		return data, err
+	}
+	releaseURL, name, ok := apiReleaseURL(webURL)
+	if !ok {
+		return nil, err
+	}
+	data, ferr := t.apiAsset(releaseURL, name, maxBytes)
+	if ferr != nil {
+		return nil, fmt.Errorf("%w (API fallback: %v)", err, ferr)
+	}
+	return data, nil
+}
+
+// apiReleaseURL maps https://github.com/<owner>/<repo>/releases/download/<tag>/<name>
+// to the REST release-by-tag URL plus the asset name; ok is false for any
+// other host or shape.
+func apiReleaseURL(webURL string) (releaseURL, name string, ok bool) {
+	rest, ok := strings.CutPrefix(webURL, "https://github.com/")
+	if !ok {
+		return "", "", false
+	}
+	repo, asset, ok := strings.Cut(rest, "/releases/download/")
+	if !ok {
+		return "", "", false
+	}
+	tag, name, ok := strings.Cut(asset, "/")
+	if !ok || repo == "" || tag == "" || name == "" {
+		return "", "", false
+	}
+	return "https://api.github.com/repos/" + repo + "/releases/tags/" + tag, name, true
+}
+
+// apiAsset looks the release up through the REST API and downloads the named
+// asset from its API URL (Accept: application/octet-stream redirects to the blob).
+func (t *githubTransport) apiAsset(releaseURL, name string, maxBytes int64) ([]byte, error) {
+	meta, _, err := t.get(releaseURL, "application/vnd.github+json", maxStatementBytes)
 	if err != nil {
 		return nil, err
 	}
+	var rel struct {
+		Assets []struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"assets"`
+	}
+	if err := json.Unmarshal(meta, &rel); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", releaseURL, err)
+	}
+	for _, a := range rel.Assets {
+		if a.Name == name && strings.HasPrefix(a.URL, "https://api.github.com/") {
+			data, _, err := t.get(a.URL, "application/octet-stream", maxBytes)
+			return data, err
+		}
+	}
+	return nil, fmt.Errorf("%s: no asset %q", releaseURL, name)
+}
+
+// get fetches url, enforcing a 200 status and a hard byte ceiling so a hostile
+// endpoint cannot stream an unbounded body into memory. status is 0 when no
+// response arrived.
+func (t *githubTransport) get(url, accept string, maxBytes int64) ([]byte, int, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
+		return nil, resp.StatusCode, fmt.Errorf("GET %s: %s", url, resp.Status)
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("GET %s: %w", url, err)
+		return nil, resp.StatusCode, fmt.Errorf("GET %s: %w", url, err)
 	}
 	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf("GET %s: response exceeds %d bytes", url, maxBytes)
+		return nil, resp.StatusCode, fmt.Errorf("GET %s: response exceeds %d bytes", url, maxBytes)
 	}
-	return data, nil
+	return data, resp.StatusCode, nil
 }
 
 // untarGz decompresses and unpacks a gzipped tar into an in-memory filesystem,

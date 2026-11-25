@@ -721,6 +721,29 @@ rules:
 #       callback or a .catch( handler, passes the literal "error", or passes a
 #       variable reason. A fixed reason in finally does not credit it. Test
 #       files never count.
+#   repo_otel_labels_reasoning_unhashed: true | false
+#       Fires when a trustabl.cot.* key is (or is not) written by hand, with
+#       set_attribute(s) / setAttribute(s), and a value that could be the
+#       reasoning itself: a runtime value that is not visibly a hash. A literal,
+#       a canonical_fp / canonicalFp call, a hand-rolled hash and a variable
+#       named for one are not reported, nor are the flag and enum keys
+#       trustabl.cot.present and trustabl.cot.mode. A key the library does not
+#       define counts, and so does the library's own constant for a key
+#       (keys.COT_TEXT_FP). Test files never count.
+#   repo_otel_labels_reasoning_labelled: true | false
+#       Fires when a model span's reasoning is (or is not) labelled: a
+#       mark_reasoning / markReasoning call, or any trustabl.cot.* key written
+#       by hand. Test files never count.
+#   repo_model_reasoning_enabled: true | false
+#       Fires when a model option in the source does (or does not) turn on
+#       reasoning: thinking, reasoning, reasoning_effort, max_thinking_tokens,
+#       thinking_config and their spellings. Values that leave it off
+#       ({"type": "disabled"}, "none", False, 0, a budget of 0) do not count.
+#       "thinking" and "reasoning" count only as an object or a config call, or
+#       reasoning=True: a variable looks the same as a field of a project's own
+#       model. Recorded only in a repo that already carries labels. Cannot see an
+#       option set outside the source, or a model that reasons by default. Test
+#       files never count.
 #   repo_raw_anthropic_tool_output_in_system: true | false
 #       Fires when a function drives the bare `anthropic` client in a manual
 #       tool-use loop (.messages.create(..., tools=...)) and passes a runtime-
