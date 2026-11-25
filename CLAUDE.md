@@ -350,6 +350,14 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Deep Agent host shell without approval (2026-11-09, `schema_version` 43 -> 44, provisional; +1 rule):** **LC-118** (high, 0.6, agent
+> scope, `langchain/deep_agent_shell.yaml`) over the new predicate `agent_deep_agent_shell_execute_ungated` and the new `applies_to` token
+> `langchain_deep_agent`. Discovery (`analysis/deepagents_agents.go`) emits one `AgentDef` (SDK `langchain`, Class `DeepAgent`) per
+> `create_deep_agent(...)` bound to `deepagents`, stamping `DeepShellBackend` and `DeepExecuteGate`. Same-file only: a factory, a lambda, a
+> backend from another module, a `HumanInTheLoopMiddleware` in `middleware=` and a subagent dict's own `interrupt_on` are not judged. No
+> Critical tier: the engine cannot link this agent to a server entrypoint. 44 follows main's 43 and is provisional. The fixture holds **394** rules (393 + 1; re-derive). Primary source: CVE-2026-77926; the grounding is in the rulebook doc
+> `docs/Policy/langchain/deep_agent_shell.md`.
+>
 > **Reasoning labels (2026-11-05, `schema_version` 41 -> 42; +2 rules):** **OBS-013** (medium, 0.6: a hand-written
 > `trustabl.cot.*` value that could be the reasoning itself) and **OBS-014** (low, 0.6: a labelled repo sets a reasoning option and no
 > span records it), new pack file `observability/reasoning.yaml`, over `repo_otel_labels_reasoning_unhashed`,

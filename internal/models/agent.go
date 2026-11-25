@@ -106,6 +106,20 @@ type AgentDef struct {
 	// when there is no checkpointer, or when it is a name or factory discovery
 	// cannot resolve. In-memory only — LC-116 reads it; not serialized.
 	CheckpointerClass string `json:"-"`
+	// DeepShellBackend records how a Deep Agent's backend= resolves to a host
+	// shell: "direct" (LocalShellBackend(...), or a same-file variable bound once
+	// to it), "composite_default" (CompositeBackend whose default is one) or
+	// "subclass" (a same-file subclass that does not override execute). Empty for
+	// every other agent and for any backend discovery cannot resolve. In-memory
+	// only — LC-118 reads it; not serialized.
+	DeepShellBackend string `json:"-"`
+	// DeepExecuteGate records what the call's interrupt_on says about the execute
+	// tool: "absent" (missing or None), "empty" ({}), "other_tools" (a dict with
+	// no "execute" key), "execute_false" ("execute": False), "gated" ("execute"
+	// set to True or a config) or "unjudged" (a value, middleware or profile that
+	// discovery cannot read). Empty for every other agent. In-memory only — LC-118
+	// reads it; not serialized.
+	DeepExecuteGate string `json:"-"`
 }
 
 // GlobalInstrumentation is the process-wide call that stands in for an

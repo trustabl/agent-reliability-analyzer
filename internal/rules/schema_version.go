@@ -73,4 +73,7 @@ package rules
 // Schema 43 adds the repo_agent_server_allows_any_origin and
 // repo_agent_server_exposed_without_key predicates (repo scope, category
 // agent_server).
-const SupportedSchemaVersion = 43
+//
+// Schema 44 adds the agent_deep_agent_shell_execute_ungated predicate (agent
+// scope) and the langchain_deep_agent applies_to token.
+const SupportedSchemaVersion = 44

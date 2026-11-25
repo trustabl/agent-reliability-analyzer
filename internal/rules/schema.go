@@ -110,6 +110,8 @@ type MatchExpr struct {
 	AgentCheckpointerInMemory *bool `yaml:"agent_checkpointer_in_memory,omitempty"`
 	// AgentServerReachable: see PredAgentServerReachable.
 	AgentServerReachable *bool `yaml:"agent_server_reachable,omitempty"`
+	// AgentDeepAgentShellExecuteUngated: see PredAgentDeepAgentShellExecuteUngated.
+	AgentDeepAgentShellExecuteUngated *bool `yaml:"agent_deep_agent_shell_execute_ungated,omitempty"`
 
 	// Subagent-scope predicates
 	SubagentGrantsTool       []string `yaml:"subagent_grants_tool,omitempty"`

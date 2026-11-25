@@ -98,7 +98,8 @@ rules:
                                             #           adk_llm_agent, adk_sequential_agent, adk_parallel_agent,
                                             #           adk_loop_agent, adk_langgraph_agent,
                                             #           langchain_agent, langchain_agent_executor,
-                                            #           langchain_state_graph, crewai_agent, pydantic_ai_agent,
+                                            #           langchain_state_graph, langchain_deep_agent, crewai_agent,
+                                            #           pydantic_ai_agent,
                                             #           vercel_ai_agent, autogen_conversable_agent,
                                             #           autogen_user_proxy_agent, autogen_assistant_agent,
                                             #           autogen_group_chat_manager, autogen_code_executor_agent.
@@ -452,6 +453,23 @@ rules:
 #       compiled in one module and imported into another (`from graph import
 #       app`). Test paths (tests/, test_*.py, conftest.py, ...) are ignored for
 #       the agent, the run call and the entrypoint. Used by LC-116.
+#
+#   agent_deep_agent_shell_execute_ungated: true | false
+#       True for a Deep Agent (create_deep_agent from the deepagents package;
+#       applies_to langchain_deep_agent) whose backend= resolves in the same file
+#       to a host shell and whose interrupt_on does not gate the execute tool.
+#       The backend resolves to a shell for: LocalShellBackend(...) directly; a
+#       variable bound exactly once, unconditionally, to such a call; a
+#       CompositeBackend whose DEFAULT is one (a LocalShellBackend only inside
+#       routes does not expose execute); a same-file subclass that overrides
+#       neither execute nor aexecute. interrupt_on is read only as a literal dict
+#       in the call: missing, None, {}, a dict with no "execute" key, or "execute"
+#       set to False is ungated; "execute" set to True or a config is gated.
+#       Never judged (false): a middleware= value that is not a literal list of
+#       calls or that contains HumanInTheLoopMiddleware(, a harness profile or
+#       excluded_tools in the file, Agent(**config), an interrupt_on that is not a
+#       literal dict, a factory or cross-module backend, and a subagent dict that
+#       sets its own interrupt_on. Used by LC-118.
 #
 #   repo_langgraph_platform_config_present: true | false
 #       DUAL-SCOPE (valid at agent and repo scope, like repo_has_observability).

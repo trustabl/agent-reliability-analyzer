@@ -91,6 +91,7 @@ against. Pick values from the table for the scope you're targeting.
 | `adk_parallel_agent`      | `ParallelAgent(...)` from `google-adk`                        |
 | `adk_loop_agent`          | `LoopAgent(...)` from `google-adk`                            |
 | `adk_langgraph_agent`     | `LanggraphAgent(...)` from `google-adk`                       |
+| `langchain_deep_agent`    | `create_deep_agent(...)` from `deepagents` (Python)           |
 
 **`scope: repo`** — receives `RepoProfile` + `RepoInventory`. `applies_to`
 at this scope is matched against a fixed token list (the loader's
