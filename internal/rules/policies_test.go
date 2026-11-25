@@ -4510,6 +4510,32 @@ var policyRepoRuleCases = []policyRepoCase{
 		models.RepoProfile{},
 		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{AllowAllBash: []models.ConfigHit{{Reason: "x"}}}},
 		false},
+	// ─── AGSRV-001 ADK server accepts any browser origin (repo-scoped, no SDK gate) ──
+	{"AGSRV-001 fires on an any-origin fact with no SDK detected", "AGSRV-001",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{AnyOriginServer: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGSRV-001 silent when no any-origin fact exists", "AGSRV-001",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGSRV-001 silent when only an unauthenticated-publish fact is present", "AGSRV-001",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{AgentServerNoKey: []models.ConfigHit{{Reason: "x"}}}},
+		false},
+	// ─── AGSRV-002 agent server published with no session key (repo-scoped, no SDK gate) ──
+	{"AGSRV-002 fires on a published-without-key fact with no SDK detected", "AGSRV-002",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{AgentServerNoKey: []models.ConfigHit{{Reason: "x"}}}},
+		true},
+	{"AGSRV-002 silent when no published-without-key fact exists", "AGSRV-002",
+		models.RepoProfile{},
+		models.RepoInventory{},
+		false},
+	{"AGSRV-002 silent when only an any-origin fact is present", "AGSRV-002",
+		models.RepoProfile{},
+		models.RepoInventory{ProjectConfig: models.ProjectConfigFacts{AnyOriginServer: []models.ConfigHit{{Reason: "x"}}}},
+		false},
 	// ─── AGCFG-014 model endpoint override in project settings (repo-scoped, no SDK gate) ──
 	{"AGCFG-014 fires on a model endpoint override fact with no SDK detected", "AGCFG-014",
 		models.RepoProfile{},
@@ -5254,6 +5280,51 @@ var policyRepoRuleCases = []policyRepoCase{
 			},
 		},
 		false},
+	// Reasoning labels (OBS-013..014). OBS-013 needs only the hand-written value;
+	// OBS-014 starts from a labelled repo that sets a reasoning option.
+	{"OBS-013 fires when a reasoning label's value is not a fingerprint", "OBS-013", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(models.OtelLabelsSignal{Kind: models.OtelLabelsAttrLiteral, Key: "trustabl.cot.text_fp", ValueUnhashed: true, File: "agent.py", StartLine: 9}),
+		true},
+	{"OBS-013 silent when the hand-written value is a fingerprint", "OBS-013", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(models.OtelLabelsSignal{Kind: models.OtelLabelsAttrLiteral, Key: "trustabl.cot.text_fp", File: "agent.py", StartLine: 9}),
+		false},
+	{"OBS-013 silent when the repo labels through the library", "OBS-013", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(models.OtelLabelsSignal{Kind: models.OtelLabelsReasoning, File: "agent.py", StartLine: 9}),
+		false},
+	{"OBS-013 silent when the raw value is only in a test file", "OBS-013", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(models.OtelLabelsSignal{Kind: models.OtelLabelsAttrLiteral, Key: "trustabl.cot.text_fp", ValueUnhashed: true, File: "tests/test_agent.py", StartLine: 3, TestOrigin: true}),
+		false},
+	{"OBS-014 fires when a model is set to reason and nothing labels it", "OBS-014", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsReasoningConfig, Key: "thinking", File: "agent.py", StartLine: 7})...),
+		true},
+	{"OBS-014 silent when a span is labelled", "OBS-014", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(append(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsReasoningConfig, Key: "thinking", File: "agent.py", StartLine: 7}),
+			models.OtelLabelsSignal{Kind: models.OtelLabelsReasoning, File: "agent.py", StartLine: 8})...),
+		false},
+	{"OBS-014 silent when the reasoning label is hand-written, which is OBS-013's to judge", "OBS-014", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(append(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsReasoningConfig, Key: "thinking", File: "agent.py", StartLine: 7}),
+			models.OtelLabelsSignal{Kind: models.OtelLabelsAttrLiteral, Key: "trustabl.cot.present", File: "agent.py", StartLine: 8})...),
+		false},
+	{"OBS-014 silent when no model is set to reason", "OBS-014", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(otelLabelsGood...),
+		false},
+	{"OBS-014 silent when the only reasoning option is in a test file", "OBS-014", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsReasoningConfig, Key: "thinking", File: "tests/test_agent.py", StartLine: 2, TestOrigin: true})...),
+		false},
+	{"OBS-014 fires when the only label call is in a test file", "OBS-014", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(append(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsReasoningConfig, Key: "thinking", File: "agent.py", StartLine: 7}),
+			models.OtelLabelsSignal{Kind: models.OtelLabelsReasoning, File: "tests/test_agent.py", StartLine: 8, TestOrigin: true})...),
+		true},
+	{"OBS-014 silent until the run's own labels are written, which is OBS-008's to say", "OBS-014", otelLabelsCorrectnessProfile,
+		otelLabelsCorrectnessInv(models.OtelLabelsSignal{Kind: models.OtelLabelsReasoningConfig, Key: "thinking", File: "agent.py", StartLine: 7}),
+		false},
+	{"OBS-014 silent with no SDK the rule applies to", "OBS-014", otelLabelsCorrectnessProfile,
+		func() models.RepoInventory {
+			inv := otelLabelsCorrectnessInv(withOtel(-1, models.OtelLabelsSignal{Kind: models.OtelLabelsReasoningConfig, Key: "thinking", File: "agent.py", StartLine: 7})...)
+			inv.SDKsDetected = nil
+			return inv
+		}(),
+		false},
 	// agent-reliability-otel-labels correctness (OBS-009..012). Each starts
 	// from a fully labelled repo and breaks one thing.
 	{"OBS-009 fires on a module-scope Run", "OBS-009", otelLabelsCorrectnessProfile,
@@ -5880,6 +5951,83 @@ var policyAgentRuleCases = []policyAgentCase{
 	{"LC-112 silent when the repo has no observability at all", "LC-112",
 		models.AgentDef{
 			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+		},
+		models.RepoInventory{},
+		false},
+	{"LC-118 fires on a direct host shell with no interrupt_on", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "absent",
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-118 fires on a host shell with an empty interrupt_on", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "empty",
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-118 fires when interrupt_on has no execute entry", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "other_tools",
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-118 fires when interrupt_on sets execute to False", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "execute_false",
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-118 fires on a CompositeBackend whose default is a host shell", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "composite_default", DeepExecuteGate: "absent",
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-118 fires on a same-file subclass that does not override execute", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "subclass", DeepExecuteGate: "absent",
+		},
+		models.RepoInventory{},
+		true},
+	{"LC-118 silent when interrupt_on gates execute", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "gated",
+		},
+		models.RepoInventory{},
+		false},
+	{"LC-118 silent when interrupt_on or middleware is not judged", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "unjudged",
+		},
+		models.RepoInventory{},
+		false},
+	{"LC-118 silent when the backend is not a host shell", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "DeepAgent", Language: models.LanguagePython,
+			DeepShellBackend: "", DeepExecuteGate: "",
+		},
+		models.RepoInventory{},
+		false},
+	{"LC-118 silent on a LangChain create_agent", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "CreateAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "absent",
+		},
+		models.RepoInventory{},
+		false},
+	{"LC-118 silent on a LangChain create_react_agent", "LC-118",
+		models.AgentDef{
+			SDK: models.SDKLangChain, Class: "ReactAgent", Language: models.LanguagePython,
+			DeepShellBackend: "direct", DeepExecuteGate: "absent",
 		},
 		models.RepoInventory{},
 		false},
@@ -8363,6 +8511,9 @@ func TestPolicyRules_AllRulesCovered(t *testing.T) {
 		record(tc.ruleID, tc.wantFires)
 	}
 	for _, tc := range policySkillRuleCases {
+		record(tc.ruleID, tc.wantFires)
+	}
+	for _, tc := range policySlashCommandRuleCases {
 		record(tc.ruleID, tc.wantFires)
 	}
 	var missingAny, missingFire, missingSilent []string

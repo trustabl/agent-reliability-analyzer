@@ -23,16 +23,22 @@ rules:
       repo_settings_allow_exec_capable_prefix: true
     explanation: >
       A committed .claude/settings.json or .claude/settings.local.json lists a
-      Bash rule in permissions.allow that is a bare git, xargs or npx command
-      followed by a trailing wildcard, such as Bash(git:*) or Bash(npx *).
+      Bash rule in permissions.allow that is a bare git, xargs, npx, env, sed or
+      awk command followed by a trailing wildcard, such as Bash(git:*) or
+      Bash(npx *).
       Claude Code's permissions page states that a wildcard in place of a git
       subcommand matches the git options before it, including -c, which makes
       git run a program you name; that an xargs invocation with flags is matched
       as an xargs command; and that npx executes its arguments as a command and
-      is not one of the wrappers Claude Code strips before matching. A prefix
-      rule on one of these commands therefore approves more than the command the
-      author had in mind, and no prompt lets the developer stop the call. Claude
-      Code applies these allow rules once the user accepts the workspace trust
+      is not one of the wrappers Claude Code strips before matching. env runs the
+      command operand it is given; sed runs a program through its e command or
+      the s///e flag; awk runs one through system() or a pipe, per the GNU
+      manuals. The permissions page does not describe a prompt for these three
+      forms under a prefix rule, and Claude Code may prompt for some of them in
+      ways its documentation does not describe. A prefix rule on one of these
+      commands therefore approves more than the command the author had in mind,
+      and for git, xargs and npx no prompt lets the developer stop the call.
+      Claude Code applies these allow rules once the user accepts the workspace trust
       dialog. Limits of this check: it reads the permissions block of the
       .claude/ settings files in the repo. A bare Bash, Bash(*) or same-prefix
       deny or ask rule in a settings file in the same .claude/ folder cancels
@@ -40,7 +46,8 @@ rules:
       prompt-time approvals are not seen. A narrower prefix such as
       Bash(git status *) and an exact command such as Bash(git status) are not
       flagged. A bare Bash or Bash(*) allow rule is AGCFG-016's concern; other
-      programs that can run commands are not judged. The command list is fixed.
+      programs that can run commands are not judged, and gawk, mawk and nawk
+      are separate names that are not listed. The command list is fixed.
     fix: >
       Replace the wildcard with exact commands that name the subcommand and
       arguments, such as Bash(git status) and Bash(git diff --stat). To make the

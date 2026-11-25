@@ -106,6 +106,20 @@ type AgentDef struct {
 	// when there is no checkpointer, or when it is a name or factory discovery
 	// cannot resolve. In-memory only — LC-116 reads it; not serialized.
 	CheckpointerClass string `json:"-"`
+	// DeepShellBackend records how a Deep Agent's backend= resolves to a host
+	// shell: "direct" (LocalShellBackend(...), or a same-file variable bound once
+	// to it), "composite_default" (CompositeBackend whose default is one) or
+	// "subclass" (a same-file subclass that does not override execute). Empty for
+	// every other agent and for any backend discovery cannot resolve. In-memory
+	// only — LC-118 reads it; not serialized.
+	DeepShellBackend string `json:"-"`
+	// DeepExecuteGate records what the call's interrupt_on says about the execute
+	// tool: "absent" (missing or None), "empty" ({}), "other_tools" (a dict with
+	// no "execute" key), "execute_false" ("execute": False), "gated" ("execute"
+	// set to True or a config) or "unjudged" (a value, middleware or profile that
+	// discovery cannot read). Empty for every other agent. In-memory only — LC-118
+	// reads it; not serialized.
+	DeepExecuteGate string `json:"-"`
 }
 
 // GlobalInstrumentation is the process-wide call that stands in for an
@@ -428,6 +442,16 @@ type ProjectConfigFacts struct {
 	// .claude/settings*.json that no bare Bash or Bash(*) deny or ask rule in the
 	// same .claude/ folder cancels. AGCFG-016 reads this list.
 	AllowAllBash []ConfigHit `json:"allow_all_bash,omitempty"`
+	// AnyOriginServer is a committed setting that lets any browser origin call a
+	// Google ADK server: the adk.web.cors.origins key in Spring configuration, an
+	// allow_origins argument of get_fast_api_app or allowOrigins option of
+	// AdkApiServer, or an --allow_origins option of adk web / adk api_server, with
+	// a * entry. AGSRV-001 reads this list.
+	AnyOriginServer []ConfigHit `json:"any_origin_server,omitempty"`
+	// AgentServerNoKey is a Docker Compose service or docker run command that runs
+	// the OpenHands agent server image, publishes its port on all host interfaces
+	// and sets no session API key name. AGSRV-002 reads this list.
+	AgentServerNoKey []ConfigHit `json:"agent_server_no_key,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

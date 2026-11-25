@@ -14,12 +14,14 @@ const (
 	ScopeRepo     Scope = "repo"
 	ScopeSubagent Scope = "subagent"
 	ScopeSkill    Scope = "skill"
+	// ScopeSlashCommand fires per .claude/commands/*.md slash command.
+	ScopeSlashCommand Scope = "slash_command"
 )
 
 // AllScopes is every rule scope this build recognizes, in a stable order. Single
 // source of truth: ValidScope checks against it and the capability descriptor
 // (trustabl capabilities) lists it. Mirrors AllLanguages / AllCategories.
-var AllScopes = []Scope{ScopeTool, ScopeAgent, ScopeRepo, ScopeSubagent, ScopeSkill}
+var AllScopes = []Scope{ScopeTool, ScopeAgent, ScopeRepo, ScopeSubagent, ScopeSkill, ScopeSlashCommand}
 
 // ValidScope reports whether s is a known scope value.
 func ValidScope(s Scope) bool {
@@ -94,6 +96,10 @@ const (
 	// events any GitHub user can cause (CI-*). Not an SDK; loads
 	// unconditionally, the rule predicate gates.
 	CategoryCI DetectorCategory = "ci"
+	// CategoryAgentServer covers how a server the repo runs for an agent is
+	// exposed to browsers and networks (AGSRV-*). Not an SDK; loads
+	// unconditionally, the rule predicate gates.
+	CategoryAgentServer DetectorCategory = "agent_server"
 )
 
 // display order. It is the single source of truth for category membership:
@@ -105,7 +111,7 @@ var AllCategories = []DetectorCategory{
 	CategoryClaudeSDK, CategoryOpenAISDK, CategoryOpenShell, CategoryGoogleADK,
 	CategoryMCP, CategoryLangChain, CategoryCrewAI, CategoryPydanticAI,
 	CategoryVercelAI, CategoryAutoGen, CategoryClaudeSkill, CategoryObservability,
-	CategoryRawLLMSDK, CategoryAgentConfig, CategoryCI,
+	CategoryRawLLMSDK, CategoryAgentConfig, CategoryCI, CategoryAgentServer,
 }
 
 // ValidCategory reports whether c is a category this build recognizes. The rule
@@ -400,6 +406,12 @@ type ScanManifest struct {
 	// depth; the generated .husky/_ helper directory is left out). Sorted. Read by
 	// AGCFG-015 only.
 	HuskyFiles []string `json:"husky_files,omitempty"`
+	// PropertiesFiles holds application*.properties files at any depth. Sorted.
+	// Read by AGSRV-001 only.
+	PropertiesFiles []string `json:"properties_files,omitempty"`
+	// ServerScriptFiles holds Dockerfile*, *.dockerfile, Makefile and *.sh files at
+	// any depth. Sorted. Read by AGSRV-001 and AGSRV-002 only.
+	ServerScriptFiles []string `json:"server_script_files,omitempty"`
 	// GuidanceFiles holds the agent guidance files the walk keeps beyond the
 	// ordinary extension lists: .cursor/rules/**/*.mdc, .windsurfrules,
 	// .windsurf/rules and .devin/rules *.md, .github/copilot-instructions.md and
@@ -528,6 +540,14 @@ const (
 	// OtelLabelsAttrLiteral is a trustabl.* label key written to a span by
 	// hand (set_attribute / setAttribute), without the library.
 	OtelLabelsAttrLiteral OtelLabelsSignalKind = "attr_literal"
+	// OtelLabelsReasoning is a mark_reasoning / markReasoning call: a model
+	// span's reasoning labels written through the library.
+	OtelLabelsReasoning OtelLabelsSignalKind = "reasoning"
+	// OtelLabelsReasoningConfig is a model option that turns on reasoning
+	// (thinking, reasoning_effort and the like). Not a library fact: it is what
+	// makes a missing reasoning label worth saying, so it is recorded only in a
+	// repo already carrying labels.
+	OtelLabelsReasoningConfig OtelLabelsSignalKind = "reasoning_config"
 )
 
 // OtelLabelsSignal is one agent-reliability-otel-labels fact OBSERVED IN CODE.
@@ -556,7 +576,10 @@ type OtelLabelsSignal struct {
 	AttemptConst bool   `json:"attempt_const,omitempty"` // tool_span: attempt is an integer literal
 	SideEffect   string `json:"side_effect,omitempty"`   // tool_span: literal side_effect value
 	ExitReason   string `json:"exit_reason,omitempty"`   // run_end: literal exit_reason value
-	Key          string `json:"key,omitempty"`           // attr_literal: the trustabl.* key
+	Key          string `json:"key,omitempty"`           // attr_literal: the trustabl.* key; reasoning_config: the option's name
+	// ValueUnhashed is set on an attr_literal under trustabl.cot.* whose value
+	// could be the reasoning itself: a runtime value that is not visibly a hash.
+	ValueUnhashed bool `json:"value_unhashed,omitempty"`
 }
 
 // DepRef is one dependency declared in a repo manifest — the agent-path

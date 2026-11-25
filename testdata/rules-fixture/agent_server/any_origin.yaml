@@ -1,0 +1,57 @@
+policy:
+  id: agent_server_any_origin
+  name: Agent development server accepts any browser origin
+  category: agent_server
+  description: >
+    Repo-scoped rule for a committed setting that lets any web origin call a Google
+    ADK server. The pack loads for each scan, because the files it reads (Spring
+    configuration, Python and TypeScript source, shell and Makefile lines, compose
+    commands, package.json scripts) have no single SDK import; the rule's own
+    predicate does the gating. Fires once per scan, attributed to the first
+    offending file and line.
+
+rules:
+  - id: AGSRV-001
+    title: Agent server is configured to accept any browser origin
+    severity: high
+    confidence: 0.6
+    applies_to:
+      - agent_server
+    scope: repo
+    match:
+      repo_agent_server_allows_any_origin: true
+    explanation: >
+      A committed file sets the allowed origins of a Google ADK server to *. The CVE
+      record for the ADK Java development server (CVE-2026-107858) states: "Because
+      the server has no authentication and requests originate from the developer's
+      browser (so binding to localhost does not prevent exploitation), a cross-origin
+      page can send messages to the agent (triggering registered tools), stream agent
+      responses, and list, read, create, or delete sessions and artifacts." The ADK
+      Java development README states: "Avoid `*`: it lets any website open in your
+      browser call the server." For ADK Python, the vendor's source states that a *
+      entry opens the API to other sites, except the endpoints that write agent files
+      or start runs. In the ADK TypeScript server a * entry disables the DNS-rebinding
+      guard and makes the origin check, which rejects cross-origin state-changing
+      requests, accept any origin.
+      Limits of this check: it reads the adk.web.cors.origins key in Spring
+      application properties and YAML files, the allow_origins list of a
+      get_fast_api_app call in a Python file that imports google.adk, the allowOrigins
+      option of an AdkApiServer call in a TypeScript or JavaScript file that imports
+      @google/adk-devtools, and an --allow_origins option on an adk web or adk
+      api_server command in Dockerfiles, Makefiles, shell scripts, compose command
+      entries and package.json scripts. A value taken from an environment variable,
+      a narrower origin list, an origin pattern, source files in test paths, Java
+      source and generic CORS middleware are not judged. An ADK Java server with no
+      origins setting is not judged either: whether its default is open depends on
+      the release in use, which is a dependency version question outside this check.
+      A call inside a comment or a string literal, and a commented script line, is not
+      judged. A reverse proxy or network rule in front of the server is not seen. A
+      bind address such as --host is not judged. The consequence quoted from the CVE
+      record is stated for the ADK Java development server; what a * entry makes
+      reachable in the Python and TypeScript servers beyond the statements above is
+      not stated here.
+    fix: >
+      List the exact origins that serve your UI, for example http://localhost:8000,
+      in adk.web.cors.origins, allow_origins, allowOrigins or --allow_origins, and
+      remove the * entry. Leave the setting unset when the UI is served from the same
+      origin as the server.

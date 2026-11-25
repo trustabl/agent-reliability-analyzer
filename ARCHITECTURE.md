@@ -427,7 +427,7 @@ flowchart TD
     score --> result
 ```
 
-The five scopes a rule can fire at — `tool`, `agent`, `subagent`, `skill`, `repo` —
+The six scopes a rule can fire at — `tool`, `agent`, `subagent`, `skill`, `slash_command`, `repo` —
 flow into `Registry.Run` from the same `RepoInventory`, but each detector consumes a
 different typed input:
 
@@ -498,8 +498,8 @@ matches each WebFetch allow entry against a fixed host list using the documented
 `domain:` rules (`webFetchCovers`), and a deny or ask rule in the same `.claude/`
 folder cancels it.
 `repo_settings_allow_exec_capable_prefix` (AGCFG-012) reads the same parsed rules:
-`execCapableAllowHits` flags a `Bash` allow entry that is a bare `git`, `xargs` or `npx`
-command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
+`execCapableAllowHits` flags a `Bash` allow entry that is a bare `git`, `xargs`, `npx`,
+`env`, `sed` or `awk` command with a trailing `:*` or ` *` (`execPrefixWord`); a narrower prefix and an exact
 command are silent, and a bare `Bash`, `Bash(*)` or same-prefix deny or ask rule in the
 same `.claude/` folder cancels it (`coversExecPrefix`).
 `repo_settings_allow_all_bash` (AGCFG-016) reads the parsed `permissions` of each
@@ -528,6 +528,25 @@ read (CI-004 reads workflow steps on untrusted triggers only). The Reason names 
 binary and the flag; no other script text is kept. Hits land in
 `ProjectConfigFacts.ScriptAgentBypass`.
 
+**Agent server exposure (category `agent_server`, `schema_version` 43).** The walk records
+`application*.properties` in `ScanManifest.PropertiesFiles` and Dockerfiles, Makefiles and `*.sh` in
+`ScanManifest.ServerScriptFiles`; compose and Spring YAML files are read from `YAMLFiles`.
+`anyOriginServerHits` (`repo_agent_server_allows_any_origin`, AGSRV-001) reads the
+`adk.web.cors.origins` key (properties and YAML), a `get_fast_api_app(...)` call's `allow_origins`
+list in a Python file that imports `google.adk`, an `AdkApiServer(...)` call's `allowOrigins` in a
+TS/JS file that imports `@google/adk-devtools` (both outside `pathclass` test paths, and only where the call starts in code: `codeMask` skips
+comments, docstrings and string literals; `#` comment lines of script files are skipped too), and an
+`--allow_origins` option of `adk web` / `adk api_server` on a command line in a script file, compose
+`command` / `entrypoint` or package.json script; only a `*` entry counts. `agentServerNoKeyHits`
+(`repo_agent_server_exposed_without_key`, AGSRV-002) reads compose services and `docker run` lines
+whose image is `ghcr.io/openhands/agent-server` (or the default inside `${VAR:-default}`) and all
+three hold: a port is published without a loopback host address; `--host` in the compose
+`entrypoint` / `command` (or after the image in a `docker run` line) is a non-loopback IP literal
+(`hostFlagNonLoopback`; a name or `${VAR}` is not judged); and no `OH_SESSION_API_KEYS_*` /
+`SESSION_API_KEY` key name is set (`env_file` makes the service unjudged). The server binds loopback
+when it is given no `--host` and no key, so a published port alone does not fire. Hits are static-text `ConfigHit`s in
+`ProjectConfigFacts.AnyOriginServer` and `.AgentServerNoKey`. Code: `internal/analysis/agent_server_exposure.go`.
+
 `repo_settings_env_redirects_model_endpoint` (AGCFG-014) reads the `env` object of each
 parsed `.claude/settings.json` and `settings.local.json`: `modelEndpointOverrideHits`
 takes the `ANTHROPIC_BASE_URL` string and passes it to `modelEndpointClass`, which parses
@@ -551,7 +570,10 @@ Settings files are parsed as JSONC (comments and trailing commas stripped), Code
 as TOML. **Env files are read for key names only**: a value is never stored,
 logged or placed in a finding. Root `.env` uses a narrow key set
 (`GEMINI_SANDBOX*`, `*_PROXY_COMMAND`); `.gemini/.env` and `.codex/config.toml`
-also check `*_BASE_URL`, `NODE_OPTIONS` and `LD_PRELOAD`. Unlike other repo-scope
+also check `NODE_OPTIONS` and `LD_PRELOAD`, and `.gemini/.env` also checks the two endpoint
+variables Gemini CLI reads (`GOOGLE_GEMINI_BASE_URL`, `GOOGLE_VERTEX_BASE_URL`, named in
+`geminiEndpointKeys`). No other `*_BASE_URL` key is judged: Codex ignores them in a project
+file and Gemini CLI does not read them. Unlike other repo-scope
 rules, an `agent_config` finding is attributed to the first path-sorted hit's
 file and line (`configHitLocation` in `rule_detector.go`), so `pathclass` can tag
 a vendored fixture as test-origin. The pack loads unconditionally and the
@@ -807,6 +829,24 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   an empty location. Hand-written `trustabl.*` keys credit the `OBS-006..008`
   ladder but are not read by these four.
 
+  Three more back `OBS-013..014`, for the reasoning labels
+  (`internal/analysis/otel_labels_reasoning.go`).
+  `repo_otel_labels_reasoning_unhashed` reads a hand-written `trustabl.cot.*`
+  key, known to the library or not, whose value could be the reasoning itself
+  (`ValueUnhashed`: a runtime value that is not visibly a hash). It does not
+  credit a hand-written key the way the ladder does, because it asks what the
+  key was given, not whether it exists. `repo_otel_labels_reasoning_labelled`
+  reads a `reasoning` signal (`mark_reasoning` / `markReasoning`) or any
+  hand-written `trustabl.cot.*` key. `repo_model_reasoning_enabled` reads a
+  `reasoning_config` signal, a model option such as `thinking` or
+  `reasoning_effort`, recorded only in a repo that already carries labels so a
+  repo without them keeps its report as it was. All three drop test-file signals,
+  and findings carry the file and line. The vendored
+  `testdata/forge/otel/otel-spec-keys.json` and `otelLabelsKeys` stay at profile
+  1.0.0 until the library release that has `mark_reasoning`, because forge's
+  recipe must not name a call the published package lacks; the `trustabl.cot.`
+  prefix check does not need that table.
+
 - **DiscoverSubagents** (`subagents.go`) — **hybrid** discovery in two passes.
   Pass 1 reads every `.claude/agents/*.md` component (matched at any path depth
   — monorepos that nest agent projects under `agent/.claude/agents/` or
@@ -886,6 +926,19 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   snapshot version is folded into `ScanID` **only** when `--vuln-scan` is on,
   leaving default scans byte-identical. Coverage is honest about its bound: a
   declared range (no lockfile to pin it) is skipped, not guessed.
+- **Slash command rules (CCMD-*)** — `slash_command` scope. `Registry.Run`
+  visits each `SlashCommandDef` in `RepoInventory.SlashCommands` with the
+  `SlashCommandDetector`s attached through `Registry.WithSlashCommand`;
+  `applies_to` is `claude_slash_command`. The three predicates
+  (`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+  `slash_command_allows_unrestricted_tool`) share `grantsUnrestrictedShell` /
+  `grantsUnrestrictedTool` with the skill predicates, so a command file and a
+  `SKILL.md` read one grant rule. Findings carry `scope: slash_command`, the
+  command's file and frontmatter line, and the command name as `ToolName`. A
+  command under a test path is tagged test-origin by `internal/pathclass` like
+  any finding. Command findings are NOT a scored surface: `analysis.Score`
+  ignores the scope, so command findings change no score (scoring is a
+  follow-up).
 - **DiscoverSlashCommands** (`slash_commands.go`) — emits one
   `SlashCommandDef` per `ComponentSlashCommand` component. Recon tags those
   at two path shapes: the canonical `.claude/commands/*.md` (any depth) AND
@@ -1142,6 +1195,22 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   synthetic kwarg. `langchain_hosted_tools.go` classifies the `PythonREPLTool` /
   `PythonAstREPLTool` / `ShellTool` / `Requests*` built-ins in an agent's tool list
   as `HostedToolDef`s (SDK `langchain`).
+- **DiscoverDeepAgents** (`deepagents_agents.go`) — Python Deep Agents. One
+  `create_deep_agent(...)` call bound to the `deepagents` package by import
+  (`from deepagents import create_deep_agent [as X]`, `deepagents.create_deep_agent`)
+  → `AgentDef` SDK `langchain`, Class `DeepAgent`. The Class is separate from
+  `ReactAgent` / `CreateAgent` so the `langchain_agent` rules do not match it; rules
+  target it with `applies_to: langchain_deep_agent`. Two in-memory facts are stamped
+  for LC-118: `DeepShellBackend` (`backend=` resolves in the same file to a host
+  shell: `LocalShellBackend(...)`, a variable bound once and unconditionally to it, a
+  `CompositeBackend` whose default is one — a LocalShellBackend only inside `routes`
+  does not expose `execute` — or a same-file subclass that does not override
+  `execute` / `aexecute`) and `DeepExecuteGate` (what a literal `interrupt_on` dict
+  says about `"execute"`; `unjudged` when middleware, a harness profile, a splat or a
+  non-literal value could change it). Factories, lambdas, other-module backends and
+  subagent `interrupt_on` overrides are not resolved. `async_create_deep_agent` is not
+  matched (the library does not define it). `PredAgentDeepAgentShellExecuteUngated`
+  reads the two facts.
 - **DiscoverLangGraphGraphs** (`langgraph_graph.go`) — Python raw LangGraph
   graphs. The imperative `StateGraph(...)` → `.add_node` / `.add_edge` →
   `.compile()` builder is emergent across many call sites, so the single-call
@@ -2200,7 +2269,7 @@ Discipline rules:
   is legacy/uninitialized and the human renderer collapses such records to
   `file:N` form. Rule detectors that emit a `Finding` MUST propagate the
   entity's `Line` to `Finding.Line` so jump-to-source works from a finding —
-  this is currently done for all five scopes (tool, agent, subagent, skill, repo).
+  this is currently done for all six scopes (tool, agent, subagent, skill, slash_command, repo).
 - **No source-text storage.** The inventory is a structured *index of
   locations*; consumers fetch source by reading the file at
   `(FilePath, Line, EndLine)`. `RawSource` is deliberately **not** included
@@ -2944,9 +3013,10 @@ writing any SDK code.
 
 **matchConditionForScope** dispatches "When this applies" text by scope: tool →
 "When defining a tool.", agent → "When declaring an agent.", repo → "For any
-repo using this SDK.", subagent → "When declaring a subagent.", skill →
+repo using this SDK.", subagent → "When declaring a subagent.", slash_command → "When declaring a
+slash command.", skill →
 delegates to the existing `matchCondition` predicate switch. This keeps the
-generated prose accurate for all five scopes without enumerating 15+ predicates.
+generated prose accurate for all six scopes without enumerating 15+ predicates.
 
 **Output.** A valid `SKILL.md` (`allowed-tools: Read`,
 `disable-model-invocation: false`) intended to be dropped into
