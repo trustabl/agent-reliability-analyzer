@@ -229,6 +229,15 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoAgentServerExposedWithoutKey != nil && (len(inv.ProjectConfig.AgentServerNoKey) > 0) != *e.RepoAgentServerExposedWithoutKey {
 		return false
 	}
+	if e.RepoSettingsAllowUnscopedGrant != nil && (len(inv.ProjectConfig.UnscopedAllow) > 0) != *e.RepoSettingsAllowUnscopedGrant {
+		return false
+	}
+	if e.RepoClaudeSettingsLocalCommitted != nil && (len(inv.ProjectConfig.LocalSettingsCommitted) > 0) != *e.RepoClaudeSettingsLocalCommitted {
+		return false
+	}
+	if e.RepoMCPConfigLaunchesDeprecatedPackage != nil && (len(inv.ProjectConfig.DeprecatedMCPLaunch) > 0) != *e.RepoMCPConfigLaunchesDeprecatedPackage {
+		return false
+	}
 	if e.RepoMCPServerBindsAllInterfacesUnprotected != nil && (len(inv.MCPServerBinds) > 0) != *e.RepoMCPServerBindsAllInterfacesUnprotected {
 		return false
 	}
@@ -390,6 +399,18 @@ func (e MatchExpr) EvaluateSkill(s models.SkillDef, inv models.RepoInventory) bo
 		return false
 	}
 	if e.SkillBundledScriptReadsSecrets != nil && PredSkillBundledScriptReadsSecrets(s) != *e.SkillBundledScriptReadsSecrets {
+		return false
+	}
+	if e.SkillBundledScriptDecodesAndExecutes != nil && PredSkillBundledScriptDecodesAndExecutes(s) != *e.SkillBundledScriptDecodesAndExecutes {
+		return false
+	}
+	if e.SkillBundledScriptDestructiveCommand != nil && PredSkillBundledScriptDestructiveCommand(s) != *e.SkillBundledScriptDestructiveCommand {
+		return false
+	}
+	if e.SkillBundledFileIsOpaque != nil && PredSkillBundledFileIsOpaque(s) != *e.SkillBundledFileIsOpaque {
+		return false
+	}
+	if e.SkillUnpinnedInstall != nil && PredSkillUnpinnedInstall(s) != *e.SkillUnpinnedInstall {
 		return false
 	}
 	if e.SkillBundledFileHasHardcodedSecret != nil && PredSkillBundledFileHasHardcodedSecret(s) != *e.SkillBundledFileHasHardcodedSecret {
@@ -640,6 +661,10 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"skill_bundled_script_network_egress":           true,
 		"skill_bundled_script_reads_secrets":            true,
 		"skill_bundled_file_has_hardcoded_secret":       true,
+		"skill_bundled_script_decodes_and_executes":     true,
+		"skill_bundled_script_destructive_command":      true,
+		"skill_bundled_file_is_opaque":                  true,
+		"skill_unpinned_install":                        true,
 		"skill_description_tool_mismatch":               true,
 		"skill_has_description":                         true,
 		"skill_is_agent_specific":                       true,
@@ -706,6 +731,9 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_script_runs_agent_cli_with_bypass_flag":      true,
 		"repo_agent_server_allows_any_origin":              true,
 		"repo_agent_server_exposed_without_key":            true,
+		"repo_settings_allow_unscoped_grant":               true,
+		"repo_claude_settings_local_committed":             true,
+		"repo_mcp_config_launches_deprecated_package":      true,
 		"repo_mcp_server_binds_all_interfaces_unprotected": true,
 	},
 }
@@ -782,6 +810,10 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.SkillBundledScriptNetworkEgress != nil, "skill_bundled_script_network_egress")
 	add(e.SkillBundledScriptReadsSecrets != nil, "skill_bundled_script_reads_secrets")
 	add(e.SkillBundledFileHasHardcodedSecret != nil, "skill_bundled_file_has_hardcoded_secret")
+	add(e.SkillBundledScriptDecodesAndExecutes != nil, "skill_bundled_script_decodes_and_executes")
+	add(e.SkillBundledScriptDestructiveCommand != nil, "skill_bundled_script_destructive_command")
+	add(e.SkillBundledFileIsOpaque != nil, "skill_bundled_file_is_opaque")
+	add(e.SkillUnpinnedInstall != nil, "skill_unpinned_install")
 	add(e.SkillDescriptionToolMismatch != nil, "skill_description_tool_mismatch")
 	add(e.SkillHasDescription != nil, "skill_has_description")
 	add(e.SkillIsAgentSpecific != nil, "skill_is_agent_specific")
@@ -827,6 +859,9 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoScriptRunsAgentCliWithBypassFlag != nil, "repo_script_runs_agent_cli_with_bypass_flag")
 	add(e.RepoAgentServerAllowsAnyOrigin != nil, "repo_agent_server_allows_any_origin")
 	add(e.RepoAgentServerExposedWithoutKey != nil, "repo_agent_server_exposed_without_key")
+	add(e.RepoSettingsAllowUnscopedGrant != nil, "repo_settings_allow_unscoped_grant")
+	add(e.RepoClaudeSettingsLocalCommitted != nil, "repo_claude_settings_local_committed")
+	add(e.RepoMCPConfigLaunchesDeprecatedPackage != nil, "repo_mcp_config_launches_deprecated_package")
 	add(e.RepoMCPServerBindsAllInterfacesUnprotected != nil, "repo_mcp_server_binds_all_interfaces_unprotected")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")

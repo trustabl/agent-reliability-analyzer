@@ -6,11 +6,33 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 46 (`rules.SupportedSchemaVersion`; 42 to 45 are merged from main, 46 is provisional). The rules fixture
-goes from 389 to 400 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003 and MCP-036/037/203). `ScanID` changes, as with every
+Rule schema 41 → 47 (`rules.SupportedSchemaVersion`; 42 to 46 are merged from main, 47 is provisional). The rules fixture
+goes from 389 to 407 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203 and the static batch 1 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
+
+### Added
+
+- **Static batch 1: config and skill files (rule schema 46 → 47, provisional; +7 rules, seven predicates).**
+  Repo scope: **AGCFG-017** (high, 0.6, `agent_config/unscoped_allow.yaml`, predicate
+  `repo_settings_allow_unscoped_grant`) flags a committed allow entry that is a `python`, `python3`,
+  `node`, `bash`, `sh`, `curl` or `wget` prefix with a trailing wildcard, a bare `WebFetch`, a bare `Edit`
+  or `Write`, or a whole-server `mcp__` entry; **AGCFG-018** (low, 0.5, `agent_config/settings_local_committed.yaml`,
+  `repo_claude_settings_local_committed`) flags a `.claude/settings.local.json` that no `.gitignore` in the tree
+  ignores; **MCPCFG-006** (high, 0.7, appended to `agent_config/mcp_client_config.yaml`,
+  `repo_mcp_config_launches_deprecated_package`) flags an MCP client config that launches a package the
+  `modelcontextprotocol/servers` README lists as archived. Skill scope: **CSKILL-088** (high, 0.7,
+  `skill_bundled_script_decodes_and_executes`), **CSKILL-089** (high, 0.6, `skill_bundled_script_destructive_command`),
+  **CSKILL-090** (medium, 0.6, `skill_bundled_file_is_opaque`) in `claude_skill/skill_bundled_content.yaml`, and
+  **CSKILL-091** (medium, 0.5, `skill_unpinned_install`) in `claude_skill/skill_unpinned_install.yaml`. New
+  `BundledFile` fields `DecodesAndExecutes`, `DestructiveCommand`, `UnpinnedInstall`, `Opaque` and
+  `SkillDef.BodyUnpinnedInstall`; `ProjectConfigFacts.UnscopedAllow`, `LocalSettingsCommitted` and
+  `DeprecatedMCPLaunch`. Files under test paths are not judged by the skill facts. Not built from the batch plan:
+  CSDK-113 (current Claude Code documentation says a subagent's `bypassPermissions` takes effect when the
+  main conversation already runs in that mode and is ignored otherwise), AGCFG-011 (`.claude/**` and `.mcp.json` are protected paths that
+  allow rules do not pre-approve) and AGCFG-015 (its approval-policy half is AGCFG-006). Engines
+  without schema 47 skip these rules with META-005.
 
 ### Fixed
 

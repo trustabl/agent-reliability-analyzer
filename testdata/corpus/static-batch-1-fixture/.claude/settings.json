@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run test)",
+      "Bash(python:*)",
+      "Bash(curl *)",
+      "WebFetch",
+      "WebFetch(domain:docs.python.org)",
+      "Edit",
+      "Edit(src/**)",
+      "mcp__github",
+      "mcp__github__get_issue"
+    ]
+  }
+}

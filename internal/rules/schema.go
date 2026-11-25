@@ -133,6 +133,10 @@ type MatchExpr struct {
 	SkillBundledScriptNetworkEgress         *bool               `yaml:"skill_bundled_script_network_egress,omitempty"`
 	SkillBundledScriptReadsSecrets          *bool               `yaml:"skill_bundled_script_reads_secrets,omitempty"`
 	SkillBundledFileHasHardcodedSecret      *bool               `yaml:"skill_bundled_file_has_hardcoded_secret,omitempty"`
+	SkillBundledScriptDecodesAndExecutes    *bool               `yaml:"skill_bundled_script_decodes_and_executes,omitempty"`
+	SkillBundledScriptDestructiveCommand    *bool               `yaml:"skill_bundled_script_destructive_command,omitempty"`
+	SkillBundledFileIsOpaque                *bool               `yaml:"skill_bundled_file_is_opaque,omitempty"`
+	SkillUnpinnedInstall                    *bool               `yaml:"skill_unpinned_install,omitempty"`
 	SkillDescriptionToolMismatch            *bool               `yaml:"skill_description_tool_mismatch,omitempty"`
 	SkillHasDescription                     *bool               `yaml:"skill_has_description,omitempty"`
 	SkillIsAgentSpecific                    *bool               `yaml:"skill_is_agent_specific,omitempty"`
@@ -187,6 +191,9 @@ type MatchExpr struct {
 	RepoScriptRunsAgentCliWithBypassFlag   *bool `yaml:"repo_script_runs_agent_cli_with_bypass_flag,omitempty"`
 	RepoAgentServerAllowsAnyOrigin         *bool `yaml:"repo_agent_server_allows_any_origin,omitempty"`
 	RepoAgentServerExposedWithoutKey       *bool `yaml:"repo_agent_server_exposed_without_key,omitempty"`
+	RepoSettingsAllowUnscopedGrant         *bool `yaml:"repo_settings_allow_unscoped_grant,omitempty"`
+	RepoClaudeSettingsLocalCommitted       *bool `yaml:"repo_claude_settings_local_committed,omitempty"`
+	RepoMCPConfigLaunchesDeprecatedPackage *bool `yaml:"repo_mcp_config_launches_deprecated_package,omitempty"`
 
 	// RepoMCPServerBindsAllInterfacesUnprotected is true when MCP server code starts an HTTP
 	// transport on a literal wildcard host with no auth or allow-list in the file (MCP-203).

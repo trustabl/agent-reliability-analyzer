@@ -153,3 +153,37 @@ rules:
     fix: >
       Serve the MCP endpoint over https:// and use that URL in the config. For a server on
       the developer's own machine, use localhost or 127.0.0.1.
+
+  - id: MCPCFG-006
+    title: Project MCP config launches an archived reference server
+    severity: high
+    confidence: 0.7
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_mcp_config_launches_deprecated_package: true
+    explanation: >
+      An MCP client config entry starts a server with npx, bunx, pnpm dlx, uvx,
+      uv tool run or pipx run on a package that the modelcontextprotocol/servers
+      README lists under "Archived": the AWS KB Retrieval, Brave Search, EverArt,
+      GitHub, GitLab, Google Drive, Google Maps, PostgreSQL, Puppeteer, Redis,
+      Sentry, Slack and SQLite reference servers. The archived repository's own
+      README says it is archived and no longer maintained, and that "NO SECURITY
+      GUARANTEES ARE PROVIDED FOR THESE ARCHIVED SERVERS": no security updates or
+      bug fixes will be provided. A config that launches one runs code that
+      receives no fixes, whatever version it names, with the tools and
+      credentials the entry gives it.
+      Limits of this check: it reads MCP client config files in the repo and the
+      launcher forms named above. The package list is fixed and was read from
+      the README on 2026-11-25; a package archived later is not in it. The Git
+      reference server is not listed because the README does not list it as
+      archived. A server started from a container image, from a path inside the
+      repo, from a git or URL spec, or over a remote url is not judged. Whether
+      the package is still downloadable from the registry is not checked, and
+      MCPCFG-004 judges the GitHub package's credential scope separately.
+    fix: >
+      Replace the server with the maintained one for the same service, where the
+      README names one (for Brave Search, the official @brave/brave-search-mcp-server
+      package), or remove the entry. Pin the replacement to an exact version, and
+      give it the narrowest credential its own documentation offers.

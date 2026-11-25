@@ -597,6 +597,35 @@ rules:
 #       ~/.aws, ~/.ssh, id_rsa, *_key, ...). Credential theft hidden outside the
 #       SKILL.md body. Bool predicate.
 #
+#   skill_bundled_script_decodes_and_executes: true | false
+#       A bundled script (Kind script, outside test paths, comments removed) pipes
+#       base64 -d / --decode to a shell or interpreter, evals or sources a command
+#       substitution over base64 -d, or calls eval/exec/new Function on a decoder
+#       result (b64decode, b32decode, b85decode, a85decode, decodebytes, decompress,
+#       fromhex, unhexlify, atob, codecs.decode, Buffer.from(..., 'base64'))
+#       (BundledFile.DecodesAndExecutes). CSKILL-088.
+#   skill_bundled_script_destructive_command: true | false
+#       A bundled script (outside test paths, comments removed) runs rm with a recursive
+#       flag whose target is exactly /, /*, ~, ~/, ~/*, $HOME or ${HOME}, mkfs, dd with
+#       of= a block device, shred on a block device, or the fork-bomb form.
+#       A relative or nested rm target is not judged (BundledFile.DestructiveCommand).
+#       CSKILL-089.
+#   skill_bundled_file_is_opaque: true | false
+#       A file in the skill directory (outside test paths) is an archive (zip, tar, gz,
+#       bz2, xz, 7z, rar, whl; document containers such as .docx are skipped), a native
+#       binary (ELF, Mach-O, PE, .so, .dll, .dylib, .exe, .class, .jar, .node, .o, .a),
+#       WebAssembly, or Python bytecode, by extension or by magic number
+#       (BundledFile.Opaque). CSKILL-090.
+#   skill_unpinned_install: true | false
+#       A shell code block of the SKILL.md body, or a bundled script (outside test paths,
+#       comments removed), runs pip/uv pip/pipx/npm/yarn/pnpm/bun install on a registry
+#       package with no exact version, npx/bunx/pnpm dlx/uvx/uv tool run/pipx run on one,
+#       go install ...@latest, or pipes curl or wget to a shell. In a script, a line counts when
+#       it starts with the command or passes it to a process API (os.system, subprocess, exec);
+#       a message, log line, assertion or list item that names an install is not judged. Prose
+#       outside a code block is not read (SkillDef.BodyUnpinnedInstall, BundledFile.UnpinnedInstall). Shares
+#       npmSpecPinned and pySpecPinned with MCPCFG-003. CSKILL-091.
+#
 #   skill_bundled_file_has_hardcoded_secret: true
 #       Fires when any non-binary bundled file contains a hardcoded secret
 #       literal — a distinctive provider token (AWS AKIA, GitHub ghp_/
@@ -961,6 +990,22 @@ rules:
 #       env_file, or a docker run line with --env-file, is not judged; a host address or
 #       --host value that is a $ variable, or a host name, is not judged. Each compose file
 #       is judged on its own (ProjectConfigFacts.AgentServerNoKey). AGSRV-002.
+#   repo_settings_allow_unscoped_grant: true | false
+#       A permissions.allow entry of .claude/settings.json or settings.local.json is a
+#       python, python3, node, bash, sh, curl or wget Bash prefix with a trailing
+#       wildcard ("python:*" or "python *"), a bare WebFetch or WebFetch(*), a bare Edit or
+#       Write or their (*) form, or a whole-server mcp__server or mcp__server__* entry. A
+#       deny or ask rule of the same shape in the same .claude/ folder cancels it
+#       (ProjectConfigFacts.UnscopedAllow). The entry is named in the Reason. AGCFG-017.
+#   repo_claude_settings_local_committed: true | false
+#       A .claude/settings.local.json is in the scanned tree and no .gitignore from the
+#       scan root down to its folder ignores it (last matching pattern wins). Global
+#       excludes and .git/info/exclude are not read
+#       (ProjectConfigFacts.LocalSettingsCommitted). AGCFG-018.
+#   repo_mcp_config_launches_deprecated_package: true | false
+#       An MCP client config entry is started by npx, bunx, pnpm dlx, uvx, uv tool run or
+#       pipx run on a package that the modelcontextprotocol/servers README lists as
+#       archived, at any version (ProjectConfigFacts.DeprecatedMCPLaunch). MCPCFG-006.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,

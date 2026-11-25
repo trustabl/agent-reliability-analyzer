@@ -1,0 +1,41 @@
+policy:
+  id: agent_config_settings_local_committed
+  name: Per-user settings file in the repository
+  category: agent_config
+  description: >
+    Repo-scoped rule for a .claude/settings.local.json that the repository's
+    .gitignore files do not ignore. The pack loads for each scan (the file it
+    reads has no SDK import), so the rule's own predicate does the gating.
+    Fires once per scan, attributed to the first such file.
+
+rules:
+  - id: AGCFG-018
+    title: Per-user Claude Code settings file is not git-ignored
+    severity: low
+    confidence: 0.5
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_claude_settings_local_committed: true
+    explanation: >
+      The scanned tree holds a .claude/settings.local.json and no .gitignore
+      from the scan root down to that folder ignores it. Claude Code's settings
+      page describes this file as the one for your own overrides in one project:
+      Claude Code keeps it out of git when it creates the file, and a file made
+      by hand needs an entry in .gitignore. The page also says Claude Code saves
+      a "Yes, and don't ask again" approval for a Bash command as an allow rule
+      in this file. A committed copy therefore publishes one person's standing
+      approvals to all who clone the repository.
+      Limits of this check: it reads the .gitignore files inside the scanned
+      tree. Whether the file is tracked in git is not known from a directory
+      scan, so a local working copy that holds an untracked file is flagged the
+      same as a tracked one. A global excludes file and .git/info/exclude are
+      outside the tree and not read. The content of the file is not judged;
+      AGCFG-016, AGCFG-012 and AGCFG-017 judge allow rules in it like any other
+      settings file.
+    fix: >
+      Remove the file from version control with git rm --cached, and add
+      .claude/settings.local.json (or **/.claude/settings.local.json) to the
+      repository's .gitignore. Move any rule the team needs into the committed
+      .claude/settings.json, with exact commands, after reviewing it.

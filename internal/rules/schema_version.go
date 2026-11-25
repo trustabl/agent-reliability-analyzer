@@ -85,4 +85,11 @@ package rules
 // Schema 46 adds the tool_description_has_hidden_text predicate (tool scope) and the
 // repo_mcp_server_binds_all_interfaces_unprotected predicate (repo scope). Provisional: this branch
 // numbers it after main's 45.
-const SupportedSchemaVersion = 46
+//
+// Schema 47 adds seven predicates: repo_settings_allow_unscoped_grant,
+// repo_claude_settings_local_committed and repo_mcp_config_launches_deprecated_package (repo
+// scope), and skill_bundled_script_decodes_and_executes,
+// skill_bundled_script_destructive_command, skill_bundled_file_is_opaque and
+// skill_unpinned_install (skill scope). A binary below 47 skips the rules that use them with
+// META-005.
+const SupportedSchemaVersion = 47

@@ -253,7 +253,10 @@ and each scope receives a different typed input:
   inventory. Catches a skill that auto-approves unrestricted `Bash`
   (CSKILL-001), runs a dynamic-context command that performs network egress
   or reads secrets before the model sees it (CSKILL-003), or is
-  model-invocable while granting side-effecting tools (CSKILL-050). Skills
+  model-invocable while granting side-effecting tools (CSKILL-050), ships a script
+  that decodes a payload and runs it (CSKILL-088), runs a destructive host command
+  (CSKILL-089), holds an archive or binary (CSKILL-090) or installs without a pinned
+  version (CSKILL-091). Skills
   are markdown, so skill rules carry no `language:`; the `claude_skill`
   pack loads whenever a `SKILL.md` is present.
 - **`slash_command`** — fires once per `.claude/commands/*.md` slash command.
@@ -1153,7 +1156,7 @@ trustabl forge --policy google_adk --lang go
 | `autogen` | AutoGen / AG2 (Python) |
 | `claude_skill` | Claude Code skills (`SKILL.md`) |
 | `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework) |
-| `agent_config` | Harness config committed to a repo that runs code or grants authority before the folder is trusted (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`) |
+| `agent_config` | Harness config committed to a repo that runs code or grants authority before the folder is trusted (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`), including interpreter and unscoped allow rules (AGCFG-017), a non-ignored `settings.local.json` (AGCFG-018) and archived MCP reference servers (MCPCFG-006) |
 | `agent_server` | Exposure of a server the repo runs for an agent: a `*` origin list on a Google ADK server (Spring `application*.properties` / `.yml`, `get_fast_api_app`, `AdkApiServer`, `adk web --allow_origins`) and an OpenHands agent server bound to a non-loopback `--host` and published in compose or `docker run` with no session API key name |
 | `ci` | Coding agents run from GitHub Actions workflows (`.github/workflows/*.yml`) on events any GitHub user can cause |
 | `openshell` | Shell-invocation tools (no rules in the current pack) |

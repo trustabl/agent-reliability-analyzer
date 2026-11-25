@@ -1353,6 +1353,56 @@ func PredSkillBundledFileHasHardcodedSecret(s models.SkillDef) bool {
 	return false
 }
 
+// PredSkillBundledScriptDecodesAndExecutes reports whether any bundled script
+// decodes a payload and runs it: base64 -d piped to a shell or interpreter, or
+// eval or exec over a decoder call. Files under test paths are not counted.
+func PredSkillBundledScriptDecodesAndExecutes(s models.SkillDef) bool {
+	for _, b := range s.BundledFiles {
+		if b.Kind == "script" && b.DecodesAndExecutes {
+			return true
+		}
+	}
+	return false
+}
+
+// PredSkillBundledScriptDestructiveCommand reports whether any bundled script
+// runs a destructive host command on a literal root or home target, a device,
+// or the fork-bomb form. Files under test paths are not counted.
+func PredSkillBundledScriptDestructiveCommand(s models.SkillDef) bool {
+	for _, b := range s.BundledFiles {
+		if b.Kind == "script" && b.DestructiveCommand {
+			return true
+		}
+	}
+	return false
+}
+
+// PredSkillBundledFileIsOpaque reports whether the skill directory ships an
+// archive, a native executable or library, WebAssembly, or Python bytecode.
+func PredSkillBundledFileIsOpaque(s models.SkillDef) bool {
+	for _, b := range s.BundledFiles {
+		if b.Opaque != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// PredSkillUnpinnedInstall reports whether the SKILL.md code blocks or any
+// bundled script installs a package with no exact version or runs a remote
+// script piped to a shell.
+func PredSkillUnpinnedInstall(s models.SkillDef) bool {
+	if s.BodyUnpinnedInstall {
+		return true
+	}
+	for _, b := range s.BundledFiles {
+		if b.Kind == "script" && b.UnpinnedInstall {
+			return true
+		}
+	}
+	return false
+}
+
 // sideEffectingSkillTools are the auto-approved tools that act with side effects
 // or exfiltrate; a read-only-sounding description that grants any of them
 // misrepresents the skill.

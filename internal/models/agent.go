@@ -251,7 +251,9 @@ type SubagentDef struct {
 // interpolation ({{...}}) — user-controlled text embedded directly in the skill
 // body. ReferencesSkills lists other skill names the body chains to.
 // BundledFiles inventories the skill's other shipped files (scripts are the
-// highest-risk bundled surface).
+// highest-risk bundled surface). BodyUnpinnedInstall flags a code block in the
+// SKILL.md body that installs a package with no exact version or pipes a remote
+// script to a shell (CSKILL-091).
 type SkillDef struct {
 	Name                   string        `json:"name"`
 	Description            string        `json:"description,omitempty"`
@@ -272,6 +274,7 @@ type SkillDef struct {
 	HasDynamicArgs         bool          `json:"has_dynamic_args,omitempty"`
 	ReferencesSkills       []string      `json:"references_skills,omitempty"`
 	BundledFiles           []BundledFile `json:"bundled_files,omitempty"`
+	BodyUnpinnedInstall    bool          `json:"body_unpinned_install,omitempty"`
 	Body                   string        `json:"-"` // raw SKILL.md body text; in-memory only, never serialized
 	Location                             // file_path = SKILL.md path
 }
@@ -297,6 +300,14 @@ type BundledFile struct {
 	HasNetworkEgress   bool   `json:"has_network_egress,omitempty"`
 	ReadsSecrets       bool   `json:"reads_secrets,omitempty"`
 	HasHardcodedSecret bool   `json:"has_hardcoded_secret,omitempty"`
+	// DecodesAndExecutes, DestructiveCommand and UnpinnedInstall are content
+	// facts set only for Kind "script" outside test paths (CSKILL-088, 089, 091).
+	// Opaque names the kind of opaque content a file holds ("archive", "native
+	// binary", "webassembly" or "bytecode") and is set for any kind (CSKILL-090).
+	DecodesAndExecutes bool   `json:"decodes_and_executes,omitempty"`
+	DestructiveCommand bool   `json:"destructive_command,omitempty"`
+	UnpinnedInstall    bool   `json:"unpinned_install,omitempty"`
+	Opaque             string `json:"opaque,omitempty"`
 }
 
 // SlashCommandDef is one parsed .claude/commands/*.md slash command. The command
@@ -452,6 +463,18 @@ type ProjectConfigFacts struct {
 	// the OpenHands agent server image, publishes its port on all host interfaces
 	// and sets no session API key name. AGSRV-002 reads this list.
 	AgentServerNoKey []ConfigHit `json:"agent_server_no_key,omitempty"`
+	// UnscopedAllow is a permissions.allow entry in .claude/settings*.json that
+	// is a python, python3, node, bash, sh, curl or wget prefix with a trailing
+	// wildcard, a bare WebFetch, a bare or (*) Edit or Write, or a whole-server
+	// mcp__ entry, not cancelled by a deny or ask rule of the same shape in the
+	// same .claude/ folder. AGCFG-017 reads this list.
+	UnscopedAllow []ConfigHit `json:"unscoped_allow,omitempty"`
+	// LocalSettingsCommitted is a .claude/settings.local.json in the scanned tree
+	// that no .gitignore in the tree ignores. AGCFG-018 reads this list.
+	LocalSettingsCommitted []ConfigHit `json:"local_settings_committed,omitempty"`
+	// DeprecatedMCPLaunch is a server started by a package runner on a package
+	// that the modelcontextprotocol/servers README lists as archived. MCPCFG-006.
+	DeprecatedMCPLaunch []ConfigHit `json:"deprecated_mcp_launch,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered
