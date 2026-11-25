@@ -74,6 +74,10 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	// AGCFG-015: committed scripts that start an agent CLI with approvals disabled.
 	f.ScriptAgentBypass = scriptAgentBypassHits(manifest)
 
+	// AGSRV-001 / AGSRV-002: agent server exposure (origins, published port).
+	f.AnyOriginServer = anyOriginServerHits(manifest)
+	f.AgentServerNoKey = agentServerNoKeyHits(manifest)
+
 	for _, c := range manifest.Components {
 		switch c.Kind {
 		case models.ComponentClaudeSettings, models.ComponentGeminiSettings:
@@ -121,6 +125,8 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.ModelEndpointOverride = sortHits(f.ModelEndpointOverride)
 	f.AllowAllBash = sortHits(f.AllowAllBash)
 	f.ScriptAgentBypass = sortHits(f.ScriptAgentBypass)
+	f.AnyOriginServer = sortHits(f.AnyOriginServer)
+	f.AgentServerNoKey = sortHits(f.AgentServerNoKey)
 	return f
 }
 

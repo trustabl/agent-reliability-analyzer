@@ -468,6 +468,14 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 		if isHuskyHookFile(lower) {
 			manifest.HuskyFiles = append(manifest.HuskyFiles, rel)
 		}
+		// AGSRV-001/002 inputs: Spring application properties and the files that can
+		// carry an adk or docker run command line.
+		if isApplicationPropertiesFile(lower) {
+			manifest.PropertiesFiles = append(manifest.PropertiesFiles, rel)
+		}
+		if isServerScriptFile(lower) {
+			manifest.ServerScriptFiles = append(manifest.ServerScriptFiles, rel)
+		}
 		// Harness config the pre-trust rules read: any ".env" file and the Codex
 		// project config. Kept narrow on purpose (pyproject.toml etc. are not).
 		if filepath.Base(lower) == ".env" || lower == ".codex/config.toml" || strings.HasSuffix(lower, "/.codex/config.toml") {
@@ -520,6 +528,8 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 	sort.Strings(manifest.WorkflowFiles)
 	sort.Strings(manifest.GuidanceFiles)
 	sort.Strings(manifest.HuskyFiles)
+	sort.Strings(manifest.PropertiesFiles)
+	sort.Strings(manifest.ServerScriptFiles)
 
 	manifest.HasClaudeSDKDependency = detectClaudeSDKDependency(src.RootPath)
 	manifest.HasOpenShellArtifact = detectOpenShellArtifact(manifest.YAMLFiles, src.RootPath)
@@ -642,6 +652,21 @@ func isWindsurfRuleFile(lower string) bool {
 func isHuskyHookFile(lower string) bool {
 	dir, _ := path.Split(lower)
 	return strings.HasSuffix(dir, "/.husky/") || dir == ".husky/"
+}
+
+// isApplicationPropertiesFile reports whether lower names a Spring application
+// properties file (application.properties, application-dev.properties, ...).
+func isApplicationPropertiesFile(lower string) bool {
+	base := path.Base(lower)
+	return strings.HasPrefix(base, "application") && strings.HasSuffix(base, ".properties")
+}
+
+// isServerScriptFile reports whether lower names a file that can carry a server
+// start command: a Dockerfile, a Makefile or a shell script.
+func isServerScriptFile(lower string) bool {
+	base := path.Base(lower)
+	return strings.HasPrefix(base, "dockerfile") || strings.HasSuffix(base, ".dockerfile") ||
+		base == "makefile" || strings.HasSuffix(base, ".sh")
 }
 
 func shouldSkipDir(name string) bool {

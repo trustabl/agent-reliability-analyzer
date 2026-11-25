@@ -6,14 +6,13 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 44 (`rules.SupportedSchemaVersion`, provisional: 42 and 43 are held by branches
-not yet on main, so a later merge may renumber). The rules fixture goes from 389 to 390 rules.
+Rule schema 43 → 44 (`rules.SupportedSchemaVersion`, provisional). The rules fixture goes from 393 to 394 rules.
 `ScanID` changes, as with every schema bump. Engines older than this release skip LC-118 and
 report a degraded scan ("rules skipped", META-005) until they are upgraded.
 
 ### Added
 
-- **Deep Agent with a host-shell backend and no approval on execute (rule schema 41 → 44,
+- **Deep Agent with a host-shell backend and no approval on execute (rule schema 43 → 44,
   provisional).** One new agent-scope predicate, `agent_deep_agent_shell_execute_ungated`, one
   new `applies_to` token, `langchain_deep_agent`, and rule **LC-118** (high, 0.6, pack file
   `langchain/deep_agent_shell.yaml`). It flags a Python `create_deep_agent(...)` call from the
@@ -37,8 +36,8 @@ report a degraded scan ("rules skipped", META-005) until they are upgraded.
 
 ## [0.1.16] - 2026-11-09
 
-Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 343 to 389 rules. `ScanID` changes, as with every schema bump, because it
+Rule schema 26 → 43 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 343 to 393 rules. `ScanID` changes, as with every schema bump, because it
 folds the engine's supported schema version. Engines older than 0.1.16 skip the
 rules that need the new predicates and report a degraded scan ("rules skipped")
 until they are upgraded. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
@@ -48,6 +47,22 @@ ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
 side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
+
+- **Agent server exposure (rule schema 42 → 43, provisional; new category `agent_server`).** Two
+  new repo-scope predicates and rules, loaded unconditionally. **AGSRV-001** (high, 0.6, pack file
+  `agent_server/any_origin.yaml`, predicate `repo_agent_server_allows_any_origin`) flags a `*` origin
+  list on a Google ADK server: the `adk.web.cors.origins` key of Spring `application*.properties` /
+  `.yml` / `.yaml`, the `allow_origins` list of a `get_fast_api_app(...)` call, the `allowOrigins`
+  option of an `AdkApiServer(...)` call, or an `--allow_origins` option of `adk web` / `adk api_server`
+  in a Dockerfile, Makefile, shell script, compose command or package.json script. **AGSRV-002**
+  (critical, 0.7, pack file `agent_server/unauthenticated_publish.yaml`, predicate
+  `repo_agent_server_exposed_without_key`) flags a Docker Compose service or `docker run` line that
+  runs `ghcr.io/openhands/agent-server`, sets the server's `--host` to a non-loopback IP literal,
+  publishes its port on all host interfaces and names neither `OH_SESSION_API_KEYS_0` nor
+  `SESSION_API_KEY` (the server binds loopback when given no `--host` and no key). New manifest lists `PropertiesFiles` and
+  `ServerScriptFiles`. Environment keys are read by name; no origin list, port or value is stored. Java
+  source (`setAllowedOrigins`) is not parsed. Not judged: a server version, Kubernetes Services,
+  `ApptainerWorkspace`.
 
 - **Permission bypass committed in the repo (rule schema 40 → 41, provisional).** Two new
   repo-scope predicates and rules. **AGCFG-015** (high, 0.6, pack file

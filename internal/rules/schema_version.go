@@ -66,7 +66,14 @@ package rules
 // Schema 41 adds the repo_settings_allow_all_bash and
 // repo_script_runs_agent_cli_with_bypass_flag predicates (repo scope).
 //
+// Schema 42 adds the repo_otel_labels_reasoning_unhashed,
+// repo_otel_labels_reasoning_labelled and repo_model_reasoning_enabled predicates
+// (repo scope), read by the reasoning-label rules OBS-013..014.
+//
+// Schema 43 adds the repo_agent_server_allows_any_origin and
+// repo_agent_server_exposed_without_key predicates (repo scope, category
+// agent_server).
+//
 // Schema 44 adds the agent_deep_agent_shell_execute_ungated predicate (agent
-// scope) and the langchain_deep_agent applies_to token. Provisional: 42 and 43
-// are held by branches not yet on main, so a later merge may renumber.
+// scope) and the langchain_deep_agent applies_to token.
 const SupportedSchemaVersion = 44

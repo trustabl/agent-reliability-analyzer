@@ -350,14 +350,28 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
-> **Deep Agent host shell without approval (2026-11-09, `schema_version` 41 -> 44, provisional; +1 rule):** **LC-118** (high, 0.6, agent
+> **Deep Agent host shell without approval (2026-11-09, `schema_version` 43 -> 44, provisional; +1 rule):** **LC-118** (high, 0.6, agent
 > scope, `langchain/deep_agent_shell.yaml`) over the new predicate `agent_deep_agent_shell_execute_ungated` and the new `applies_to` token
 > `langchain_deep_agent`. Discovery (`analysis/deepagents_agents.go`) emits one `AgentDef` (SDK `langchain`, Class `DeepAgent`) per
 > `create_deep_agent(...)` bound to `deepagents`, stamping `DeepShellBackend` and `DeepExecuteGate`. Same-file only: a factory, a lambda, a
 > backend from another module, a `HumanInTheLoopMiddleware` in `middleware=` and a subagent dict's own `interrupt_on` are not judged. No
-> Critical tier: the engine cannot link this agent to a server entrypoint. 42 and 43 are held by branches not yet on main, so 44 is
-> provisional. The fixture holds **390** rules (389 + 1; re-derive). Primary source: CVE-2026-77926; the grounding is in the rulebook doc
+> Critical tier: the engine cannot link this agent to a server entrypoint. 44 follows main's 43 and is provisional. The fixture holds **394** rules (393 + 1; re-derive). Primary source: CVE-2026-77926; the grounding is in the rulebook doc
 > `docs/Policy/langchain/deep_agent_shell.md`.
+>
+> **Reasoning labels (2026-11-05, `schema_version` 41 -> 42; +2 rules):** **OBS-013** (medium, 0.6: a hand-written
+> `trustabl.cot.*` value that could be the reasoning itself) and **OBS-014** (low, 0.6: a labelled repo sets a reasoning option and no
+> span records it), new pack file `observability/reasoning.yaml`, over `repo_otel_labels_reasoning_unhashed`,
+> `repo_otel_labels_reasoning_labelled` and `repo_model_reasoning_enabled`. `OtelLabelsSignal` gains the `reasoning` and `reasoning_config`
+> kinds and `ValueUnhashed`. OBS-014 sits one rung below OBS-008 and is deliberately not gated on `repo_observability_initialized`. The key
+> names live in `trustabl-guard/docs/trustabl-otel-attributes.md` v1.5; the vendored manifest and forge's recipe stay at profile 1.0.0 until
+> the library release that has `mark_reasoning`. Paired with `agent-reliability-rules` on the branch of the same name. The fixture holds **391** rules (389 + 2; re-derive).
+> **Agent server exposure (2026-11-09, `schema_version` 42 -> 43, provisional; +2 rules):** new unconditionally-loaded
+> category `agent_server` (pack dir `agent_server/`, prefix `AGSRV-`, outside the NNN/1NN/2NN convention; registered in
+> `models.ValidCategory`, `loader.go` repo-scope applies_to, `rule_detector.go`). **AGSRV-001** (high, 0.6, `any_origin.yaml`)
+> over `repo_agent_server_allows_any_origin` (`ProjectConfigFacts.AnyOriginServer`) and **AGSRV-002** (critical, 0.7,
+> `unauthenticated_publish.yaml`) over `repo_agent_server_exposed_without_key` (`AgentServerNoKey`; needs a non-loopback `--host`, a port published on all interfaces and no session key name). Sources: CVE-2026-107858
+> (ADK Java dev server) and the VulnCheck advisory for CVE-2026-112346 (OpenHands). Spring config files only for Java; Java source
+> is not parsed (follow-up). Key names are read, values never stored. The fixture holds **393** rules (391 + 2; re-derive). Rulebook docs: `docs/Policy/agent_server/`.
 >
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by
@@ -435,14 +449,14 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > `uv tool run` / `pipx run` / `docker run` on a package or image with no exact version (docker: an `@sha256:` digest). Git, URL,
 > local-path and `$VAR` specs are not judged; a command inside the repo stays with MCPCFG-002, so the two never judge one entry.
 > Schema 29 is held by CSDK-115 on main, so this number is provisional and a later merge may renumber. The fixture holds
-> **354** rules (353 + 1; re-derive). Rulebook doc: `docs/Policy/agent_config/mcp_client_config.md`, a separate follow-up round.
+> **354** rules (353 + 1; re-derive). Rulebook doc landed: `docs/Policy/agent_config/mcp_client_config.md` in `../trustabl-rulebook`.
 > Not judged and not built: git refs, `deno` / `podman` / `yarn dlx` / `npm exec` launchers, lockfile pins.
 > **CI workflows (2026-10-19, `schema_version` 27 → 28, provisional; +5 rules):** new unconditionally-loaded category `ci` (**CI-001..005**, repo
 > scope, `applies_to: [github_actions]`) over five `repo_ci_agent_*` predicates backed by `RepoInventory.CIWorkflows`
 > (`analysis.DiscoverCIWorkflows`). The walk reads only the repo-root `.github/workflows/*.yml|yaml` (into `ScanManifest.WorkflowFiles`, not
 > `YAMLFiles`). The IDs sit outside the SDK-prefix `NNN`/`1NN`/`2NN` convention, like AGCFG. A CI rule emits one finding per step that runs an
-> offending agent, and for CI-003 one per `actions/checkout` step in that job (not one per scan). Hits carry event, action and secret names only, never a `with` / `env` / `run` value. Rulebook docs (`docs/Policy/ci/`) are a
-> separate follow-up. Built in parallel with the otel-labels correctness batch, which merged first and took 26 → 27, so this batch takes 28. The fixture holds **352** rules (347 + 5; re-derive, do not trust this figure).
+> offending agent, and for CI-003 one per `actions/checkout` step in that job (not one per scan). Hits carry event, action and secret names only, never a `with` / `env` / `run` value. Rulebook docs landed in `../trustabl-rulebook`
+> (`docs/Policy/ci/agent_hardening.md`, `docs/Policy/ci/untrusted_triggers.md`). Built in parallel with the otel-labels correctness batch, which merged first and took 26 → 27, so this batch takes 28. The fixture holds **352** rules (347 + 5; re-derive, do not trust this figure).
 >
 > **Tool-call claims for the Claude Agent SDK (2026-10-22, `schema_version` 33 → 34; +3 rules):** **CSDK-026..028** in
 > `claude_sdk/tool_call_claims.yaml`. Claude handlers take one `args` dict, so the claim is an input-schema key: discovery fills
@@ -482,7 +496,7 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > **Limits:** one hop per edge (a helper of a helper is silent); a graph built or compiled in a factory function is not tracked; a saver
 > chosen at runtime is silent; subgraphs and the Platform exemption are inherited from LC-114; recall on real server repos is
 > **unmeasured** — the corpus has 40 run calls, none LangGraph, none server-reachable, and its findings are byte-identical before and after.
-> Rulebook rationale doc for LC-116 is a separate follow-up in `../trustabl-rulebook` (not touched here).
+> Rulebook rationale doc for LC-116 landed in `../trustabl-rulebook`: `docs/Policy/langchain/agent_safety.md`.
 >
 > **Server-entrypoint fact (2026-10-05, no schema change, stays 20; no rules, no predicates):** `RepoInventory.Entrypoints`
 > (`models.EntrypointDef`; also `ScanResult.entrypoints`) records Python FastAPI / Flask routes (`http`) and Celery / Dramatiq
@@ -591,30 +605,21 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > in both trees, both branches cut from the rules repo's main). Re-run it before
 > pushing rather than trusting this note.
 >
-> **Rulebook gate status:** two measurements exist and are **not a trend** —
-> they ran against different packs. On 2026-09-21, `check_rulebook.py`
-> reported **97 errors** against the observability-era pack, **none** naming
-> any of the 15 observability rules; it was 50 on 2026-09-17 and 32 before
-> that. Of the 65 rule IDs those errors named, **47 did not exist** at the
-> pre-rebase base (`43da0b4` in the rules repo) — they are rules that landed
-> on main without a rationale doc, and the gate runs only in the rulebook
-> repo's CI, which is exactly how rules reach production ungrounded. One of
-> the 18 older ones is a defect that work *revealed*, not caused:
-> `docs/Policy/claude_sdk/repo.md` documents `CSDK-206` and `CSDK-207`, neither
-> of which is shipped. The Claude observability rule initially took `CSDK-206`
-> (derived from the shipped packs, which do not contain it) and was renumbered
-> to **`CSDK-208`** once the collision surfaced — a reminder that the next
-> free ID must be derived from the union of the packs **and** the rulebook. On
-> 2026-09-28 the gate reported **99 errors** against the Batch 1 pack, none
-> introduced by the four new rationale docs (the count did not move across
-> them; the 5 new rules pass COVERAGE/CONSISTENCY/PLACEMENT cleanly).
-> Re-run the gate against the merged pack rather than trusting either number.
-> Clearing the backlog is a separate, not-yet-scoped cleanup.
+> **Rulebook gate status (2026-11-06):** `check_rulebook.py --strict` against
+> rules `origin/main` (`87547a4`) reports **0 errors, 0 warnings**: 389 rules
+> in the pack, 148 rationale docs, and every shipped rule has one. Besides
+> COVERAGE / CONSISTENCY / PLACEMENT the gate now checks STRUCTURE: the
+> required template sections, each rule heading (severity and confidence), and
+> the `**Rules:**` header line. The gate runs only in the rulebook repo's CI,
+> so re-run it against the merged pack rather than trusting this number. The
+> next free rule ID must be derived from the union of the packs **and** the
+> rulebook: `CSDK-206` is now shipped, and the rulebook no longer documents
+> `CSDK-207`.
 >
-> **Run the gate with the renamed repo path:**
-> `python3 tools/check_rulebook.py --rules-repo ../agent-reliability-rules` —
-> its default is still the pre-rename `../trustabl-rules` (which is also where
-> the checkout lives on some machines).
+> **Run the gate from the rulebook repo:**
+> `python3 tools/check_rulebook.py --rules-repo <path-to-rules-checkout> --strict`.
+> Its default is still `../trustabl-rules` (or `$TRUSTABL_RULES_REPO`), which
+> is where the checkout lives on most machines.
 
 The rule-authoring contract (required fields, ID conventions, per-scope
 `applies_to` values, framing discipline) lives in

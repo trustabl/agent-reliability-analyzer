@@ -1953,6 +1953,58 @@ func PredRepoOtelLabelsRunEndSuccessOnly(want bool, inv models.RepoInventory) bo
 	return (otelRunEndSuccessOnlyOffender(inv) != nil) == want
 }
 
+// otelReasoningUnhashedOffender returns the first hand-written trustabl.cot.*
+// value that could be the reasoning itself; nil when there is none.
+func otelReasoningUnhashedOffender(inv models.RepoInventory) *models.OtelLabelsSignal {
+	for _, s := range countedOtelLabels(inv, models.OtelLabelsAttrLiteral) {
+		if s.ValueUnhashed {
+			return &s
+		}
+	}
+	return nil
+}
+
+// otelReasoningConfigEvidence returns the first model option that turns on
+// reasoning; nil when there is none.
+func otelReasoningConfigEvidence(inv models.RepoInventory) *models.OtelLabelsSignal {
+	if opts := countedOtelLabels(inv, models.OtelLabelsReasoningConfig); len(opts) > 0 {
+		return &opts[0]
+	}
+	return nil
+}
+
+// PredRepoOtelLabelsReasoningUnhashed reports whether a trustabl.cot.* key is
+// written by hand with a value that could be the reasoning itself. This is the
+// reasoning labels' one privacy check, so unlike OBS-006..008 it does not credit
+// a hand-written key: it asks what the key was given. Test files never count.
+func PredRepoOtelLabelsReasoningUnhashed(want bool, inv models.RepoInventory) bool {
+	return (otelReasoningUnhashedOffender(inv) != nil) == want
+}
+
+// PredRepoOtelLabelsReasoningLabelled reports whether a model span's reasoning
+// is labelled: a mark_reasoning call, or a trustabl.cot.* key written by hand.
+// Test files never count: a label only a test writes labels no production span.
+func PredRepoOtelLabelsReasoningLabelled(want bool, inv models.RepoInventory) bool {
+	labelled := len(countedOtelLabels(inv, models.OtelLabelsReasoning)) > 0
+	if !labelled {
+		for _, s := range countedOtelLabels(inv, models.OtelLabelsAttrLiteral) {
+			if strings.HasPrefix(s.Key, "trustabl.cot.") {
+				labelled = true
+				break
+			}
+		}
+	}
+	return labelled == want
+}
+
+// PredRepoModelReasoningEnabled reports whether a model option in the source
+// turns reasoning on. It proves the option, not that a given call reasoned, and
+// it cannot see an option set outside the source or a model that reasons by
+// default. Test files never count.
+func PredRepoModelReasoningEnabled(want bool, inv models.RepoInventory) bool {
+	return (otelReasoningConfigEvidence(inv) != nil) == want
+}
+
 // PredRepoClaudeOptionsModeWithoutKwarg fires when a SINGLE discovered
 // ClaudeAgentOptions(...) construction both sets permission_mode to one of
 // e.Modes and does not set e.Kwarg. This correlates the two facts at the
