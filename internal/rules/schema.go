@@ -114,6 +114,8 @@ type MatchExpr struct {
 	AgentCheckpointerInMemory *bool `yaml:"agent_checkpointer_in_memory,omitempty"`
 	// AgentServerReachable: see PredAgentServerReachable.
 	AgentServerReachable *bool `yaml:"agent_server_reachable,omitempty"`
+	// AgentDeepAgentShellExecuteUngated: see PredAgentDeepAgentShellExecuteUngated.
+	AgentDeepAgentShellExecuteUngated *bool `yaml:"agent_deep_agent_shell_execute_ungated,omitempty"`
 
 	// Subagent-scope predicates
 	SubagentGrantsTool       []string `yaml:"subagent_grants_tool,omitempty"`
@@ -139,6 +141,11 @@ type MatchExpr struct {
 	SkillNameHasText                        []string            `yaml:"skill_name_has_text,omitempty"`
 	SkillDescriptionHasText                 []string            `yaml:"skill_description_has_text,omitempty"`
 	SkillTextMatches                        *SkillTextMatchExpr `yaml:"skill_text_matches,omitempty"`
+
+	// Slash-command-scope predicates
+	SlashCommandAllowsUnrestrictedShell *bool    `yaml:"slash_command_allows_unrestricted_shell,omitempty"`
+	SlashCommandModelInvocable          *bool    `yaml:"slash_command_model_invocable,omitempty"`
+	SlashCommandAllowsUnrestrictedTool  []string `yaml:"slash_command_allows_unrestricted_tool,omitempty"`
 
 	// Repo-scope predicates
 	RepoHasSDKInCode                        []string                    `yaml:"repo_has_sdk_in_code,omitempty"`
@@ -178,6 +185,8 @@ type MatchExpr struct {
 	RepoSettingsEnvRedirectsModelEndpoint  *bool `yaml:"repo_settings_env_redirects_model_endpoint,omitempty"`
 	RepoSettingsAllowAllBash               *bool `yaml:"repo_settings_allow_all_bash,omitempty"`
 	RepoScriptRunsAgentCliWithBypassFlag   *bool `yaml:"repo_script_runs_agent_cli_with_bypass_flag,omitempty"`
+	RepoAgentServerAllowsAnyOrigin         *bool `yaml:"repo_agent_server_allows_any_origin,omitempty"`
+	RepoAgentServerExposedWithoutKey       *bool `yaml:"repo_agent_server_exposed_without_key,omitempty"`
 
 	// RepoMCPServerBindsAllInterfacesUnprotected is true when MCP server code starts an HTTP
 	// transport on a literal wildcard host with no auth or allow-list in the file (MCP-203).
@@ -206,6 +215,11 @@ type MatchExpr struct {
 	RepoOtelLabelsToolSpanFailureUnsafe *bool `yaml:"repo_otel_labels_tool_span_failure_unsafe,omitempty"`
 	RepoOtelLabelsAttemptConstant       *bool `yaml:"repo_otel_labels_attempt_constant,omitempty"`
 	RepoOtelLabelsRunEndSuccessOnly     *bool `yaml:"repo_otel_labels_run_end_success_only,omitempty"`
+
+	// Reasoning-label predicates (OBS-013..014). Test-file signals never count.
+	RepoOtelLabelsReasoningUnhashed *bool `yaml:"repo_otel_labels_reasoning_unhashed,omitempty"`
+	RepoOtelLabelsReasoningLabelled *bool `yaml:"repo_otel_labels_reasoning_labelled,omitempty"`
+	RepoModelReasoningEnabled       *bool `yaml:"repo_model_reasoning_enabled,omitempty"`
 
 	// RepoLangGraphPlatformConfigPresent is ALSO valid at agent scope (dual-scope,
 	// like repo_has_observability): a langgraph.json means LangGraph Platform

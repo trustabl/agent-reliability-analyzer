@@ -85,6 +85,16 @@ type SkillDetector interface {
 	Detect(models.SkillDef, models.RepoInventory) []models.Finding
 }
 
+// SlashCommandDetector fires against one SlashCommandDef at a time. Slash
+// commands are .claude/commands/*.md frontmatter declarations — no function AST —
+// so Detect takes no ParsedFile (like SkillDetector).
+type SlashCommandDetector interface {
+	RuleID() string
+	Category() models.DetectorCategory
+	Applies(models.SlashCommandDef) bool
+	Detect(models.SlashCommandDef, models.RepoInventory) []models.Finding
+}
+
 // Registry is the set of detectors active for a scan.
 type Registry struct {
 	tool     []ToolDetector
@@ -92,11 +102,21 @@ type Registry struct {
 	repo     []RepoDetector
 	subagent []SubagentDetector
 	skill    []SkillDetector
+
+	slashCommand []SlashCommandDetector
 }
 
 // New returns a Registry holding the given detectors.
 func New(tool []ToolDetector, agent []AgentDetector, repo []RepoDetector, subagent []SubagentDetector, skill []SkillDetector) *Registry {
 	return &Registry{tool: tool, agent: agent, repo: repo, subagent: subagent, skill: skill}
+}
+
+// WithSlashCommand returns the registry with the given slash-command detectors
+// attached. It is a method, not a New parameter, so the constructor signature
+// the other scopes share stays unchanged.
+func (r *Registry) WithSlashCommand(d []SlashCommandDetector) *Registry {
+	r.slashCommand = d
+	return r
 }
 
 // Run executes every applicable detector across tools, agents, and repo,
@@ -152,6 +172,17 @@ func (r *Registry) Run(profile models.RepoProfile, inv models.RepoInventory, par
 				continue
 			}
 			out = append(out, safeDetect(d.RuleID(), d.Category(), func() []models.Finding { return d.Detect(s, inv) })...)
+		}
+	}
+	for _, c := range inv.SlashCommands {
+		if onEntity != nil {
+			onEntity("slash command: " + c.Name)
+		}
+		for _, d := range r.slashCommand {
+			if !d.Applies(c) {
+				continue
+			}
+			out = append(out, safeDetect(d.RuleID(), d.Category(), func() []models.Finding { return d.Detect(c, inv) })...)
 		}
 	}
 	for _, d := range r.repo {
@@ -248,6 +279,14 @@ func (r *Registry) ApplicableCategories(profile models.RepoProfile, inv models.R
 			}
 		}
 	}
+	for _, d := range r.slashCommand {
+		for _, c := range inv.SlashCommands {
+			if d.Applies(c) {
+				out[d.Category()] = true
+				break
+			}
+		}
+	}
 	return out
 }
 
@@ -283,12 +322,17 @@ func (r *Registry) Subset(cats ...models.DetectorCategory) *Registry {
 			sub.skill = append(sub.skill, d)
 		}
 	}
+	for _, d := range r.slashCommand {
+		if cset[d.Category()] {
+			sub.slashCommand = append(sub.slashCommand, d)
+		}
+	}
 	return &sub
 }
 
 // Count returns the total number of registered detectors.
 func (r *Registry) Count() int {
-	return len(r.tool) + len(r.agent) + len(r.repo) + len(r.subagent) + len(r.skill)
+	return len(r.tool) + len(r.agent) + len(r.repo) + len(r.subagent) + len(r.skill) + len(r.slashCommand)
 }
 
 func parsedFor(filePath string, parsed []analysis.ParsedFile) analysis.ParsedFile {

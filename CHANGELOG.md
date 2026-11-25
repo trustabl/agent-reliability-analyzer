@@ -6,10 +6,56 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+Rule schema 41 → 46 (`rules.SupportedSchemaVersion`; 42 to 45 are merged from main, 46 is provisional). The rules fixture
+goes from 389 to 400 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003 and MCP-036/037/203). `ScanID` changes, as with every
+schema bump, because it folds the engine's supported schema version. Engines without schema 46
+skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
+upgraded.
+
 ### Added
 
+
+- **Deep Agent with a host-shell backend and no approval on execute (rule schema 43 → 44,
+  provisional).** One new agent-scope predicate, `agent_deep_agent_shell_execute_ungated`, one
+  new `applies_to` token, `langchain_deep_agent`, and rule **LC-118** (high, 0.6, pack file
+  `langchain/deep_agent_shell.yaml`). It flags a Python `create_deep_agent(...)` call from the
+  `deepagents` package whose `backend=` is a `LocalShellBackend` and whose `interrupt_on` is
+  missing, `None`, `{}`, a dict with no `"execute"` key, or sets `"execute"` to `False`. The
+  backend counts as a host shell when it is `LocalShellBackend(...)` directly, a variable bound
+  once and unconditionally to it in the call's function or at module level, a `CompositeBackend`
+  whose default is one (a `LocalShellBackend` only in `routes` does not expose `execute`), or a
+  same-file subclass that overrides neither `execute` nor `aexecute`. Not judged: a backend built
+  by a factory, a lambda or another module; a `middleware=` value that is not a literal list of
+  calls or that holds a `HumanInTheLoopMiddleware(...)` call; a harness profile or
+  `excluded_tools` in the file; an `interrupt_on` that is not a literal dict; an `execute`
+  entry given as a config (treated as a gate, its `when` predicate is not read); and a subagent
+  dict that sets its own `interrupt_on`. A local developer tool is matched the same way as a
+  deployed service. There is no Critical tier: the engine cannot link a Deep Agent to a server
+  entrypoint. `async_create_deep_agent` is not matched, because the library does not define it.
+  New discovery `DiscoverDeepAgents` (`internal/analysis/deepagents_agents.go`) emits one
+  `AgentDef` (SDK `langchain`, Class `DeepAgent`) per call bound to `deepagents` by import; the
+  new Class keeps the `langchain_agent` rules from matching it. Backed by the in-memory
+  `AgentDef.DeepShellBackend` and `AgentDef.DeepExecuteGate`. Primary source: CVE-2026-77926.
+
+- **Slash command rules (rule schema 44 → 45, provisional).** New `slash_command` scope
+  (`applies_to: [claude_slash_command]`) over the existing `.claude/commands/*.md` discovery,
+  three predicates (`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+  `slash_command_allows_unrestricted_tool`) and rules **CCMD-001** (high, 0.9; a bare `Bash`,
+  `Bash(*)` or `Bash(:*)` grant in `allowed-tools`), **CCMD-002** (high, 0.8; a command the
+  model can start that pre-approves `Write`, `Edit`, `MultiEdit` or `NotebookEdit` with no
+  restricting pattern) and **CCMD-003** (medium, 0.7; `WebSearch` or a `WebFetch` with no
+  domain pattern), pack file `claude_skill/slash_command_safety.yaml`. Claude Code treats a
+  command file as a skill, so the predicates share their grant logic with the skill predicates;
+  a scoped grant such as `Bash(git status *)`, `Edit(docs/**)` or
+  `WebFetch(domain:example.com)` is silent. `disable-model-invocation` is read leniently
+  (`true`, `yes`, `on`, `y`, `1`, quoted or not), so a quoted value no longer drops a command's
+  whole frontmatter. The rules first shipped in rules #138 and were reverted in #139 with the
+  rest of that bulk reconcile. Command findings are not a scored surface, so no score changes;
+  a command under a test path is tagged test-origin like any finding. Not read: command bodies,
+  `~/.claude/commands`, MCP fetch tools.
+
 - **MCP tool descriptions with hidden characters, and MCP servers bound to all interfaces (rule
-  schema 41 → 46, provisional; +3 rules, 392 in the fixture).** Two new predicates, one tool
+  schema 45 → 46, provisional; +3 rules, 400 in the fixture).** Two new predicates, one tool
   scope and one repo scope. **MCP-036** (Python) and **MCP-037** (TypeScript) (medium, 0.5, pack
   file `mcp/tool_description_hidden_text.yaml`, predicate `tool_description_has_hidden_text`) flag
   an MCP tool description that holds a zero-width character, a Unicode Tags-block character or a
@@ -32,8 +78,8 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [0.1.16] - 2026-11-09
 
-Rule schema 26 → 41 (`rules.SupportedSchemaVersion`). The rules fixture goes
-from 343 to 389 rules. `ScanID` changes, as with every schema bump, because it
+Rule schema 26 → 43 (`rules.SupportedSchemaVersion`). The rules fixture goes
+from 343 to 393 rules. `ScanID` changes, as with every schema bump, because it
 folds the engine's supported schema version. Engines older than 0.1.16 skip the
 rules that need the new predicates and report a degraded scan ("rules skipped")
 until they are upgraded. OAI-034 / MCP-033 / LC-028 / CREW-016 / PYD-016 /
@@ -43,6 +89,22 @@ ADK or AutoGen tool that takes no `claim` argument, and OAI-037 on every
 side-effecting TypeScript OpenAI Agents tool. They never fail `--strict`, and they lower the score only slightly.
 
 ### Added
+
+- **Agent server exposure (rule schema 42 → 43, provisional; new category `agent_server`).** Two
+  new repo-scope predicates and rules, loaded unconditionally. **AGSRV-001** (high, 0.6, pack file
+  `agent_server/any_origin.yaml`, predicate `repo_agent_server_allows_any_origin`) flags a `*` origin
+  list on a Google ADK server: the `adk.web.cors.origins` key of Spring `application*.properties` /
+  `.yml` / `.yaml`, the `allow_origins` list of a `get_fast_api_app(...)` call, the `allowOrigins`
+  option of an `AdkApiServer(...)` call, or an `--allow_origins` option of `adk web` / `adk api_server`
+  in a Dockerfile, Makefile, shell script, compose command or package.json script. **AGSRV-002**
+  (critical, 0.7, pack file `agent_server/unauthenticated_publish.yaml`, predicate
+  `repo_agent_server_exposed_without_key`) flags a Docker Compose service or `docker run` line that
+  runs `ghcr.io/openhands/agent-server`, sets the server's `--host` to a non-loopback IP literal,
+  publishes its port on all host interfaces and names neither `OH_SESSION_API_KEYS_0` nor
+  `SESSION_API_KEY` (the server binds loopback when given no `--host` and no key). New manifest lists `PropertiesFiles` and
+  `ServerScriptFiles`. Environment keys are read by name; no origin list, port or value is stored. Java
+  source (`setAllowedOrigins`) is not parsed. Not judged: a server version, Kubernetes Services,
+  `ApptainerWorkspace`.
 
 - **Permission bypass committed in the repo (rule schema 40 → 41, provisional).** Two new
   repo-scope predicates and rules. **AGCFG-015** (high, 0.6, pack file

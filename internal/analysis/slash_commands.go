@@ -17,7 +17,33 @@ type slashCommandFrontmatter struct {
 	AllowedTools           stringOrList `yaml:"allowed-tools"`
 	Model                  string       `yaml:"model"`
 	ArgumentHint           string       `yaml:"argument-hint"`
-	DisableModelInvocation bool         `yaml:"disable-model-invocation"`
+	DisableModelInvocation lenientBool  `yaml:"disable-model-invocation"`
+}
+
+// lenientBool unmarshals a YAML scalar that reads as true into true and any
+// other scalar into false, instead of failing. A strict bool field makes
+// yaml.v3 reject a quoted "true" or the number 1, and the caller then drops the
+// whole frontmatter, so a command's allowed-tools would be lost along with it.
+// Spellings read as true: true, yes, on, y and 1 in any letter case, quoted or
+// not. This is a reading of intent, not a statement of how Claude Code parses
+// the key: neither its docs nor its source were found to say what a string
+// value does. Reading a string as true suppresses a finding that depends on the
+// command being model-invocable (CCMD-002), the same direction an unquoted
+// `yes` already takes.
+type lenientBool bool
+
+func (b *lenientBool) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		*b = false
+		return nil
+	}
+	switch strings.ToLower(strings.TrimSpace(value.Value)) {
+	case "true", "yes", "on", "y", "1":
+		*b = true
+	default:
+		*b = false
+	}
+	return nil
 }
 
 // DiscoverSlashCommands parses every ComponentSlashCommand (.claude/commands/*.md)
@@ -48,7 +74,7 @@ func DiscoverSlashCommands(manifest models.ScanManifest) []models.SlashCommandDe
 				def.ToolGrants = parseToolGrants(tokens)
 				def.Model = parsed.Model
 				def.ArgumentHint = parsed.ArgumentHint
-				def.DisableModelInvocation = parsed.DisableModelInvocation
+				def.DisableModelInvocation = bool(parsed.DisableModelInvocation)
 				def.Line = startLine
 				def.EndLine = endLine
 			}

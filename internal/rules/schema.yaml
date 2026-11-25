@@ -85,7 +85,7 @@ rules:
                                             # for that kind. Cross-SDK rules belong in their own
                                             # SDK-specific policy file with their own framing.
 
-    scope: tool                             # REQUIRED. One of: tool | agent | subagent | skill | repo.
+    scope: tool                             # REQUIRED. One of: tool | agent | subagent | skill | slash_command | repo.
                                             #   tool  — fires per ToolDef. Input: a ToolDef + ParsedFile.
                                             #           applies_to accepts: claude_sdk_tool, openai_tool,
                                             #           mcp_tool, adk_function_tool, shell_invocation, unknown,
@@ -98,7 +98,8 @@ rules:
                                             #           adk_llm_agent, adk_sequential_agent, adk_parallel_agent,
                                             #           adk_loop_agent, adk_langgraph_agent,
                                             #           langchain_agent, langchain_agent_executor,
-                                            #           langchain_state_graph, crewai_agent, pydantic_ai_agent,
+                                            #           langchain_state_graph, langchain_deep_agent, crewai_agent,
+                                            #           pydantic_ai_agent,
                                             #           vercel_ai_agent, autogen_conversable_agent,
                                             #           autogen_user_proxy_agent, autogen_assistant_agent,
                                             #           autogen_group_chat_manager, autogen_code_executor_agent.
@@ -106,6 +107,9 @@ rules:
                                             #           claude_subagent.
                                             #   skill — fires per Claude Code skill (SKILL.md). applies_to accepts:
                                             #           claude_skill.
+                                            #   slash_command — fires per Claude Code slash command
+                                            #           (.claude/commands/*.md). applies_to accepts:
+                                            #           claude_slash_command.
                                             #   repo  — fires once per scan. applies_to accepts:
                                             #           claude_sdk, openai_agents, google_adk, openshell, mcp,
                                             #           langchain, crewai, pydantic_ai, vercel_ai, autogen,
@@ -463,6 +467,23 @@ rules:
 #       app`). Test paths (tests/, test_*.py, conftest.py, ...) are ignored for
 #       the agent, the run call and the entrypoint. Used by LC-116.
 #
+#   agent_deep_agent_shell_execute_ungated: true | false
+#       True for a Deep Agent (create_deep_agent from the deepagents package;
+#       applies_to langchain_deep_agent) whose backend= resolves in the same file
+#       to a host shell and whose interrupt_on does not gate the execute tool.
+#       The backend resolves to a shell for: LocalShellBackend(...) directly; a
+#       variable bound exactly once, unconditionally, to such a call; a
+#       CompositeBackend whose DEFAULT is one (a LocalShellBackend only inside
+#       routes does not expose execute); a same-file subclass that overrides
+#       neither execute nor aexecute. interrupt_on is read only as a literal dict
+#       in the call: missing, None, {}, a dict with no "execute" key, or "execute"
+#       set to False is ungated; "execute" set to True or a config is gated.
+#       Never judged (false): a middleware= value that is not a literal list of
+#       calls or that contains HumanInTheLoopMiddleware(, a harness profile or
+#       excluded_tools in the file, Agent(**config), an interrupt_on that is not a
+#       literal dict, a factory or cross-module backend, and a subagent dict that
+#       sets its own interrupt_on. Used by LC-118.
+#
 #   repo_langgraph_platform_config_present: true | false
 #       DUAL-SCOPE (valid at agent and repo scope, like repo_has_observability).
 #       True when the repo ships a langgraph.json at any depth
@@ -487,6 +508,30 @@ rules:
 #       A `tools:` key with an empty or null value counts as declared (false).
 #       Files found by the frontmatter-shape fallback are excluded. Used by
 #       CSDK-115.
+#
+#
+# ━━━ SLASH-COMMAND-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# (used only in scope: slash_command rules — Claude Code slash commands,
+# .claude/commands/*.md. Claude Code treats a command file as a skill that
+# takes the same frontmatter, so these mirror the skill predicates and share
+# their grant logic.)
+#
+#   slash_command_allows_unrestricted_shell: true
+#       Fires when allowed-tools pre-approves unrestricted shell: a bare `Bash`
+#       grant or a wildcard pattern (Bash(*) / Bash(:*)). Same logic as
+#       skill_allows_unrestricted_shell. Bool predicate; negate with `false`.
+#
+#   slash_command_model_invocable: true
+#       Fires when the model can start the command itself
+#       (disable-model-invocation is not set). Bool predicate.
+#
+#   slash_command_allows_unrestricted_tool: [Write, Edit, WebFetch, ...]
+#       Fires when allowed-tools pre-approves any of the given tool names with a
+#       genuinely unrestricted grant. Same pattern rules as
+#       skill_allows_unrestricted_tool: a scoped grant (Edit(docs/**),
+#       WebFetch(domain:example.com), Bash(git status *)) does not count; Write
+#       and NotebookEdit always count; a tool with no specifier (WebSearch)
+#       counts when listed.
 #
 #
 # ━━━ SKILL-SCOPE PREDICATES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -731,6 +776,29 @@ rules:
 #       callback or a .catch( handler, passes the literal "error", or passes a
 #       variable reason. A fixed reason in finally does not credit it. Test
 #       files never count.
+#   repo_otel_labels_reasoning_unhashed: true | false
+#       Fires when a trustabl.cot.* key is (or is not) written by hand, with
+#       set_attribute(s) / setAttribute(s), and a value that could be the
+#       reasoning itself: a runtime value that is not visibly a hash. A literal,
+#       a canonical_fp / canonicalFp call, a hand-rolled hash and a variable
+#       named for one are not reported, nor are the flag and enum keys
+#       trustabl.cot.present and trustabl.cot.mode. A key the library does not
+#       define counts, and so does the library's own constant for a key
+#       (keys.COT_TEXT_FP). Test files never count.
+#   repo_otel_labels_reasoning_labelled: true | false
+#       Fires when a model span's reasoning is (or is not) labelled: a
+#       mark_reasoning / markReasoning call, or any trustabl.cot.* key written
+#       by hand. Test files never count.
+#   repo_model_reasoning_enabled: true | false
+#       Fires when a model option in the source does (or does not) turn on
+#       reasoning: thinking, reasoning, reasoning_effort, max_thinking_tokens,
+#       thinking_config and their spellings. Values that leave it off
+#       ({"type": "disabled"}, "none", False, 0, a budget of 0) do not count.
+#       "thinking" and "reasoning" count only as an object or a config call, or
+#       reasoning=True: a variable looks the same as a field of a project's own
+#       model. Recorded only in a repo that already carries labels. Cannot see an
+#       option set outside the source, or a model that reasons by default. Test
+#       files never count.
 #   repo_raw_anthropic_tool_output_in_system: true | false
 #       Fires when a function drives the bare `anthropic` client in a manual
 #       tool-use loop (.messages.create(..., tools=...)) and passes a runtime-
@@ -867,6 +935,32 @@ rules:
 #       and workflow run steps are not read. A hit's Reason names the surface, binary
 #       and flag, never other script text (ProjectConfigFacts.ScriptAgentBypass).
 #       AGCFG-015.
+#   repo_agent_server_allows_any_origin: true | false
+#       A committed file sets the origin list of a Google ADK server to *: the
+#       adk.web.cors.origins key of Spring application*.properties / .yml / .yaml; the
+#       allow_origins list of a get_fast_api_app(...) call in a Python file that imports
+#       google.adk; the allowOrigins option of an AdkApiServer(...) call in a TS/JS file
+#       that imports @google/adk-devtools; an --allow_origins option of "adk web" or
+#       "adk api_server" in a Dockerfile, Makefile, *.sh, compose command / entrypoint or
+#       package.json script. Python and TS/JS files in test paths are skipped, and a call in a
+#       comment, docstring or string literal, or on a # comment line of a script file, is not judged. A value
+#       that is a variable reference, a narrower list, Java source and generic CORS
+#       middleware are not judged. The hit's Reason names the surface, never the list
+#       (ProjectConfigFacts.AnyOriginServer). AGSRV-001.
+#   repo_agent_server_exposed_without_key: true | false
+#       A Docker Compose service (docker-compose*.yml, compose*.yml) or a docker run line
+#       (Dockerfile, Makefile, *.sh) runs ghcr.io/openhands/agent-server (the literal, or
+#       the default inside ${VAR:-default}) and all three hold: (a) a port is published
+#       without a loopback host address (short mapping, bare container port, or long
+#       syntax with no host_ip or 0.0.0.0); (b) the server's --host (in the compose
+#       entrypoint or command, or after the image in a docker run line) is an IP literal
+#       other than a loopback address (0.0.0.0, ::, [::], another address); the server
+#       reads its bind address from --host alone, and binds loopback when it gets none
+#       and no key is configured; (c) the environment names neither OH_SESSION_API_KEYS_*
+#       nor SESSION_API_KEY. Environment keys are compared by name only. A service with an
+#       env_file, or a docker run line with --env-file, is not judged; a host address or
+#       --host value that is a $ variable, or a host name, is not judged. Each compose file
+#       is judged on its own (ProjectConfigFacts.AgentServerNoKey). AGSRV-002.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,
