@@ -141,7 +141,7 @@ func loadPolicies(fsys fs.FS, lenient bool) ([]PolicyFile, []string, error) {
 				}
 				continue
 			}
-			errs = append(errs, fmt.Errorf("%s: unknown category %q (allowed: claude_sdk, openai_sdk, openshell, google_adk, mcp, langchain, crewai, pydantic_ai, vercel_ai, autogen, claude_skill, observability, raw_llm_sdk, agent_config, ci)", name, pf.Policy.Category))
+			errs = append(errs, fmt.Errorf("%s: unknown category %q (allowed: claude_sdk, openai_sdk, openshell, google_adk, mcp, langchain, crewai, pydantic_ai, vercel_ai, autogen, claude_skill, observability, raw_llm_sdk, agent_config, ci, agent_server)", name, pf.Policy.Category))
 			continue
 		}
 
@@ -346,7 +346,7 @@ var appliesToByScope = map[models.Scope][]string{
 		"claude_query_main",
 		"adk_llm_agent", "adk_sequential_agent", "adk_parallel_agent",
 		"adk_loop_agent", "adk_langgraph_agent",
-		"langchain_agent", "langchain_agent_executor", "langchain_state_graph",
+		"langchain_agent", "langchain_agent_executor", "langchain_state_graph", "langchain_deep_agent",
 		"crewai_agent", "pydantic_ai_agent", "vercel_ai_agent",
 		"autogen_conversable_agent", "autogen_user_proxy_agent",
 		"autogen_assistant_agent", "autogen_group_chat_manager",
@@ -356,7 +356,7 @@ var appliesToByScope = map[models.Scope][]string{
 		"claude_sdk", "openai_agents", "openshell", "mcp", "google_adk",
 		"langchain",
 		"crewai", "pydantic_ai", "vercel_ai", "autogen",
-		"raw_llm_sdk", "agent_config", "github_actions",
+		"raw_llm_sdk", "agent_config", "github_actions", "agent_server",
 	},
 	models.ScopeSubagent:     {"claude_subagent"},
 	models.ScopeSkill:        {"claude_skill"},

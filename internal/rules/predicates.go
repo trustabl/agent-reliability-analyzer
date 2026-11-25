@@ -1990,6 +1990,58 @@ func PredRepoOtelLabelsRunEndSuccessOnly(want bool, inv models.RepoInventory) bo
 	return (otelRunEndSuccessOnlyOffender(inv) != nil) == want
 }
 
+// otelReasoningUnhashedOffender returns the first hand-written trustabl.cot.*
+// value that could be the reasoning itself; nil when there is none.
+func otelReasoningUnhashedOffender(inv models.RepoInventory) *models.OtelLabelsSignal {
+	for _, s := range countedOtelLabels(inv, models.OtelLabelsAttrLiteral) {
+		if s.ValueUnhashed {
+			return &s
+		}
+	}
+	return nil
+}
+
+// otelReasoningConfigEvidence returns the first model option that turns on
+// reasoning; nil when there is none.
+func otelReasoningConfigEvidence(inv models.RepoInventory) *models.OtelLabelsSignal {
+	if opts := countedOtelLabels(inv, models.OtelLabelsReasoningConfig); len(opts) > 0 {
+		return &opts[0]
+	}
+	return nil
+}
+
+// PredRepoOtelLabelsReasoningUnhashed reports whether a trustabl.cot.* key is
+// written by hand with a value that could be the reasoning itself. This is the
+// reasoning labels' one privacy check, so unlike OBS-006..008 it does not credit
+// a hand-written key: it asks what the key was given. Test files never count.
+func PredRepoOtelLabelsReasoningUnhashed(want bool, inv models.RepoInventory) bool {
+	return (otelReasoningUnhashedOffender(inv) != nil) == want
+}
+
+// PredRepoOtelLabelsReasoningLabelled reports whether a model span's reasoning
+// is labelled: a mark_reasoning call, or a trustabl.cot.* key written by hand.
+// Test files never count: a label only a test writes labels no production span.
+func PredRepoOtelLabelsReasoningLabelled(want bool, inv models.RepoInventory) bool {
+	labelled := len(countedOtelLabels(inv, models.OtelLabelsReasoning)) > 0
+	if !labelled {
+		for _, s := range countedOtelLabels(inv, models.OtelLabelsAttrLiteral) {
+			if strings.HasPrefix(s.Key, "trustabl.cot.") {
+				labelled = true
+				break
+			}
+		}
+	}
+	return labelled == want
+}
+
+// PredRepoModelReasoningEnabled reports whether a model option in the source
+// turns reasoning on. It proves the option, not that a given call reasoned, and
+// it cannot see an option set outside the source or a model that reasons by
+// default. Test files never count.
+func PredRepoModelReasoningEnabled(want bool, inv models.RepoInventory) bool {
+	return (otelReasoningConfigEvidence(inv) != nil) == want
+}
+
 // PredRepoClaudeOptionsModeWithoutKwarg fires when a SINGLE discovered
 // ClaudeAgentOptions(...) construction both sets permission_mode to one of
 // e.Modes and does not set e.Kwarg. This correlates the two facts at the
@@ -2088,6 +2140,28 @@ func PredAgentServerReachable(a models.AgentDef, inv models.RepoInventory) bool 
 		if pathclass.Classify(rc.FilePath) == models.OriginTest || pathclass.Classify(rc.ServerReachable.FilePath) == models.OriginTest {
 			continue
 		}
+		return true
+	}
+	return false
+}
+
+// PredAgentDeepAgentShellExecuteUngated is true for a Deep Agent (Class
+// "DeepAgent") whose backend= discovery resolved to a host shell
+// (AgentDef.DeepShellBackend: LocalShellBackend, directly, through a same-file
+// variable, as the default of a CompositeBackend, or a same-file subclass that
+// does not override execute) and whose interrupt_on, read as a literal dict in
+// the call, is missing, empty, has no "execute" entry, or sets it to False
+// (AgentDef.DeepExecuteGate). Every case discovery could not read is false:
+// "gated" and "unjudged" never fire. Not judged: a HumanInTheLoopMiddleware or
+// any other value in middleware=, a harness profile or excluded_tools in the
+// file, an interrupt_on that is not a literal dict, a subagent dict that sets
+// its own interrupt_on, and a backend built by a factory or in another module.
+func PredAgentDeepAgentShellExecuteUngated(a models.AgentDef) bool {
+	if a.Class != "DeepAgent" || a.DeepShellBackend == "" {
+		return false
+	}
+	switch a.DeepExecuteGate {
+	case "absent", "empty", "other_tools", "execute_false":
 		return true
 	}
 	return false

@@ -528,6 +528,25 @@ read (CI-004 reads workflow steps on untrusted triggers only). The Reason names 
 binary and the flag; no other script text is kept. Hits land in
 `ProjectConfigFacts.ScriptAgentBypass`.
 
+**Agent server exposure (category `agent_server`, `schema_version` 43).** The walk records
+`application*.properties` in `ScanManifest.PropertiesFiles` and Dockerfiles, Makefiles and `*.sh` in
+`ScanManifest.ServerScriptFiles`; compose and Spring YAML files are read from `YAMLFiles`.
+`anyOriginServerHits` (`repo_agent_server_allows_any_origin`, AGSRV-001) reads the
+`adk.web.cors.origins` key (properties and YAML), a `get_fast_api_app(...)` call's `allow_origins`
+list in a Python file that imports `google.adk`, an `AdkApiServer(...)` call's `allowOrigins` in a
+TS/JS file that imports `@google/adk-devtools` (both outside `pathclass` test paths, and only where the call starts in code: `codeMask` skips
+comments, docstrings and string literals; `#` comment lines of script files are skipped too), and an
+`--allow_origins` option of `adk web` / `adk api_server` on a command line in a script file, compose
+`command` / `entrypoint` or package.json script; only a `*` entry counts. `agentServerNoKeyHits`
+(`repo_agent_server_exposed_without_key`, AGSRV-002) reads compose services and `docker run` lines
+whose image is `ghcr.io/openhands/agent-server` (or the default inside `${VAR:-default}`) and all
+three hold: a port is published without a loopback host address; `--host` in the compose
+`entrypoint` / `command` (or after the image in a `docker run` line) is a non-loopback IP literal
+(`hostFlagNonLoopback`; a name or `${VAR}` is not judged); and no `OH_SESSION_API_KEYS_*` /
+`SESSION_API_KEY` key name is set (`env_file` makes the service unjudged). The server binds loopback
+when it is given no `--host` and no key, so a published port alone does not fire. Hits are static-text `ConfigHit`s in
+`ProjectConfigFacts.AnyOriginServer` and `.AgentServerNoKey`. Code: `internal/analysis/agent_server_exposure.go`.
+
 `repo_settings_env_redirects_model_endpoint` (AGCFG-014) reads the `env` object of each
 parsed `.claude/settings.json` and `settings.local.json`: `modelEndpointOverrideHits`
 takes the `ANTHROPIC_BASE_URL` string and passes it to `modelEndpointClass`, which parses
@@ -806,6 +825,24 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   (`otelLabelsEvidence` in `rule_detector.go`); every other repo finding keeps
   an empty location. Hand-written `trustabl.*` keys credit the `OBS-006..008`
   ladder but are not read by these four.
+
+  Three more back `OBS-013..014`, for the reasoning labels
+  (`internal/analysis/otel_labels_reasoning.go`).
+  `repo_otel_labels_reasoning_unhashed` reads a hand-written `trustabl.cot.*`
+  key, known to the library or not, whose value could be the reasoning itself
+  (`ValueUnhashed`: a runtime value that is not visibly a hash). It does not
+  credit a hand-written key the way the ladder does, because it asks what the
+  key was given, not whether it exists. `repo_otel_labels_reasoning_labelled`
+  reads a `reasoning` signal (`mark_reasoning` / `markReasoning`) or any
+  hand-written `trustabl.cot.*` key. `repo_model_reasoning_enabled` reads a
+  `reasoning_config` signal, a model option such as `thinking` or
+  `reasoning_effort`, recorded only in a repo that already carries labels so a
+  repo without them keeps its report as it was. All three drop test-file signals,
+  and findings carry the file and line. The vendored
+  `testdata/forge/otel/otel-spec-keys.json` and `otelLabelsKeys` stay at profile
+  1.0.0 until the library release that has `mark_reasoning`, because forge's
+  recipe must not name a call the published package lacks; the `trustabl.cot.`
+  prefix check does not need that table.
 
 - **DiscoverSubagents** (`subagents.go`) — **hybrid** discovery in two passes.
   Pass 1 reads every `.claude/agents/*.md` component (matched at any path depth
@@ -1156,6 +1193,22 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   synthetic kwarg. `langchain_hosted_tools.go` classifies the `PythonREPLTool` /
   `PythonAstREPLTool` / `ShellTool` / `Requests*` built-ins in an agent's tool list
   as `HostedToolDef`s (SDK `langchain`).
+- **DiscoverDeepAgents** (`deepagents_agents.go`) — Python Deep Agents. One
+  `create_deep_agent(...)` call bound to the `deepagents` package by import
+  (`from deepagents import create_deep_agent [as X]`, `deepagents.create_deep_agent`)
+  → `AgentDef` SDK `langchain`, Class `DeepAgent`. The Class is separate from
+  `ReactAgent` / `CreateAgent` so the `langchain_agent` rules do not match it; rules
+  target it with `applies_to: langchain_deep_agent`. Two in-memory facts are stamped
+  for LC-118: `DeepShellBackend` (`backend=` resolves in the same file to a host
+  shell: `LocalShellBackend(...)`, a variable bound once and unconditionally to it, a
+  `CompositeBackend` whose default is one — a LocalShellBackend only inside `routes`
+  does not expose `execute` — or a same-file subclass that does not override
+  `execute` / `aexecute`) and `DeepExecuteGate` (what a literal `interrupt_on` dict
+  says about `"execute"`; `unjudged` when middleware, a harness profile, a splat or a
+  non-literal value could change it). Factories, lambdas, other-module backends and
+  subagent `interrupt_on` overrides are not resolved. `async_create_deep_agent` is not
+  matched (the library does not define it). `PredAgentDeepAgentShellExecuteUngated`
+  reads the two facts.
 - **DiscoverLangGraphGraphs** (`langgraph_graph.go`) — Python raw LangGraph
   graphs. The imperative `StateGraph(...)` → `.add_node` / `.add_edge` →
   `.compile()` builder is emergent across many call sites, so the single-call

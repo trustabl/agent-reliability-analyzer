@@ -84,6 +84,9 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentServerReachable != nil && PredAgentServerReachable(a, inv) != *e.AgentServerReachable {
 		return false
 	}
+	if e.AgentDeepAgentShellExecuteUngated != nil && PredAgentDeepAgentShellExecuteUngated(a) != *e.AgentDeepAgentShellExecuteUngated {
+		return false
+	}
 	if e.RepoLangGraphPlatformConfigPresent != nil && PredRepoLangGraphPlatformConfigPresent(inv) != *e.RepoLangGraphPlatformConfigPresent {
 		return false
 	}
@@ -220,6 +223,12 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoScriptRunsAgentCliWithBypassFlag != nil && (len(inv.ProjectConfig.ScriptAgentBypass) > 0) != *e.RepoScriptRunsAgentCliWithBypassFlag {
 		return false
 	}
+	if e.RepoAgentServerAllowsAnyOrigin != nil && (len(inv.ProjectConfig.AnyOriginServer) > 0) != *e.RepoAgentServerAllowsAnyOrigin {
+		return false
+	}
+	if e.RepoAgentServerExposedWithoutKey != nil && (len(inv.ProjectConfig.AgentServerNoKey) > 0) != *e.RepoAgentServerExposedWithoutKey {
+		return false
+	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
 	}
@@ -254,6 +263,15 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 		return false
 	}
 	if e.RepoOtelLabelsRunEndSuccessOnly != nil && !PredRepoOtelLabelsRunEndSuccessOnly(*e.RepoOtelLabelsRunEndSuccessOnly, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsReasoningUnhashed != nil && !PredRepoOtelLabelsReasoningUnhashed(*e.RepoOtelLabelsReasoningUnhashed, inv) {
+		return false
+	}
+	if e.RepoOtelLabelsReasoningLabelled != nil && !PredRepoOtelLabelsReasoningLabelled(*e.RepoOtelLabelsReasoningLabelled, inv) {
+		return false
+	}
+	if e.RepoModelReasoningEnabled != nil && !PredRepoModelReasoningEnabled(*e.RepoModelReasoningEnabled, inv) {
 		return false
 	}
 	if len(e.RepoClaudeDefaultModeIs) > 0 && !PredRepoClaudeDefaultModeIs(e.RepoClaudeDefaultModeIs, inv) {
@@ -596,6 +614,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_kwargs_observed":                     true,
 		"agent_checkpointer_in_memory":              true,
 		"agent_server_reachable":                    true,
+		"agent_deep_agent_shell_execute_ungated":    true,
 		// Dual-scope (see EvaluateAgent): LangGraph Platform injects a checkpointer.
 		"repo_langgraph_platform_config_present": true,
 	},
@@ -651,6 +670,9 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_otel_labels_tool_span_failure_unsafe":    true,
 		"repo_otel_labels_attempt_constant":            true,
 		"repo_otel_labels_run_end_success_only":        true,
+		"repo_otel_labels_reasoning_unhashed":          true,
+		"repo_otel_labels_reasoning_labelled":          true,
+		"repo_model_reasoning_enabled":                 true,
 		"repo_langgraph_platform_config_present":       true,
 		"repo_raw_anthropic_tool_output_in_system":     true,
 		"repo_raw_openai_tool_output_in_system":        true,
@@ -676,6 +698,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_settings_env_redirects_model_endpoint":   true,
 		"repo_settings_allow_all_bash":                 true,
 		"repo_script_runs_agent_cli_with_bypass_flag":  true,
+		"repo_agent_server_allows_any_origin":          true,
+		"repo_agent_server_exposed_without_key":        true,
 	},
 }
 
@@ -734,6 +758,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentKwargsObserved != nil, "agent_kwargs_observed")
 	add(e.AgentCheckpointerInMemory != nil, "agent_checkpointer_in_memory")
 	add(e.AgentServerReachable != nil, "agent_server_reachable")
+	add(e.AgentDeepAgentShellExecuteUngated != nil, "agent_deep_agent_shell_execute_ungated")
 	// Subagent scope
 	add(len(e.SubagentGrantsTool) > 0, "subagent_grants_tool")
 	add(e.SubagentInheritsAllTools != nil, "subagent_inherits_all_tools")
@@ -792,6 +817,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoSettingsEnvRedirectsModelEndpoint != nil, "repo_settings_env_redirects_model_endpoint")
 	add(e.RepoSettingsAllowAllBash != nil, "repo_settings_allow_all_bash")
 	add(e.RepoScriptRunsAgentCliWithBypassFlag != nil, "repo_script_runs_agent_cli_with_bypass_flag")
+	add(e.RepoAgentServerAllowsAnyOrigin != nil, "repo_agent_server_allows_any_origin")
+	add(e.RepoAgentServerExposedWithoutKey != nil, "repo_agent_server_exposed_without_key")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")
@@ -809,6 +836,9 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoOtelLabelsToolSpanFailureUnsafe != nil, "repo_otel_labels_tool_span_failure_unsafe")
 	add(e.RepoOtelLabelsAttemptConstant != nil, "repo_otel_labels_attempt_constant")
 	add(e.RepoOtelLabelsRunEndSuccessOnly != nil, "repo_otel_labels_run_end_success_only")
+	add(e.RepoOtelLabelsReasoningUnhashed != nil, "repo_otel_labels_reasoning_unhashed")
+	add(e.RepoOtelLabelsReasoningLabelled != nil, "repo_otel_labels_reasoning_labelled")
+	add(e.RepoModelReasoningEnabled != nil, "repo_model_reasoning_enabled")
 	return n
 }
 
