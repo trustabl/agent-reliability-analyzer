@@ -361,6 +361,17 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **MCP tool description hidden text and MCP server bind (2026-11-12, `schema_version` 45 -> 46, provisional; +3 rules):** **MCP-036** (Python) /
+> **MCP-037** (TypeScript) (medium, 0.5, pack file `mcp/tool_description_hidden_text.yaml`) over the new tool-scope predicate
+> `tool_description_has_hidden_text`, which runs `analysis.HasHiddenText` (the AGCFG-009/013 code-point test and exemptions) on `ToolDef.Description` and
+> the Python `description=` decorator kwarg; no phrase or HTML-comment marker. **MCP-203** (high, 0.6, repo scope, pack file `mcp/server_exposure.yaml`)
+> over `repo_mcp_server_binds_all_interfaces_unprotected`, backed by `RepoInventory.MCPServerBinds` (`analysis.DiscoverMCPServerBinds`): a literal wildcard host on an
+> SSE / HTTP run call of a same-file `FastMCP` / `MCPServer` variable, constructor call or one-hop same-file factory result (or the SDK v1 constructor), or on `createMcpExpressApp`, with no auth, `transport_security`,
+> `allowedHosts` or SDK auth import in the file. Variables, env lookups, default and loopback hosts, `**kwargs` and test paths are not judged; the host is never
+> stored. 46 follows main's 45 and is provisional. Not built: the `readOnlyHint` contradiction rule (backlog), "HTTP without auth",
+> uvicorn launches, TypeScript SDK v2. The fixture holds **400** rules (397 + 3; re-derive). Rulebook docs: `docs/Policy/mcp/tool_description_hidden_text.md`,
+> `server_exposure.md`.
+>
 > **Deep Agent host shell without approval (2026-11-09, `schema_version` 43 -> 44, provisional; +1 rule):** **LC-118** (high, 0.6, agent
 > scope, `langchain/deep_agent_shell.yaml`) over the new predicate `agent_deep_agent_shell_execute_ungated` and the new `applies_to` token
 > `langchain_deep_agent`. Discovery (`analysis/deepagents_agents.go`) emits one `AgentDef` (SDK `langchain`, Class `DeepAgent`) per

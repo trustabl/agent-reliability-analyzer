@@ -2470,3 +2470,65 @@ func TestScan_SlashCommandFixture(t *testing.T) {
 		}
 	}
 }
+
+// End to end: the MCP server fixture holds invisible characters in tool descriptions and HTTP
+// servers bound to 0.0.0.0. MCP-036 and MCP-037 fire on the tool descriptions, MCP-203 on the
+// two unprotected binds, and nothing fires from safe/. Findings under tests/ stay out of the
+// readiness score but are still reported, so the test pins where each rule lands.
+func TestScan_MCPServerToolsFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "mcp-server-tools-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string][]string{}
+	for _, f := range res.Findings {
+		switch f.RuleID {
+		case "MCP-036", "MCP-037", "MCP-203":
+			got[f.RuleID] = append(got[f.RuleID], f.FilePath)
+			if f.StartLine < 1 {
+				t.Errorf("%s has no line (%s)", f.RuleID, f.FilePath)
+			}
+			if strings.Contains(f.Explanation+f.Title+f.FilePath, "\u200b") {
+				t.Errorf("%s echoed a hidden character", f.RuleID)
+			}
+		}
+	}
+	has := func(id, suffix string, want int) {
+		n := 0
+		for _, p := range got[id] {
+			if p == suffix {
+				n++
+			}
+		}
+		if n != want {
+			t.Errorf("%s on %s: %d findings, want %d; all: %v", id, suffix, n, want, got)
+		}
+	}
+	has("MCP-036", "server.py", 2) // docstring and description= argument
+	has("MCP-037", "server.ts", 1)
+	has("MCP-203", "server.py", 1)
+	has("MCP-203", "server.ts", 1)
+	has("MCP-203", "factory_server.py", 1) // run on a one-hop factory result
+	for id, paths := range got {
+		for _, p := range paths {
+			if strings.Contains(p, "safe/") {
+				t.Errorf("%s fired under safe/: %s", id, p)
+			}
+		}
+	}
+	for _, p := range got["MCP-203"] {
+		if strings.Contains(p, "tests/") {
+			t.Errorf("MCP-203 fired under tests/: %s", p)
+		}
+	}
+	// Determinism: a second scan gives the same ScanID and the same finding order.
+	res2, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("rescan: %v", err)
+	}
+	if res.ScanID != res2.ScanID || len(res.Findings) != len(res2.Findings) {
+		t.Errorf("scan is not stable: %s/%d vs %s/%d", res.ScanID, len(res.Findings), res2.ScanID, len(res2.Findings))
+	}
+}

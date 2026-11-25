@@ -245,6 +245,16 @@ rules:
 #       or an ADK before_tool_callback). A tool that declares `claim` without
 #       the fact matches no value. The loader rejects any other value.
 #
+#   tool_description_has_hidden_text: true | false
+#                           The tool's description holds a zero-width character, a Unicode
+#                           Tags-block character or a bidirectional-override character. The
+#                           test and exemptions are the ones the guidance-file rules use
+#                           (a leading BOM; a joiner between non-ASCII letters or emoji; a
+#                           subdivision-flag sequence). Python: the docstring and a string
+#                           `description=` decorator argument. TypeScript: the string-literal
+#                           description of registerTool / tool. A description built from a
+#                           variable, f-string or template is not read, and an escape
+#                           sequence written in source is not flagged. MCP-036 / MCP-037.
 #   has_description_text: [substring, substring, ...]
 #       The tool's description (docstring for Python, the explicit
 #       description argument for TypeScript) contains any listed substring.
@@ -900,6 +910,18 @@ rules:
 #       not. Files in test-fixture folders are judged
 #       (ProjectConfigFacts.AllowAllBash). AGCFG-016. AGCFG-012 keeps the git, xargs
 #       and npx prefix entries.
+#   repo_mcp_server_binds_all_interfaces_unprotected: true | false
+#       MCP server code starts an HTTP transport (sse, http or streamable-http) on a literal
+#       wildcard host (0.0.0.0, :: or [::]) and the same file names no authentication and no
+#       host or origin allow-list. Python: <server>.run(transport=..., host=...) on a variable
+#       bound to FastMCP(...) / MCPServer(...) from mcp.server.fastmcp, mcp.server.mcpserver,
+#       mcp.server or fastmcp, with the host on the run call or (SDK v1) the constructor;
+#       credit is an auth, token_verifier or auth_server_provider argument, or
+#       transport_security. TypeScript: createMcpExpressApp({ host }) from the SDK v1 express
+#       module; credit is allowedHosts, an object spread, or an import from the SDK auth
+#       modules. A host from a variable, f-string or environment lookup, a loopback or default
+#       host, and a **kwargs splat are not judged. Test paths are skipped. The host is reduced
+#       to the judgment during discovery and never stored. One finding per bind (MCP-203).
 #   repo_script_runs_agent_cli_with_bypass_flag: true | false
 #       A package.json lifecycle script (preinstall, install, postinstall, prepare), a
 #       .husky hook file line, or a JS/TS process-spawn call (spawn, spawnSync, exec,

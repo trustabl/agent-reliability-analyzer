@@ -435,6 +435,8 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.CIWorkflows = analysis.DiscoverCIWorkflows(profile.Manifest)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
+	// MCP-203: MCP server code binding an HTTP transport to a literal wildcard host.
+	inventory.MCPServerBinds = analysis.DiscoverMCPServerBinds(parsed, tsFiles)
 	// Server-entrypoint fact (Python): must follow DiscoverAgentRunCalls, which
 	// supplies the run calls the reachability stamp is applied to.
 	inventory.Entrypoints = analysis.DiscoverEntrypoints(parsed)

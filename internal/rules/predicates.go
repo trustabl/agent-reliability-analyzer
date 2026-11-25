@@ -359,6 +359,18 @@ func PredNameHasPrefix(prefixes []string, t models.ToolDef) bool {
 	return false
 }
 
+// PredToolDescriptionHasHiddenText implements tool_description_has_hidden_text: the tool's
+// description holds zero-width, Unicode Tags-block or bidirectional-override characters, using
+// the same code-point test and exemptions as the guidance-file rules (AGCFG-009/013). It reads
+// ToolDef.Description (a Python docstring, or a TypeScript string-literal description) and, for
+// a Python tool, the raw `description=` decorator argument. The text is never returned.
+func PredToolDescriptionHasHiddenText(t models.ToolDef) bool {
+	if analysis.HasHiddenText(t.Description) {
+		return true
+	}
+	return analysis.HasHiddenText(t.Config["description"])
+}
+
 // ClaimUseAbsent is the tool_claim_use value for a tool that declares no
 // `claim` parameter. It is decided from ToolDef.ParamNames, so it holds for
 // every discovery path; the other values come from the FactClaimUse fact,

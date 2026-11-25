@@ -6,9 +6,9 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 45 (`rules.SupportedSchemaVersion`; 42 to 44 are merged from main, 45 is provisional). The rules fixture
-goes from 389 to 397 rules (OBS-013..014, AGSRV-001..002, LC-118 and CCMD-001..003). `ScanID` changes, as with every
-schema bump, because it folds the engine's supported schema version. Engines without schema 45
+Rule schema 41 → 46 (`rules.SupportedSchemaVersion`; 42 to 45 are merged from main, 46 is provisional). The rules fixture
+goes from 389 to 400 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003 and MCP-036/037/203). `ScanID` changes, as with every
+schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
@@ -71,6 +71,28 @@ upgraded.
   rest of that bulk reconcile. Command findings are not a scored surface, so no score changes;
   a command under a test path is tagged test-origin like any finding. Not read: command bodies,
   `~/.claude/commands`, MCP fetch tools.
+
+- **MCP tool descriptions with hidden characters, and MCP servers bound to all interfaces (rule
+  schema 45 → 46, provisional; +3 rules, 400 in the fixture).** Two new predicates, one tool
+  scope and one repo scope. **MCP-036** (Python) and **MCP-037** (TypeScript) (medium, 0.5, pack
+  file `mcp/tool_description_hidden_text.yaml`, predicate `tool_description_has_hidden_text`) flag
+  an MCP tool description that holds a zero-width character, a Unicode Tags-block character or a
+  bidirectional override, using the code-point test and exemptions the guidance-file rules
+  (AGCFG-009/013) use; no phrase or HTML-comment marker is tested. Python reads the docstring and
+  a `description=` decorator argument; TypeScript reads the string-literal description of
+  `registerTool` / `tool`. The finding does not repeat the characters. **MCP-203** (high, 0.6,
+  repo scope, pack file `mcp/server_exposure.yaml`, predicate
+  `repo_mcp_server_binds_all_interfaces_unprotected`) flags a run call that starts an MCP server
+  on `sse`, `http` or `streamable-http` with a literal wildcard host (on a same-file server
+  variable, the constructor call itself, or the result of a one-hop same-file factory function) (`0.0.0.0`, `::`, `[::]`), or
+  a `createMcpExpressApp({ host })` call with one, when the same file names no `auth`,
+  `token_verifier`, `auth_server_provider`, `transport_security`, `allowedHosts` or SDK auth import.
+  A host from a variable or an environment lookup, a default or loopback host, and test paths are
+  not judged. Backed by the new `RepoInventory.MCPServerBinds` (`analysis.DiscoverMCPServerBinds`),
+  one finding per bind; the host text is reduced to the judgment and never stored. Not built:
+  phrase markers, an HTTP-transport-without-auth check, a uvicorn launch of an MCP app, TypeScript
+  SDK v2 packages. The annotation-contradiction rule (`readOnlyHint`) was reviewed and moved to the
+  backlog. Rulebook docs: `docs/Policy/mcp/tool_description_hidden_text.md`, `server_exposure.md`.
 
 ### Changed
 

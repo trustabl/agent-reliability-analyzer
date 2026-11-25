@@ -81,4 +81,8 @@ package rules
 // predicates, slash_command_allows_unrestricted_shell, slash_command_model_invocable and
 // slash_command_allows_unrestricted_tool. A binary without the scope skips those
 // rules with META-005.
-const SupportedSchemaVersion = 45
+//
+// Schema 46 adds the tool_description_has_hidden_text predicate (tool scope) and the
+// repo_mcp_server_binds_all_interfaces_unprotected predicate (repo scope). Provisional: this branch
+// numbers it after main's 45.
+const SupportedSchemaVersion = 46

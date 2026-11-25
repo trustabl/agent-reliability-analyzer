@@ -159,6 +159,15 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 		}
 		return out
 	}
+	// MCP-203 reports one finding per unprotected bind, so two servers in one repo keep
+	// their own site.
+	if on := d.rule.Match.RepoMCPServerBindsAllInterfacesUnprotected; on != nil && *on && len(inv.MCPServerBinds) > 0 {
+		out := make([]models.Finding, 0, len(inv.MCPServerBinds))
+		for _, b := range inv.MCPServerBinds {
+			out = append(out, findingFromRule(d.rule, models.ScopeRepo, b.FilePath, b.Line, b.Line, ""))
+		}
+		return out
+	}
 	if s := otelLabelsEvidence(d.rule.Match, inv); s != nil {
 		return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, s.File, s.StartLine, s.EndLine, "")}
 	}
