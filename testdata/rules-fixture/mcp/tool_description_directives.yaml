@@ -1,0 +1,103 @@
+policy:
+  id: mcp_tool_description_directives
+  name: MCP tool descriptions with directives aimed at the model
+  category: mcp
+  description: >
+    Rules for visible text in an MCP tool description that addresses the model and not the
+    reader: instruction-override phrasing, a tag that marks text as important to the model,
+    an order not to tell the user, and a request to read a credential or client config file
+    before the tool is used. A client sends each tool description to the model as part of the
+    tool definition. The check matches phrases in the description and is separate from
+    MCP-036 and MCP-037, which test code points.
+
+rules:
+  - id: MCP-211
+    title: MCP tool description contains directives aimed at the model
+    severity: high
+    confidence: 0.5
+    language: python
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      has_description_text:
+        - "<important>"
+        - do not tell the user
+        - don't tell the user
+        - do not mention that you
+        - without telling the user
+        - ignore previous
+        - ignore all previous
+        - ignore prior
+        - disregard previous
+        - before using this tool, read
+        - before using this tool, first
+        - ~/.ssh
+        - id_rsa
+        - mcp.json
+    explanation: >
+      The tool's docstring contains a phrase that addresses the model and not a person reading
+      the description: an instruction-override phrase, an <IMPORTANT> tag, an order not to tell
+      the user, or a request to read a credential or client config file such as ~/.ssh or
+      mcp.json before the tool is used. An MCP client passes the description to the model as
+      part of the tool definition, and a person reads a shortened view of it. Invariant
+      Labs, in its report on tool poisoning, gives an example description of a tool that adds
+      two numbers and carries an <IMPORTANT> block that tells the model to read
+      ~/.cursor/mcp.json and ~/.ssh/id_rsa, pass the content as an argument and not mention it.
+      Wang et al. (arXiv:2508.14925, MCPTox) build their benchmark on 45 live MCP servers and
+      353 tools to measure how agents respond to instructions placed in tool metadata.
+      Limits of this check: it matches phrases, case-insensitively, in the docstring, not
+      meaning. A server whose tools manage MCP client config, or a description that quotes one
+      of the phrases to warn against it, matches and is a false positive. A directive worded
+      another way, a directive in a parameter description or in the description= decorator
+      argument, and a description built at run time are not read. This rule reads visible text,
+      and MCP-036 tests hidden characters.
+    fix: >
+      Rewrite the description so it says what the tool does, what it takes and what it returns.
+      Remove any instruction to the model about other tools, files or what to tell the user. If
+      the tool needs a file or a credential, take it as a typed parameter or read it in code
+      with a path the server controls.
+
+  - id: MCP-213
+    title: TypeScript MCP tool description contains directives aimed at the model
+    severity: high
+    confidence: 0.5
+    language: typescript
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      has_description_text:
+        - "<important>"
+        - do not tell the user
+        - don't tell the user
+        - do not mention that you
+        - without telling the user
+        - ignore previous
+        - ignore all previous
+        - ignore prior
+        - disregard previous
+        - before using this tool, read
+        - before using this tool, first
+        - ~/.ssh
+        - id_rsa
+        - mcp.json
+    explanation: >
+      The description string passed to registerTool or tool contains a phrase that addresses the
+      model and not a person reading the description: an instruction-override phrase, an
+      <IMPORTANT> tag, an order not to tell the user, or a request to read a credential or
+      client config file such as ~/.ssh or mcp.json before the tool is used. An MCP client
+      passes the description to the model as part of the tool definition. Invariant Labs, in its
+      report on tool poisoning, describes this as text that the model sees in full and a user
+      sees in a shortened view.
+      Limits of this check: it matches phrases, case-insensitively, in a string-literal
+      description, not meaning. A server whose tools manage MCP client config, or a description
+      that quotes one of the phrases to warn against it, matches and is a false positive. A
+      directive worded another way, a directive in an input schema description, and a
+      description built from a template literal or a variable are not read. MCP-037 tests hidden
+      characters in the same string.
+    fix: >
+      Rewrite the description so it says what the tool does, what it takes and what it returns.
+      Remove any instruction to the model about other tools, files or what to tell the user. If
+      the tool needs a file or a credential, take it as a typed parameter or read it in code
+      with a path the server controls.

@@ -7,7 +7,7 @@ to follow Semantic Versioning once it reaches 1.0.
 ## [Unreleased]
 
 Rule schema 41 → 47 (`rules.SupportedSchemaVersion`; 42 to 46 are merged from main, 47 is provisional). The rules fixture
-goes from 389 to 407 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203 and the static batch 1 rules below). `ScanID` changes, as with every
+goes from 389 to 416 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules and the static batch 1 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
@@ -36,6 +36,27 @@ upgraded.
 
 ### Fixed
 
+- A skill whose frontmatter Claude Code accepts is no longer dropped by a strict
+  YAML decode. `disable-model-invocation` and `user-invocable` now read the
+  spellings the skills page lists ("Boolean fields accept `yes`, `no`, `on`,
+  `off`, `1`, and `0` in any letter case, in addition to `true` and `false`"),
+  quoted or not, plus `y` and `n`, which yaml.v3 already read. Before, a quoted
+  or numeric value (`disable-model-invocation: "true"`, `: 1`) skipped the whole
+  skill, so no CSKILL rule judged it. An unrecognised value reads false for
+  `disable-model-invocation` and stays unset for `user-invocable`; the docs do
+  not say how Claude Code reads one, so this is a choice, not a vendor rule.
+- `argument-hint` accepts a string or a YAML list. The skills page's own example,
+  `argument-hint: [issue-number]`, is a YAML list and used to skip the skill.
+  A list is joined with spaces, so the brackets are lost and the words are kept.
+- Slash commands (`.claude/commands/*.md`) get the same two fixes. A command with
+  a quoted boolean or a list `argument-hint` was kept but lost its description,
+  allowed-tools and model.
+- Known gap, not fixed here: a SKILL.md whose YAML does not parse at all (for
+  example an unquoted description containing a colon and a space) is still
+  skipped. Claude Code loads such a skill with no fields set.
+- No rule or schema change. On the in-repo corpus and 38 public repositories
+  (2,178 SKILL.md files) no finding changed; the sample held no quoted boolean.
+
 - **AGCFG-006 no longer flags endpoint keys the tool does not read** (no schema change). A `*_BASE_URL` key was flagged by suffix in `.gemini/.env` and `.codex/config.toml`.
   `.gemini/.env` now judges `GOOGLE_GEMINI_BASE_URL` and `GOOGLE_VERTEX_BASE_URL`, the two
   variables Gemini CLI reads, so `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` there are
@@ -48,6 +69,23 @@ upgraded.
   changed by none; `.gemini/.env` files in public repos were not sampled.
 
 ### Added
+
+- **Nine static rules, rules without engine changes (no schema change; 409 in the fixture).** **CSKILL-092** (low,
+  0.5) and **CSKILL-093** (high, 0.5), pack file `claude_skill/skill_selection_and_decoding.yaml`:
+  a skill description that tells the agent to choose this skill over others, and a skill body
+  sentence that names a decoding step and a word for following the result. **MCP-211** (Python) and
+  **MCP-213** (TypeScript) (high, 0.5, `mcp/tool_description_directives.yaml`): phrases aimed at the
+  model in a tool description (an `<IMPORTANT>` block, an order not to tell the user, override
+  phrasing, a request to read `~/.ssh` or `mcp.json`). **MCP-212** (Python) and **MCP-214**
+  (TypeScript) (high, 0.5, `mcp/elicitation.yaml`): a tool that calls `elicit(` or `elicitInput`,
+  reaches a shell, code-execution or file-write call, and has no `accept` in the body. **OAI-206**
+  (high, 0.7), `openai_sdk/agent_tool_wiring.yaml`: a handoff target that holds a shell tool
+  (re-land of the ID removed in the 2026-09-11 bulk revert). **OAI-208** and **OAI-209** (high, 0.5,
+  `openai_sdk/tool_safety_overrides.yaml`): a tool that reaches a shell, code or write call and takes
+  a model-settable override parameter, and an options order tool with no limit and no approval. All
+  reuse existing predicates. OAI-208 and OAI-209 are built for the OpenAI pack and no other. Field check: 60+ public repositories; see COVERAGE. Rulebook docs:
+  `docs/Policy/claude_skill/skill_selection_and_decoding.md`, `mcp/tool_description_directives.md`,
+  `mcp/elicitation.md`, `openai_sdk/agent_tool_wiring.md`, `openai_sdk/tool_safety_overrides.md`.
 
 - **AGCFG-012 judges `env`, `sed` and `awk` prefixes** (no schema change). A `Bash` allow
   rule that is a bare `env`, `sed` or `awk` followed by a trailing wildcard now fires, from

@@ -1,0 +1,94 @@
+policy:
+  id: mcp_elicitation
+  name: MCP tools that request elicitation without checking the answer
+  category: mcp
+  description: >
+    Rules for an MCP tool handler that asks the person for input through the elicitation
+    feature and then does not test whether the person accepted. The MCP specification lets a
+    person accept, decline or cancel an elicitation request, so a handler that reads no
+    answer cannot tell the three apart. MCP-030 credits a handler that calls elicit as a
+    gate; these rules look at the answer.
+
+rules:
+  - id: MCP-212
+    title: MCP tool requests elicitation but does not check for an accept action
+    severity: high
+    confidence: 0.5
+    language: python
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      all:
+        - has_body_text:
+            - "elicit("
+        - any:
+            - has_shell_call: true
+            - has_code_exec_call: true
+            - has_write_call: true
+        - not:
+            has_body_text:
+              - accept
+              - Accept
+    explanation: >
+      This tool handler calls elicit(...) to ask the person for input, and its body does not
+      contain the word "accept" anywhere. The body also runs a shell command, executes code or writes a file. The MCP specification defines three response actions
+      for an elicitation request, accept, decline and cancel, so a handler that continues
+      without comparing the action to "accept" proceeds after a decline or a cancel as well.
+      GitHub advisory GHSA-737x-cwfr-5vvc (obsidian-tc, CVE-2026-115477) reports a destructive
+      tool call that still wrote after the elicitation leg was answered with {action:
+      "decline"}, and its fix requires the response to be {action: "accept", content:
+      {approve: true}} before the server trusts the earlier state.
+      Limits of this check: it reads the handler body as text. It does not follow the answer
+      into a helper function, does not check the order of the elicit call and the side effect, and a
+      side effect is one the engine recognizes as a shell, code-execution or file-write call, so
+      a tool whose side effect is a database or network call is not flagged and a tool that
+      asks for a name and changes nothing is silent. A body that mentions "accept" in a comment or a string counts
+      as a check, and an elicit( call that appears in a comment and nowhere else counts as a call. An elicit
+      call in another function or file is not seen.
+    fix: >
+      Keep the result of the elicit call and test it before the side effect: proceed when
+      result.action == "accept" (and, for a yes or no question, when the returned field is
+      true), and return or raise on decline and cancel. Do the check in the same handler as the
+      side effect, so a reader can see that the side effect depends on it.
+
+  - id: MCP-214
+    title: TypeScript MCP tool requests elicitation but does not check for an accept action
+    severity: high
+    confidence: 0.5
+    language: typescript
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      all:
+        - has_body_text:
+            - elicitInput
+            - elicitation/create
+        - any:
+            - has_shell_call: true
+            - has_code_exec_call: true
+            - has_write_call: true
+        - not:
+            has_body_text:
+              - accept
+              - Accept
+    explanation: >
+      This tool handler calls elicitInput(...) or sends elicitation/create to ask the person for
+      input, and its body does not contain the word "accept" anywhere. The body also runs a shell command, executes code or writes a file. The MCP specification
+      defines three response actions for an elicitation request, accept, decline and cancel, so
+      a handler that continues without comparing the action to "accept" proceeds after a decline
+      or a cancel as well. GitHub advisory GHSA-737x-cwfr-5vvc (obsidian-tc, CVE-2026-115477)
+      reports a destructive tool call that still wrote after the elicitation leg was answered
+      with {action: "decline"}, and its fix requires the response to be {action: "accept",
+      content: {approve: true}} before the server trusts the earlier state.
+      Limits of this check: it reads the handler source span as text. It does not follow the
+      answer into a helper function, does not check the order of the call and the side effect, and a side
+      effect is a shell, code-execution or file-write call the engine recognizes. A mention of "accept" in a comment or a string
+      counts as a check, and an elicitInput call that appears in a comment and nowhere else counts as a
+      call. An elicit call in another function or file is not seen.
+    fix: >
+      Keep the result of elicitInput and test it before the side effect: proceed when
+      result.action === "accept" (and, for a yes or no question, when the returned field is
+      true), and return an error on decline and cancel. Do the check in the same handler as the
+      side effect.

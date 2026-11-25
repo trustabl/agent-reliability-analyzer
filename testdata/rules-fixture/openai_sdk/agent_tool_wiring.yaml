@@ -1,0 +1,42 @@
+policy:
+  id: openai_sdk_agent_tool_wiring
+  name: OpenAI Agents SDK agent tool wiring
+  category: openai_sdk
+  description: >
+    Agent-scoped rule for the OpenAI Agents SDK that looks at which tools an agent is given
+    and where the agent sits in a handoff chain: a handoff target that holds shell tools. It
+    reads the Agent(...) constructor and the resolved tool and handoff graph.
+
+rules:
+  - id: OAI-206
+    title: Handoff-target agent wires shell tools
+    severity: high
+    confidence: 0.7
+    language: python
+    applies_to:
+      - openai_agent
+      - openai_sandbox_agent
+    scope: agent
+    match:
+      all:
+        - agent_is_subagent_of_any: true
+        - agent_uses_tool_kind: [shell_invocation]
+    explanation: >
+      This agent is the target of a handoff (it appears in another agent's handoffs=[...]) and
+      is wired with a tool that runs shell commands. The OpenAI Agents SDK guardrails
+      documentation states that input guardrails run for the first agent in the chain and that
+      an agent's input guardrails run when that agent is the first agent and not otherwise. A parent can
+      therefore pass work to this agent without this agent's own input guardrails inspecting
+      the delegated turn, and the shell tool then runs on that input.
+      Limits of this check: it reads the agent graph in the source. A handoff built in another
+      module, a handoff target created in a loop, and an agent passed in as a variable that
+      discovery cannot resolve are not seen. Tools that run shell commands count; file
+      read and write tools are not judged. Tool guardrails, which the SDK runs on each guarded
+      function-tool call, are not read, so an agent whose shell tool has its own guardrail
+      still matches. OAI-104 flags a plain Agent with shell tools whether or not it is a
+      handoff target, and both rules can report the same agent.
+    fix: >
+      Remove the shell tool from this handoff target, or move it to the agent that receives the
+      user input, where input guardrails run, and have that agent do the work. If the handoff
+      must stay, validate the handoff payload before it reaches this agent (an input_filter on
+      the handoff, or a tool guardrail on the shell tool) and gate the tool with needs_approval.

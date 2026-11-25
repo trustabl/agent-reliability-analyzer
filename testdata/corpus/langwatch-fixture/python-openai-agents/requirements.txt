@@ -1,0 +1,2 @@
+openai-agents==0.0.19
+langwatch==1.4.0
