@@ -366,6 +366,8 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Static batch 3 (2026-11-25, no schema change; +9 rules, 409 in the fixture):** **CSKILL-092/093** (`claude_skill/skill_selection_and_decoding.yaml`), **MCP-211/213** (`mcp/tool_description_directives.yaml`), **MCP-212/214** (`mcp/elicitation.yaml`; needs a shell, code or write fact and no `accept` in the body), **OAI-206** (`openai_sdk/agent_tool_wiring.yaml`), **OAI-208/209** (`openai_sdk/tool_safety_overrides.yaml`). All reuse existing predicates (`skill_text_matches`, `has_description_text`, `has_body_text`, `agent_is_subagent_of_any`, `param_name_matches`). OAI-208/209 exist for the OpenAI pack and no other. The fixture holds **409** rules (re-derive). Rulebook docs under `docs/Policy/` for the five pack files.
+>
 > **MCP tool description hidden text and MCP server bind (2026-11-12, `schema_version` 45 -> 46, provisional; +3 rules):** **MCP-036** (Python) /
 > **MCP-037** (TypeScript) (medium, 0.5, pack file `mcp/tool_description_hidden_text.yaml`) over the new tool-scope predicate
 > `tool_description_has_hidden_text`, which runs `analysis.HasHiddenText` (the AGCFG-009/013 code-point test and exemptions) on `ToolDef.Description` and

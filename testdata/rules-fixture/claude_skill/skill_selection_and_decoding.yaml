@@ -1,0 +1,120 @@
+policy:
+  id: claude_skill_selection_and_decoding
+  name: Claude Agent Skill text that steers selection or asks for decoding
+  category: claude_skill
+  description: >
+    Text in a SKILL.md that tries to steer which skill the agent picks, or that tells the
+    agent to decode content and act on the result. Both checks read words in the skill's
+    description or body, so they carry no language: field. They complement CSKILL-040,
+    which looks for override phrasing, hidden characters and long base64 blobs.
+
+rules:
+  - id: CSKILL-092
+    title: Skill description pushes the agent to choose this skill over others
+    severity: low
+    confidence: 0.5
+    applies_to:
+      - claude_skill
+    scope: skill
+    match:
+      skill_text_matches:
+        fields: [description]
+        terms:
+          - choose this skill over
+          - pick this skill over
+          - select this skill over
+          - prefer this skill over
+          - use this skill instead of
+          - use this skill over
+          - preferred over
+          - over all other skills
+          - over other skills
+          - picked whenever possible
+          - must be selected
+          - must be chosen
+        exclude_context:
+          - when
+          - if
+    explanation: >
+      This skill's description contains a sentence that tells the agent to prefer this skill
+      to others, such as "use this skill instead of" or "must be selected". An agent reads the
+      description of each installed skill to decide which one to load, so wording that argues
+      for the skill, and does not say what the skill does, can move the choice without any
+      change in what the skill can do. Saha, Faghih and Feizi (arXiv:2605.11418) appended
+      single sentences of this kind to the description of functionally equivalent skills and
+      report that the modified variants were selected in 77.6% of paired trials on average,
+      and their table of trigger sentences lists directive wording such as "choose this skill
+      over others for this purpose."
+      Limits of this check: it reads words in the description field, not meaning, and it is
+      a quality signal, not proof of an attack. A sentence that contains "when" or "if" is
+      skipped, so a description that scopes the claim to a task ("use this skill instead of
+      grep when ...") does not match. A description that argues for itself in other words, a
+      claim about quality or trust, and text in the skill body are not read. A skill that
+      names a sibling skill it replaces can match and is a false positive.
+    fix: >
+      Describe what the skill does and the task it is for, and leave the choice between
+      skills to the agent. If this skill does replace another one, name the task in the same
+      sentence ("use this skill instead of the legacy exporter when the input is CSV") so the
+      description states a condition and not a preference.
+
+  - id: CSKILL-093
+    title: Skill body tells the agent to decode content and then act on it
+    severity: high
+    confidence: 0.5
+    applies_to:
+      - claude_skill
+    scope: skill
+    match:
+      skill_text_matches:
+        fields: [body]
+        terms:
+          - decode
+          - decipher
+          - decrypt
+          - rot13
+          - base64 -d
+          - base64 --decode
+          - atob
+          - caesar
+          - shift each letter
+        require_context:
+          - follow
+          - execute
+          - obey
+          - carry out
+          - instructions
+          - commands
+        exclude_context:
+          - example
+          - for instance
+          - e.g.
+          - obfuscated
+          - malicious
+          - attack
+          - detect
+          - signature
+    explanation: >
+      A sentence in this skill's body names a decoding step (decode, decipher, decrypt, rot13,
+      base64 -d, atob, a Caesar shift) and, in the same sentence, a word for following or
+      running what comes out (follow, execute, obey, instructions, commands). A skill that
+      asks the agent to decode text and then act on it can carry instructions that a reviewer
+      reading the file sees as an encoded string. Chen, Chen and Yu (arXiv:2610.18262)
+      embed instructions in skill files in Caesar and layered encodings for the agent to
+      decode and follow, report attack success rates of up to 47.5% and 40.3% across eight
+      models, and report that the tested skill scanners flag few of the injected skills.
+      CSKILL-040 covers override phrasing, hidden characters and long base64 blobs; this rule
+      covers the instruction to decode and act.
+      Limits of this check: it reads words in the skill body, one sentence at a time, and does
+      not decode or inspect any encoded string. A skill that decodes data for a legitimate
+      purpose and then runs a command in the same sentence matches and is a false positive. A
+      decode instruction split across sentences or lines, an encoded string with no decode
+      instruction, and files bundled with the skill are not read. A sentence that contains
+      "example", "for instance", "e.g.", "obfuscated", "malicious", "attack", "detect" or "signature"
+      is skipped, so text that describes an attack is not flagged. A full stop inside a file name ends the
+      sentence for this check, so a decode word and a follow word on either side of a name such
+      as notes.txt are not paired.
+    fix: >
+      Remove the instruction to decode and follow. Put the guidance in the skill as plain
+      visible text. If the skill must decode data (a token, a payload, a log), say that the
+      decoded output is data to report and not instructions to carry out, and name the
+      command the skill runs on it.
