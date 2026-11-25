@@ -520,6 +520,44 @@ func TestScan_SkillNameMatch(t *testing.T) {
 	}
 }
 
+// A skill whose frontmatter Claude Code accepts but a strict YAML decode
+// rejects (a quoted or numeric boolean, a list argument-hint) must still be
+// discovered and judged. Before the tolerant decode all three were dropped.
+func TestScan_SkillFrontmatterTolerant(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "skill-frontmatter-tolerant-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	found := map[string]bool{}
+	for _, s := range res.Skills {
+		found[s.Name] = true
+	}
+	for _, n := range []string{"quoted-flag", "numeric-flag", "hint-list"} {
+		if !found[n] {
+			t.Errorf("skill %q was not discovered; found %v", n, found)
+		}
+	}
+	fired := map[string]bool{}
+	for _, f := range res.Findings {
+		if f.RuleID == "CSKILL-001" {
+			fired[f.FilePath] = true
+		}
+	}
+	for _, n := range []string{"quoted-flag", "numeric-flag", "hint-list"} {
+		p := ".claude/skills/" + n + "/SKILL.md"
+		if !fired[p] {
+			t.Errorf("CSKILL-001 did not fire on %s; fired on %v", p, fired)
+		}
+	}
+	for _, s := range res.Skills {
+		if s.Name == "hint-list" && s.UserInvocable != nil {
+			t.Errorf("unrecognised user-invocable must stay unset, got %v", *s.UserInvocable)
+		}
+	}
+}
+
 func TestScan_SubagentToolsInherit(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "subagent-tools-inherit")

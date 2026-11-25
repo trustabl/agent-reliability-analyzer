@@ -15,16 +15,16 @@ import (
 )
 
 type skillFrontmatter struct {
-	Name                   string       `yaml:"name"`
-	Description            string       `yaml:"description"`
-	AllowedTools           stringOrList `yaml:"allowed-tools"`
-	DisallowedTools        stringOrList `yaml:"disallowed-tools"`
-	ArgumentHint           string       `yaml:"argument-hint"`
-	DisableModelInvocation bool         `yaml:"disable-model-invocation"`
-	UserInvocable          *bool        `yaml:"user-invocable"`
-	Context                string       `yaml:"context"`
-	Agent                  string       `yaml:"agent"`
-	Hooks                  yaml.Node    `yaml:"hooks"`
+	Name                   string         `yaml:"name"`
+	Description            string         `yaml:"description"`
+	AllowedTools           stringOrList   `yaml:"allowed-tools"`
+	DisallowedTools        stringOrList   `yaml:"disallowed-tools"`
+	ArgumentHint           argumentHint   `yaml:"argument-hint"`
+	DisableModelInvocation lenientBool    `yaml:"disable-model-invocation"`
+	UserInvocable          lenientOptBool `yaml:"user-invocable"`
+	Context                string         `yaml:"context"`
+	Agent                  string         `yaml:"agent"`
+	Hooks                  yaml.Node      `yaml:"hooks"`
 }
 
 // DiscoverSkills parses every SKILL.md in the manifest's markdown files. A skill
@@ -62,9 +62,9 @@ func DiscoverSkills(manifest models.ScanManifest) []models.SkillDef {
 			AllowedTools:           tokens,
 			ToolGrants:             parseToolGrants(tokens),
 			DisallowedTools:        splitToolsTokens([]string(parsed.DisallowedTools)),
-			ArgumentHint:           parsed.ArgumentHint,
-			DisableModelInvocation: parsed.DisableModelInvocation,
-			UserInvocable:          parsed.UserInvocable,
+			ArgumentHint:           string(parsed.ArgumentHint),
+			DisableModelInvocation: bool(parsed.DisableModelInvocation),
+			UserInvocable:          parsed.UserInvocable.ptr(),
 			Context:                parsed.Context,
 			Agent:                  parsed.Agent,
 			HasHooks:               parsed.Hooks.Kind == yaml.MappingNode && len(parsed.Hooks.Content) > 0,

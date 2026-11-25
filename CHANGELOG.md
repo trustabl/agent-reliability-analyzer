@@ -14,6 +14,27 @@ upgraded.
 
 ### Fixed
 
+- A skill whose frontmatter Claude Code accepts is no longer dropped by a strict
+  YAML decode. `disable-model-invocation` and `user-invocable` now read the
+  spellings the skills page lists ("Boolean fields accept `yes`, `no`, `on`,
+  `off`, `1`, and `0` in any letter case, in addition to `true` and `false`"),
+  quoted or not, plus `y` and `n`, which yaml.v3 already read. Before, a quoted
+  or numeric value (`disable-model-invocation: "true"`, `: 1`) skipped the whole
+  skill, so no CSKILL rule judged it. An unrecognised value reads false for
+  `disable-model-invocation` and stays unset for `user-invocable`; the docs do
+  not say how Claude Code reads one, so this is a choice, not a vendor rule.
+- `argument-hint` accepts a string or a YAML list. The skills page's own example,
+  `argument-hint: [issue-number]`, is a YAML list and used to skip the skill.
+  A list is joined with spaces, so the brackets are lost and the words are kept.
+- Slash commands (`.claude/commands/*.md`) get the same two fixes. A command with
+  a quoted boolean or a list `argument-hint` was kept but lost its description,
+  allowed-tools and model.
+- Known gap, not fixed here: a SKILL.md whose YAML does not parse at all (for
+  example an unquoted description containing a colon and a space) is still
+  skipped. Claude Code loads such a skill with no fields set.
+- No rule or schema change. On the in-repo corpus and 38 public repositories
+  (2,178 SKILL.md files) no finding changed; the sample held no quoted boolean.
+
 - **AGCFG-006 no longer flags endpoint keys the tool does not read** (no schema change). A `*_BASE_URL` key was flagged by suffix in `.gemini/.env` and `.codex/config.toml`.
   `.gemini/.env` now judges `GOOGLE_GEMINI_BASE_URL` and `GOOGLE_VERTEX_BASE_URL`, the two
   variables Gemini CLI reads, so `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` there are

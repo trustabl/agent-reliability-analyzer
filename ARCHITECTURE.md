@@ -910,7 +910,11 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   plugin `skills/`, nested monorepo skills). Captures `name`, `description`,
   `allowed-tools` / `disallowed-tools` (parsed into `ToolGrants`),
   `argument-hint`, `disable-model-invocation`, and the invocation/fork
-  frontmatter; plus **body facts** from the markdown (dynamic-context exec
+  frontmatter (the boolean fields and `argument-hint` use tolerant decoders in
+  `lenient_bool.go` / `lenient_hint.go`: yes/no/on/off/1/0 and true/false in any
+  case, quoted or not, and a string or list hint, so a spelling Claude Code
+  accepts never drops the skill; an unrecognised `user-invocable` stays nil);
+  plus **body facts** from the markdown (dynamic-context exec
   commands, external URLs, prompt-injection markers — including hidden-Unicode:
   zero-width characters, the Tags block U+E0000–E007F, and bidi overrides) and a
   **bundled-file inventory** (script/markdown/binary/resource by extension).
@@ -986,7 +990,8 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   swept up. The command name is the file basename without extension (Claude
   Code derives the command from the path, not frontmatter). Frontmatter
   (`description`, `allowed-tools`, `model`, `argument-hint`,
-  `disable-model-invocation`) is parsed when present; a command **without**
+  `disable-model-invocation`) is parsed when present, with the same tolerant
+  boolean and `argument-hint` decoders as skills; a command **without**
   frontmatter is still emitted (its body is the prompt — only name + location
   populated).
 - **DiscoverPlugins** (`plugins.go`) — JSON-parses `.claude-plugin/plugin.json`
