@@ -529,6 +529,58 @@ func TestDetectObsDeps_NoObservabilityDeclared(t *testing.T) {
 	}
 }
 
+func TestDetectObsDeps_LangWatch(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("langchain\nlangwatch==1.4.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := detectObsDeps(dir)
+	if len(got) != 1 || got[0].Vendor != models.VendorLangWatch || got[0].Source != "requirements.txt" {
+		t.Fatalf("got %+v, want one langwatch dep from requirements.txt", got)
+	}
+}
+
+// LangWatch's agent-testing library ships as langwatch-scenario (PyPI) and
+// @langwatch/scenario (npm). Neither is the tracing SDK, so a repo declaring only
+// the test library must not get OBS-005 or Forge's LangWatch tracing variant.
+func TestDetectObsDeps_LangWatchMatchesWholeName(t *testing.T) {
+	cases := []struct {
+		name, file, body string
+		want             bool
+	}{
+		{"requirements pin", "requirements.txt", "langwatch==1.4.0\n", true},
+		{"requirements extras", "requirements.txt", "langwatch[langchain]>=1.0\n", true},
+		{"requirements bare at EOF", "requirements.txt", "fastapi\nlangwatch", true},
+		{"pep 621", "pyproject.toml", "dependencies = [\n    \"langwatch>=0.7.1\",\n]\n", true},
+		{"poetry", "pyproject.toml", "[tool.poetry.dependencies]\nlangwatch = \"^0.0.17\"\n", true},
+		{"pipfile", "Pipfile", "[packages]\nlangwatch = \"*\"\n", true},
+		{"npm", "package.json", `{"dependencies": {"langwatch": "^2.2.0"}}`, true},
+		{"sdk beside scenario", "pyproject.toml", "dependencies = [\n    \"langwatch-scenario>=0.7.14\",\n    \"langwatch>=0.7.1\",\n]\n", true},
+		{"pypi scenario only", "requirements.txt", "langwatch-scenario==0.7.9\n", false},
+		{"pypi scenario underscore", "requirements.txt", "langwatch_scenario==0.7.9\n", false},
+		{"pyproject scenario only", "pyproject.toml", "dependencies = [\n    \"langwatch-scenario>=0.7.14\",\n]\n", false},
+		{"npm scenario only", "package.json", `{"devDependencies": {"@langwatch/scenario": "^0.4.0"}}`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, tc.file), []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got := false
+			for _, d := range detectObsDeps(dir) {
+				if d.Vendor == models.VendorLangWatch {
+					got = true
+				}
+			}
+			if got != tc.want {
+				t.Fatalf("langwatch declared = %v, want %v (%s: %q)", got, tc.want, tc.file, tc.body)
+			}
+		})
+	}
+}
+
 func TestNormalize_PreTrustHarnessConfigClassified(t *testing.T) {
 	dir := t.TempDir()
 	for rel, body := range map[string]string{

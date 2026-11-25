@@ -36,7 +36,8 @@ func Recon(src *Source, onFile func(string)) (models.RepoProfile, error) {
 // obsDepNeedles maps a manifest substring to the observability vendor it
 // declares. Patterns are lowercase; manifest text is lowercased before matching.
 // Kept separate from detectSDKDeps' needles on purpose — see the ObsDep doc
-// comment for why these must not become SDKDeps.
+// comment for why these must not become SDKDeps. A pattern in
+// obsDepWholeNames matches only as a complete package name.
 var obsDepNeedles = []struct {
 	Vendor  models.ObservabilityVendor
 	Pattern string
@@ -56,6 +57,7 @@ var obsDepNeedles = []struct {
 	{models.VendorMLflow, "mlflow"},
 	{models.VendorDatadogLLMObs, "ddtrace"},
 	{models.VendorOpik, "opik"},
+	{models.VendorLangWatch, "langwatch"},
 	// Helicone is deliberately absent: it is a provider base-URL override, not
 	// an importable package, so no AST pass can ever produce a code signal for
 	// it (see DiscoverObservability). Declaring the dep here without any way
@@ -63,6 +65,11 @@ var obsDepNeedles = []struct {
 	// but never wired") on every real Helicone user with no way to clear it.
 	// Deferred until the base-URL-literal detection is implemented.
 }
+
+// obsDepWholeNames are the needles of vendors that ship other packages whose
+// names contain the needle. LangWatch's agent-testing library,
+// langwatch-scenario (PyPI) and @langwatch/scenario (npm), is not its tracing SDK.
+var obsDepWholeNames = map[string]bool{"langwatch": true}
 
 // obsDepManifests are the fixed-name root manifests the needle scan reads.
 var obsDepManifests = []string{
@@ -81,7 +88,9 @@ func detectObsDeps(root string) []models.ObsDep {
 			continue
 		}
 		for _, n := range obsDepNeedles {
-			if !strings.Contains(text, n.Pattern) {
+			whole := obsDepWholeNames[n.Pattern]
+			if whole && !containsPackageName(text, n.Pattern) ||
+				!whole && !strings.Contains(text, n.Pattern) {
 				continue
 			}
 			key := string(n.Vendor) + "@" + mfile
@@ -99,6 +108,30 @@ func detectObsDeps(root string) []models.ObsDep {
 		return out[i].Source < out[j].Source
 	})
 	return out
+}
+
+// containsPackageName reports whether name occurs in text as a complete package
+// name: not preceded or followed by a character that can be part of one, so
+// "langwatch==1.4.0" and "\"langwatch\":" match but "langwatch-scenario" and
+// "@langwatch/scenario" do not.
+func containsPackageName(text, name string) bool {
+	for i := 0; ; {
+		j := strings.Index(text[i:], name)
+		if j < 0 {
+			return false
+		}
+		start, end := i+j, i+j+len(name)
+		if (start == 0 || !isPackageNameByte(text[start-1])) &&
+			(end == len(text) || !isPackageNameByte(text[end])) {
+			return true
+		}
+		i = start + 1
+	}
+}
+
+func isPackageNameByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= '0' && c <= '9' ||
+		c == '-' || c == '_' || c == '.' || c == '@' || c == '/'
 }
 
 // readRootManifestLower reads one fixed-name root manifest and lowercases it
