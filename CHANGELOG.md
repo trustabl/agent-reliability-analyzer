@@ -12,8 +12,26 @@ schema bump, because it folds the engine's supported schema version. Engines wit
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
+### Fixed
+
+- **AGCFG-006 no longer flags endpoint keys the tool does not read** (no schema change). A `*_BASE_URL` key was flagged by suffix in `.gemini/.env` and `.codex/config.toml`.
+  `.gemini/.env` now judges `GOOGLE_GEMINI_BASE_URL` and `GOOGLE_VERTEX_BASE_URL`, the two
+  variables Gemini CLI reads, so `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` there are
+  silent. `.codex/config.toml` judges no endpoint key, because Codex ignores
+  `openai_base_url`, `chatgpt_base_url`, `model_provider`, `model_providers` and `profiles`
+  in a project file. Severity stays critical. Key names are read; no value is.
+  `*_PROXY_COMMAND` and `GEMINI_SANDBOX*` in `config.toml` are unchanged. Findings
+  that change: a `.gemini/.env` or `.codex/config.toml` whose sole hit was a suffix-matched
+  `*_BASE_URL` key loses that hit. The corpus and 120 public `.codex/config.toml` files
+  changed by none; `.gemini/.env` files in public repos were not sampled.
+
 ### Added
 
+- **AGCFG-012 judges `env`, `sed` and `awk` prefixes** (no schema change). A `Bash` allow
+  rule that is a bare `env`, `sed` or `awk` followed by a trailing wildcard now fires, from
+  the GNU manuals (`env` runs its command operand; `sed` runs a program through `e`;
+  `awk` through `system()` or a pipe). Claude Code may prompt for some of these forms in
+  ways its documentation does not describe.
 
 - **Deep Agent with a host-shell backend and no approval on execute (rule schema 43 → 44,
   provisional).** One new agent-scope predicate, `agent_deep_agent_shell_execute_ungated`, one
@@ -75,6 +93,21 @@ upgraded.
   phrase markers, an HTTP-transport-without-auth check, a uvicorn launch of an MCP app, TypeScript
   SDK v2 packages. The annotation-contradiction rule (`readOnlyHint`) was reviewed and moved to the
   backlog. Rulebook docs: `docs/Policy/mcp/tool_description_hidden_text.md`, `server_exposure.md`.
+
+### Changed
+
+- **CSKILL-081, 084, 085, 086: fewer false positives (rules change, no schema bump).** The
+  four rules in `claude_skill/skill_quality_text.yaml` now use the word-boundary predicate
+  `skill_text_matches`. 081 matches credential-type token phrases (api, access, auth,
+  authentication, bearer, refresh, session, oauth, secret token) instead of the bare word
+  "token". 084 matches whole-collection phrases and no longer matches "entire" inside
+  "entirely" or "all files" inside "small files". 085 recognises purpose and trigger words
+  ("to", "for", "when", "use", ...) where it recognised seven phrases. 086 no longer matches
+  "log" inside "logic" or "methodology", and "record" and "database" are no longer terms.
+  Severity and confidence are unchanged. On 43 public repositories (1,820 skills) the four
+  rules go from 3,938 to 1,656 findings; false-positive counts are model-assisted judgments,
+  and the 086 count is understated (see `COVERAGE.md`). A bare "token" with no credential
+  qualifier no longer matches in 081.
 
 ## [0.1.16] - 2026-11-09
 
