@@ -428,6 +428,16 @@ type ProjectConfigFacts struct {
 	// .claude/settings*.json that no bare Bash or Bash(*) deny or ask rule in the
 	// same .claude/ folder cancels. AGCFG-016 reads this list.
 	AllowAllBash []ConfigHit `json:"allow_all_bash,omitempty"`
+	// AnyOriginServer is a committed setting that lets any browser origin call a
+	// Google ADK server: the adk.web.cors.origins key in Spring configuration, an
+	// allow_origins argument of get_fast_api_app or allowOrigins option of
+	// AdkApiServer, or an --allow_origins option of adk web / adk api_server, with
+	// a * entry. AGSRV-001 reads this list.
+	AnyOriginServer []ConfigHit `json:"any_origin_server,omitempty"`
+	// AgentServerNoKey is a Docker Compose service or docker run command that runs
+	// the OpenHands agent server image, publishes its port on all host interfaces
+	// and sets no session API key name. AGSRV-002 reads this list.
+	AgentServerNoKey []ConfigHit `json:"agent_server_no_key,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

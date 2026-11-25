@@ -357,6 +357,13 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 > kinds and `ValueUnhashed`. OBS-014 sits one rung below OBS-008 and is deliberately not gated on `repo_observability_initialized`. The key
 > names live in `trustabl-guard/docs/trustabl-otel-attributes.md` v1.5; the vendored manifest and forge's recipe stay at profile 1.0.0 until
 > the library release that has `mark_reasoning`. Paired with `agent-reliability-rules` on the branch of the same name. The fixture holds **391** rules (389 + 2; re-derive).
+> **Agent server exposure (2026-11-09, `schema_version` 42 -> 43, provisional; +2 rules):** new unconditionally-loaded
+> category `agent_server` (pack dir `agent_server/`, prefix `AGSRV-`, outside the NNN/1NN/2NN convention; registered in
+> `models.ValidCategory`, `loader.go` repo-scope applies_to, `rule_detector.go`). **AGSRV-001** (high, 0.6, `any_origin.yaml`)
+> over `repo_agent_server_allows_any_origin` (`ProjectConfigFacts.AnyOriginServer`) and **AGSRV-002** (critical, 0.7,
+> `unauthenticated_publish.yaml`) over `repo_agent_server_exposed_without_key` (`AgentServerNoKey`; needs a non-loopback `--host`, a port published on all interfaces and no session key name). Sources: CVE-2026-107858
+> (ADK Java dev server) and the VulnCheck advisory for CVE-2026-112346 (OpenHands). Spring config files only for Java; Java source
+> is not parsed (follow-up). Key names are read, values never stored. The fixture holds **393** rules (391 + 2; re-derive). Rulebook docs: `docs/Policy/agent_server/`.
 >
 > **Permission bypass committed in the repo (2026-11-04, `schema_version` 40 -> 41, provisional; +2 rules):** **AGCFG-015** (high, 0.6, repo
 > scope, category `agent_config`, pack file `agent_config/script_agent_bypass.yaml`) over `repo_script_runs_agent_cli_with_bypass_flag`, backed by

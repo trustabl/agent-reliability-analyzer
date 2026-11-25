@@ -80,7 +80,15 @@ rules:
           - password
           - secret
           - credential
-          - token
+          - api token
+          - access token
+          - auth token
+          - authentication token
+          - bearer token
+          - refresh token
+          - session token
+          - oauth token
+          - secret token
           - api key
           - ssn
           - social security
@@ -120,22 +128,24 @@ rules:
           - for instance
           - e.g.
     explanation: >
-      This skill's body or description names a sensitive data class —
-      passwords, tokens, SSNs, credit card numbers, PII, or private keys — in
-      the same sentence as an operational verb (reads, stores, sends,
-      processes, ...), so it claims to actually handle that data rather than
-      merely mention it, without stating what it does with that data beyond
-      naming it. Without an explicit data-minimization boundary and a stated
-      purpose, there is no way to tell whether the skill only touches the
-      fields the task actually requires or whether it retains what it reads. A
-      sentence that only states where a credential already lives (e.g. "API
-      keys live in GitHub Actions secrets") does not count — only a claim that
-      the skill itself operates on the data does.
+      This skill's body or description names a sensitive data class (passwords, credentials,
+      credential-type tokens such as API, access, bearer, refresh or session tokens, SSNs,
+      credit card numbers, PII, or private keys) in the same sentence as an operational verb
+      (reads, stores, sends, processes, ...), so it claims to handle that data rather than
+      merely mention it, without stating what it does with that data beyond naming it. Without
+      an explicit data-minimization boundary and a stated purpose, there is no way to tell
+      whether the skill touches the fields the task requires or retains what it reads.
+      Limits of this check: it reads words, not meaning. A bare "token" does not match, so a
+      sentence about "the token" with no credential qualifier is not flagged. A sentence that
+      states where a credential already lives (for example "API keys live in GitHub Actions
+      secrets") does not count. "Credential" in the sense of a professional qualification,
+      "access" or "process" used in a different sense than operating on the data, and advice
+      about how other systems should treat credentials can still match.
     fix: >
-      Declare exactly which sensitive fields the skill reads, why it needs
-      them, and how long it keeps them (ideally: not at all, beyond the current
-      turn). If the skill only needs to detect or redact sensitive data rather
-      than process its contents, say so explicitly in the description.
+      Declare exactly which sensitive fields the skill reads, why it needs them, and how long
+      it keeps them (ideally: not at all, beyond the current turn). If the skill needs to
+      detect or redact sensitive data rather than process its contents, say so explicitly in
+      the description.
 
   - id: CSKILL-082
     title: Security-purpose skill grants side-effecting tools
@@ -213,26 +223,32 @@ rules:
       - claude_skill
     scope: skill
     match:
-      skill_body_has_text:
-        - all data
-        - entire
-        - complete database
-        - every record
-        - full export
-        - all files
-        - all records
+      skill_text_matches:
+        fields: [body]
+        terms:
+          - all data
+          - entire database
+          - entire dataset
+          - entire table
+          - complete database
+          - every record
+          - full export
+          - all records
     explanation: >
-      This skill's body uses broad-access phrasing — "all data", "entire",
-      "every record", "full export" — that suggests it pulls more than the
-      task at hand needs. Requesting an entire dataset or a full export when a
-      task needs only a filtered subset widens the blast radius of any bug,
-      leak, or injected instruction that later acts on the retrieved data.
+      This skill's body uses broad-access phrasing ("all data", "entire database", "every
+      record", "full export") that suggests it pulls more than the task at hand needs.
+      Requesting a whole dataset or a full export when a task needs a filtered subset widens
+      the blast radius of any bug, leak, or injected instruction that later acts on the
+      retrieved data.
+      Limits of this check: the phrases are matched as whole words, so "entirely" and
+      "small files" do not match, and a bare "entire" or "all files" is not flagged. A skill
+      can ask for everything with wording outside this list ("pull the whole users table").
+      The text states intent; the tool that runs the query enforces the real boundary.
     fix: >
-      Scope the skill's data access to the specific records or fields the task
-      requires and filter at the source rather than fetching everything and
-      filtering afterward. If a full export genuinely is the task, state why
-      in the skill's description so reviewers can evaluate the scope
-      deliberately rather than by default.
+      Scope the skill's data access to the specific records or fields the task requires and
+      filter at the source rather than fetching everything and filtering afterward. If a full
+      export is the task, state why in the skill's description so reviewers can evaluate the
+      scope deliberately rather than by default.
 
   - id: CSKILL-085
     title: Skill description states no purpose
@@ -243,25 +259,34 @@ rules:
     scope: skill
     match:
       not:
-        skill_description_has_text:
-          - in order to
-          - to allow
-          - to enable
-          - purpose
-          - used for
-          - designed to
-          - intended to
+        skill_text_matches:
+          fields: [description]
+          terms:
+            - to
+            - for
+            - when
+            - use
+            - used
+            - in order to
+            - so that
+            - purpose
+            - helps
+            - designed to
+            - intended to
     explanation: >
-      This skill's description contains no purpose phrasing — nothing framed
-      as "to enable…", "used for…", or "designed to…" — so it states what the
-      skill touches without stating why. A user or reviewer deciding whether
-      the skill's data access and tool grants are justified has no stated
-      intent to weigh them against.
+      This skill's description contains none of the words that introduce a purpose or
+      a trigger ("to ...", "for ...", "when ...", "use ...", "so that ..."), so it may state what
+      the skill touches without stating why. A user or reviewer deciding whether the skill's
+      data access and tool grants are justified has no stated intent to weigh them against.
+      Limits of this check: it looks for those words as whole words, not for meaning. A
+      description in a language other than English, or a description that states its goal
+      with a plain verb phrase ("Builds Flask apps"), can match without lacking a purpose,
+      and a description that uses one of the words in another sense passes without stating one.
     fix: >
-      Add one clause to the description that states the skill's purpose, e.g.
-      "…to allow drafting release notes from commit history." A single
-      purpose phrase is enough to let a reviewer judge whether the skill's
-      access is proportionate to what it's for.
+      Add one clause to the description that states the skill's purpose, for example "...to
+      allow drafting release notes from commit history", or when to use it. A single purpose
+      phrase is enough to let a reviewer judge whether the skill's access is proportionate to
+      what it is for.
 
   - id: CSKILL-086
     title: Skill body implies data retention or logging
@@ -271,30 +296,35 @@ rules:
       - claude_skill
     scope: skill
     match:
-      skill_body_has_text:
-        - log
-        - store
-        - persist
-        - save
-        - retain
-        - cache
-        - database
-        - write to
-        - append to
-        - record
+      skill_text_matches:
+        fields: [body]
+        terms:
+          - log
+          - store
+          - persist
+          - persistence
+          - persistent
+          - save
+          - retain
+          - cache
+          - write to
+          - append to
     explanation: >
-      This skill's body uses language implying persistence — logging,
-      storing, caching, or writing to a database — without stating a
-      retention policy or user-consent basis for keeping that data. Data that
-      is written or logged outlives the current session, so what gets kept,
-      for how long, and who can see it needs to be explicit rather than
-      implied by a verb in the instructions.
+      This skill's body uses language implying persistence (logging, storing, caching, saving,
+      or appending to a file) without stating a retention policy or user-consent basis for
+      keeping that data. Data that is written or logged outlives the current session, so what
+      gets kept, for how long, and who can see it needs to be explicit rather than implied by a
+      verb in the instructions.
+      Limits of this check: terms are matched as whole words, so "logic", "catalog",
+      "methodology" and "restore" do not match, and the bare nouns "record" and "database" are
+      no longer flagged. The sentence is not checked for a data-class word, so persisting a
+      setting or a generated file still matches, as does a sentence that reads logs rather
+      than writes them. Persistence worded outside the list ("keep a copy") is not seen.
     fix: >
-      State what is stored, where it's stored, how long it's retained, and
-      the basis for retaining it (e.g. "logs the request ID only, for 24
-      hours, to support debugging"). If the skill doesn't need to persist
-      anything beyond the current turn, say so explicitly instead of leaving
-      it to be inferred.
+      State what is stored, where it is stored, how long it is retained, and the basis for
+      retaining it (for example "logs the request ID, for 24 hours, to support debugging"). If
+      the skill does not need to persist anything beyond the current turn, say so explicitly
+      instead of leaving it to be inferred.
 
   - id: CSKILL-087
     title: Skill description is a placeholder

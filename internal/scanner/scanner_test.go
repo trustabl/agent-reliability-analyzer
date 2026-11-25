@@ -1509,6 +1509,48 @@ func TestScan_PermissionBypassFixture(t *testing.T) {
 	}
 }
 
+// End to end: the agent-server fixture has a * origin in Spring config and a Python
+// call, and a compose service that publishes the OpenHands agent server on all
+// interfaces with no session key name. AGSRV-001 and AGSRV-002 each fire once. The
+// test-path file and everything under safe/ stay silent, and the findings hold no
+// port or origin value.
+func TestScan_AgentServerExposureFixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "agent-server-exposure-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	got := map[string][]models.Finding{}
+	for _, f := range res.Findings {
+		if strings.HasPrefix(f.RuleID, "AGSRV-") {
+			got[f.RuleID] = append(got[f.RuleID], f)
+		} else if strings.HasPrefix(f.RuleID, "AGCFG-") || strings.HasPrefix(f.RuleID, "MCPCFG-") {
+			t.Errorf("%s fired on the agent-server fixture (%s:%d)", f.RuleID, f.FilePath, f.StartLine)
+		}
+	}
+	for id, want := range map[string]struct {
+		file string
+		line int
+	}{
+		"AGSRV-001": {"serve.py", 3},
+		"AGSRV-002": {"docker-compose.yml", 3},
+	} {
+		if len(got[id]) != 1 {
+			t.Fatalf("%s fired %d times, want once; findings: %v", id, len(got[id]), res.Findings)
+		}
+		f := got[id][0]
+		if !strings.HasSuffix(f.FilePath, want.file) || strings.Contains(f.FilePath, "safe/") || f.StartLine != want.line {
+			t.Errorf("%s attributed to %s:%d, want %s:%d", id, f.FilePath, f.StartLine, want.file, want.line)
+		}
+		for _, s := range []string{"8010"} {
+			if strings.Contains(f.Explanation+f.Title, s) {
+				t.Errorf("%s text holds %q", id, s)
+			}
+		}
+	}
+}
+
 // A husky hook file is read: the generated .husky/_ helper directory is not.
 func TestScan_PermissionBypassHuskyHook(t *testing.T) {
 	dir := t.TempDir()

@@ -528,6 +528,25 @@ read (CI-004 reads workflow steps on untrusted triggers only). The Reason names 
 binary and the flag; no other script text is kept. Hits land in
 `ProjectConfigFacts.ScriptAgentBypass`.
 
+**Agent server exposure (category `agent_server`, `schema_version` 43).** The walk records
+`application*.properties` in `ScanManifest.PropertiesFiles` and Dockerfiles, Makefiles and `*.sh` in
+`ScanManifest.ServerScriptFiles`; compose and Spring YAML files are read from `YAMLFiles`.
+`anyOriginServerHits` (`repo_agent_server_allows_any_origin`, AGSRV-001) reads the
+`adk.web.cors.origins` key (properties and YAML), a `get_fast_api_app(...)` call's `allow_origins`
+list in a Python file that imports `google.adk`, an `AdkApiServer(...)` call's `allowOrigins` in a
+TS/JS file that imports `@google/adk-devtools` (both outside `pathclass` test paths, and only where the call starts in code: `codeMask` skips
+comments, docstrings and string literals; `#` comment lines of script files are skipped too), and an
+`--allow_origins` option of `adk web` / `adk api_server` on a command line in a script file, compose
+`command` / `entrypoint` or package.json script; only a `*` entry counts. `agentServerNoKeyHits`
+(`repo_agent_server_exposed_without_key`, AGSRV-002) reads compose services and `docker run` lines
+whose image is `ghcr.io/openhands/agent-server` (or the default inside `${VAR:-default}`) and all
+three hold: a port is published without a loopback host address; `--host` in the compose
+`entrypoint` / `command` (or after the image in a `docker run` line) is a non-loopback IP literal
+(`hostFlagNonLoopback`; a name or `${VAR}` is not judged); and no `OH_SESSION_API_KEYS_*` /
+`SESSION_API_KEY` key name is set (`env_file` makes the service unjudged). The server binds loopback
+when it is given no `--host` and no key, so a published port alone does not fire. Hits are static-text `ConfigHit`s in
+`ProjectConfigFacts.AnyOriginServer` and `.AgentServerNoKey`. Code: `internal/analysis/agent_server_exposure.go`.
+
 `repo_settings_env_redirects_model_endpoint` (AGCFG-014) reads the `env` object of each
 parsed `.claude/settings.json` and `settings.local.json`: `modelEndpointOverrideHits`
 takes the `ANTHROPIC_BASE_URL` string and passes it to `modelEndpointClass`, which parses

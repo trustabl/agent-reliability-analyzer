@@ -69,4 +69,8 @@ package rules
 // Schema 42 adds the repo_otel_labels_reasoning_unhashed,
 // repo_otel_labels_reasoning_labelled and repo_model_reasoning_enabled predicates
 // (repo scope), read by the reasoning-label rules OBS-013..014.
-const SupportedSchemaVersion = 42
+//
+// Schema 43 adds the repo_agent_server_allows_any_origin and
+// repo_agent_server_exposed_without_key predicates (repo scope, category
+// agent_server).
+const SupportedSchemaVersion = 43
