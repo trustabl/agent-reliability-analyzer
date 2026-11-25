@@ -76,4 +76,9 @@ package rules
 //
 // Schema 44 adds the agent_deep_agent_shell_execute_ungated predicate (agent
 // scope) and the langchain_deep_agent applies_to token.
-const SupportedSchemaVersion = 44
+//
+// Schema 45 adds the slash_command scope (applies_to claude_slash_command) and its three
+// predicates, slash_command_allows_unrestricted_shell, slash_command_model_invocable and
+// slash_command_allows_unrestricted_tool. A binary without the scope skips those
+// rules with META-005.
+const SupportedSchemaVersion = 45

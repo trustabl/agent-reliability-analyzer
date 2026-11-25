@@ -6,9 +6,11 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 43 → 44 (`rules.SupportedSchemaVersion`, provisional). The rules fixture goes from 393 to 394 rules.
-`ScanID` changes, as with every schema bump. Engines older than this release skip LC-118 and
-report a degraded scan ("rules skipped", META-005) until they are upgraded.
+Rule schema 41 → 45 (`rules.SupportedSchemaVersion`; 42 to 44 are merged from main, 45 is provisional). The rules fixture
+goes from 389 to 397 rules (OBS-013..014, AGSRV-001..002, LC-118 and CCMD-001..003). `ScanID` changes, as with every
+schema bump, because it folds the engine's supported schema version. Engines without schema 45
+skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
+upgraded.
 
 ### Added
 
@@ -33,6 +35,23 @@ report a degraded scan ("rules skipped", META-005) until they are upgraded.
   `AgentDef` (SDK `langchain`, Class `DeepAgent`) per call bound to `deepagents` by import; the
   new Class keeps the `langchain_agent` rules from matching it. Backed by the in-memory
   `AgentDef.DeepShellBackend` and `AgentDef.DeepExecuteGate`. Primary source: CVE-2026-77926.
+
+- **Slash command rules (rule schema 44 → 45, provisional).** New `slash_command` scope
+  (`applies_to: [claude_slash_command]`) over the existing `.claude/commands/*.md` discovery,
+  three predicates (`slash_command_allows_unrestricted_shell`, `slash_command_model_invocable`,
+  `slash_command_allows_unrestricted_tool`) and rules **CCMD-001** (high, 0.9; a bare `Bash`,
+  `Bash(*)` or `Bash(:*)` grant in `allowed-tools`), **CCMD-002** (high, 0.8; a command the
+  model can start that pre-approves `Write`, `Edit`, `MultiEdit` or `NotebookEdit` with no
+  restricting pattern) and **CCMD-003** (medium, 0.7; `WebSearch` or a `WebFetch` with no
+  domain pattern), pack file `claude_skill/slash_command_safety.yaml`. Claude Code treats a
+  command file as a skill, so the predicates share their grant logic with the skill predicates;
+  a scoped grant such as `Bash(git status *)`, `Edit(docs/**)` or
+  `WebFetch(domain:example.com)` is silent. `disable-model-invocation` is read leniently
+  (`true`, `yes`, `on`, `y`, `1`, quoted or not), so a quoted value no longer drops a command's
+  whole frontmatter. The rules first shipped in rules #138 and were reverted in #139 with the
+  rest of that bulk reconcile. Command findings are not a scored surface, so no score changes;
+  a command under a test path is tagged test-origin like any finding. Not read: command bodies,
+  `~/.claude/commands`, MCP fetch tools.
 
 ## [0.1.16] - 2026-11-09
 

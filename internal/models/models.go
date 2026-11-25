@@ -14,12 +14,14 @@ const (
 	ScopeRepo     Scope = "repo"
 	ScopeSubagent Scope = "subagent"
 	ScopeSkill    Scope = "skill"
+	// ScopeSlashCommand fires per .claude/commands/*.md slash command.
+	ScopeSlashCommand Scope = "slash_command"
 )
 
 // AllScopes is every rule scope this build recognizes, in a stable order. Single
 // source of truth: ValidScope checks against it and the capability descriptor
 // (trustabl capabilities) lists it. Mirrors AllLanguages / AllCategories.
-var AllScopes = []Scope{ScopeTool, ScopeAgent, ScopeRepo, ScopeSubagent, ScopeSkill}
+var AllScopes = []Scope{ScopeTool, ScopeAgent, ScopeRepo, ScopeSubagent, ScopeSkill, ScopeSlashCommand}
 
 // ValidScope reports whether s is a known scope value.
 func ValidScope(s Scope) bool {
