@@ -12,7 +12,26 @@ schema bump, because it folds the engine's supported schema version. Engines wit
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
+### Fixed
+
+- **AGCFG-006 no longer flags endpoint keys the tool does not read** (no schema change). A `*_BASE_URL` key was flagged by suffix in `.gemini/.env` and `.codex/config.toml`.
+  `.gemini/.env` now judges `GOOGLE_GEMINI_BASE_URL` and `GOOGLE_VERTEX_BASE_URL`, the two
+  variables Gemini CLI reads, so `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` there are
+  silent. `.codex/config.toml` judges no endpoint key, because Codex ignores
+  `openai_base_url`, `chatgpt_base_url`, `model_provider`, `model_providers` and `profiles`
+  in a project file. Severity stays critical. Key names are read; no value is.
+  `*_PROXY_COMMAND` and `GEMINI_SANDBOX*` in `config.toml` are unchanged. Findings
+  that change: a `.gemini/.env` or `.codex/config.toml` whose sole hit was a suffix-matched
+  `*_BASE_URL` key loses that hit. The corpus and 120 public `.codex/config.toml` files
+  changed by none; `.gemini/.env` files in public repos were not sampled.
+
 ### Added
+
+- **AGCFG-012 judges `env`, `sed` and `awk` prefixes** (no schema change). A `Bash` allow
+  rule that is a bare `env`, `sed` or `awk` followed by a trailing wildcard now fires, from
+  the GNU manuals (`env` runs its command operand; `sed` runs a program through `e`;
+  `awk` through `system()` or a pipe). Claude Code may prompt for some of these forms in
+  ways its documentation does not describe.
 
 - **Deep Agent with a host-shell backend and no approval on execute (rule schema 43 → 44,
   provisional).** One new agent-scope predicate, `agent_deep_agent_shell_execute_ungated`, one
