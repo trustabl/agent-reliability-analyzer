@@ -1199,6 +1199,16 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   mis-attributed. Emitting `KindMCPTool` routes through the existing
   `SDKMCP` → `mcp` pack plumbing. Low-level `Server` + `setRequestHandler`
   tools are not extracted (gap).
+- **DiscoverCallKwargs** (`repo_call_kwargs.go`) — the fact behind `repo_call_kwarg_matches` (AGCFG-019, 020,
+  021), over the Python and TS/JS parsed files (test paths skipped via `pathclass`). It records a call that
+  passes one keyword from a closed table with a judged value: `env` on `StdioServerParameters` (Python, file imports from `mcp`)
+  or `StdioClientTransport` (TS, imported from `@modelcontextprotocol/sdk/client/stdio.js`), recorded when the launch command is not a literal, with value `environ`
+  (`os.environ`, a name imported from `os`, `.copy()`, `dict(...)`, a dict display with `**os.environ`; `process.env` or an object
+  spreading it, through a type cast), and `warn_only`, `ssrf_protection_enabled` and `trust_remote_code` with the literal `True` or
+  `False` (Python). Each hit is a `models.CallKwargHit` in `RepoInventory.CallKwargs`; a spec of the predicate matches it by exact callee,
+  callee substring, keyword and value. `transitive_capability_exceeds_direct` (OAI-210, OAI-211,
+  `PredAgentTransitiveCapabilityExceedsDirect`) walks `AgentDef.HandoffRefs.Resolved` breadth first with a visited set and asks
+  `PredAgentUsesToolKind` for `shell_invocation` on each target.
 - **DiscoverMCPServerBinds** (`mcp_server_binds.go`) — the fact behind MCP-203, over the
   Python and TS/JS parsed files (test paths skipped via `pathclass`). Python: a variable bound in
   the same file to `FastMCP(...)` / `MCPServer(...)` imported from `mcp.server.fastmcp`,

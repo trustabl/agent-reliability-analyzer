@@ -92,4 +92,7 @@ package rules
 // skill_bundled_script_destructive_command, skill_bundled_file_is_opaque and
 // skill_unpinned_install (skill scope). A binary below 47 skips the rules that use them with
 // META-005.
-const SupportedSchemaVersion = 47
+//
+// Schema 49 adds the repo_call_kwarg_matches predicate (repo scope) and the
+// transitive_capability_exceeds_direct predicate (agent scope). Provisional: batch 2 holds 48.
+const SupportedSchemaVersion = 49

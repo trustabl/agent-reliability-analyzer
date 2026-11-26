@@ -1,0 +1,63 @@
+policy:
+  id: agent_config_mcp_client_env
+  name: MCP stdio server started with the whole parent environment
+  category: agent_config
+  description: >
+    Repo-scoped rule for application code that launches an MCP server as a
+    child process through an MCP SDK client and hands that process the whole
+    environment of the parent. The pack loads for each scan (the file has no
+    SDK import), so the rule's own predicate does the gating. Fires once per
+    matching call, so two launch sites keep their own location.
+
+rules:
+  - id: AGCFG-019
+    title: MCP stdio server with a non-literal command is started with the whole parent environment
+    severity: medium
+    confidence: 0.4
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_call_kwarg_matches:
+        - callee:
+            - StdioServerParameters
+            - StdioClientTransport
+          kwarg: env
+          value: environ
+    explanation: >
+      Repo code builds the launch parameters of an MCP stdio server
+      (StdioServerParameters in Python, StdioClientTransport in TypeScript)
+      whose command is not a literal, so the program that runs comes from a
+      variable, a configuration lookup or input, with env set to the whole parent environment: os.environ, a copy of it, a
+      dict that unpacks it, or process.env. Both SDKs document a narrower
+      default. When env is not given, the child process receives
+      get_default_environment() (Python) or getDefaultEnvironment()
+      (TypeScript), which copy a short list of variables: HOME, LOGNAME, PATH,
+      SHELL, TERM and USER on POSIX, with a Windows equivalent. When env is
+      given, the SDK merges it over that list, so env=os.environ passes all
+      variables of the parent to the server, including API keys, cloud
+      credentials and tokens the server does not need. A server whose command
+      comes from a variable, a configuration lookup or input is code the host did
+      not write and the model's tool calls drive, so a variable that reaches it
+      can leave the host through that server.
+      Limits of this check: it reads the keyword or property written at the
+      launch call. A command that is a string literal, an f-string with no
+      substitution or sys.executable (TypeScript: a string or a template with no
+      substitution) names the project's own server and is not flagged; so is a
+      call with no command argument. An env value held in a variable (env=env), a dict built in a
+      helper, a **kwargs splat and a launch configured in a JSON file are not
+      judged; the JSON launch configs have their own rules. A Python call is
+      judged when the file imports from the mcp package and the callee is named
+      StdioServerParameters; a TypeScript call is judged when
+      StdioClientTransport is imported from the SDK's client/stdio module. Files
+      under a test path are not read. A non-literal command does not prove that the
+      server is third-party code; a path built from the project's own directory
+      in an f-string or a variable is flagged. A subprocess call or another SDK's
+      options object that receives os.environ is not judged: a child process
+      inherits the full parent environment when env is omitted, so passing
+      os.environ there changes nothing.
+    fix: >
+      Pass the variables the server reads and no others, for example
+      env={"GITHUB_TOKEN": os.environ["GITHUB_TOKEN"]}. The SDK adds its short
+      default list (PATH and the other variables above), so the server still
+      starts. Keep the secrets of the host process out of that dict.

@@ -1,0 +1,89 @@
+policy:
+  id: openai_sdk_handoff_shell_chain
+  name: Handoff chain reaches shell execution
+  category: openai_sdk
+  description: >
+    Agent-scoped rules for OpenAI Agents SDK agents that reach, through their
+    resolved handoff targets, an agent that executes shell commands. The
+    guarded and unguarded cases are separate rules; they cannot both fire on
+    one agent. The pack loads when the repo imports the OpenAI Agents SDK.
+
+rules:
+  - id: OAI-210
+    title: Agent with no input_guardrails reaches a shell-executing agent through its handoffs
+    severity: medium
+    confidence: 0.5
+    applies_to:
+      - openai_agent
+      - openai_sandbox_agent
+    scope: agent
+    match:
+      all:
+        - not:
+            agent_kwarg_present:
+              - input_guardrails
+        - transitive_capability_exceeds_direct:
+            - shell
+    explanation: >
+      This agent declares no input_guardrails and hands off, directly or through
+      a chain of handoffs, to an agent whose tools execute shell commands, while
+      this agent has no shell tool of its own. The OpenAI Agents SDK guardrails
+      page states that input guardrails run for the first agent in the
+      chain, so an agent that receives the user's message with no
+      input_guardrails passes it on with nothing screening it before a
+      downstream shell tool can act. Each agent can look harmless on its own;
+      the chain is where the shell capability meets input that nothing checked.
+      Limits of this check: it reads handoff targets that discovery resolves to
+      an agent in the same file; a target in another file, built by a factory or
+      passed through a variable is not followed. Shell execution means a tool
+      that calls subprocess or os.system, a shell-invocation tool, or a hosted
+      ShellTool, LocalShellTool, ApplyPatchTool or CodeInterpreterTool on the
+      target. The check cannot tell which agent receives the user's input; an
+      agent in the middle of a chain is judged the same as the entry agent, and
+      its own guardrails would not run in that position. An input_filter on the
+      handoff, tool-level validation and approval settings on the shell tool are
+      not read. A shell tool on this agent itself is the concern of the direct
+      shell rules.
+    fix: >
+      Add input_guardrails to the agent that receives the user's input, and
+      review whether the downstream agent needs shell access at all. Constrain
+      the delegated payload with an input_filter on the handoff and validate the
+      command inside the shell tool, because the downstream agent's own input
+      guardrails do not run on a delegated turn.
+
+  - id: OAI-211
+    title: Agent with input_guardrails reaches a shell-executing agent through its handoffs
+    severity: low
+    confidence: 0.5
+    applies_to:
+      - openai_agent
+      - openai_sandbox_agent
+    scope: agent
+    match:
+      all:
+        - agent_kwarg_present:
+            - input_guardrails
+        - transitive_capability_exceeds_direct:
+            - shell
+    explanation: >
+      This agent declares input_guardrails and hands off, directly or through a
+      chain of handoffs, to an agent whose tools execute shell commands, while
+      this agent has no shell tool of its own. The OpenAI Agents SDK guardrails
+      page states that input guardrails run for the first agent in the
+      chain, so these guardrails screen the user's message when this agent is
+      the entry agent and do not run again on the delegated turn. The text that
+      reaches the shell tool is the handoff payload, which the model wrote, and
+      the guardrails did not see it.
+      Limits of this check: it reads handoff targets that discovery resolves to
+      an agent in the same file; a target in another file, built by a factory or
+      passed through a variable is not followed. The check does not read what
+      the guardrails test, an input_filter on the handoff, or validation inside
+      the shell tool, and it cannot tell whether this agent is the entry agent.
+      An agent with no input_guardrails and the same chain is OAI-210, so the
+      two rules do not fire on one agent. This rule is rated lower than OAI-210
+      because the guardrails here screen the user's message at the entry point.
+    fix: >
+      Validate the delegated payload where it is used: add an input_filter on
+      the handoff and check the command inside the shell tool, because the
+      downstream agent's input guardrails do not run on a delegated turn.
+      Review whether the downstream agent needs shell access.

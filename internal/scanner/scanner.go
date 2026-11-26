@@ -437,6 +437,8 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
 	// MCP-203: MCP server code binding an HTTP transport to a literal wildcard host.
 	inventory.MCPServerBinds = analysis.DiscoverMCPServerBinds(parsed, tsFiles)
+	// AGCFG-019..021: call-site keywords with a literal or whole-environment value.
+	inventory.CallKwargs = analysis.DiscoverCallKwargs(parsed, tsFiles)
 	// Run-time callbacks (agent.invoke(..., config={"callbacks": [...]})) credit
 	// a LangChain agent the way a process-wide instrumentor does. Must follow
 	// both ApplyGlobalInstrumentation (whose credit it keeps) and the run calls.

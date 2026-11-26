@@ -675,6 +675,7 @@ type RepoInventory struct {
 	AgentRunCalls      []AgentRunCallDef       `json:"agent_run_calls,omitempty"`
 	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	MCPServerBinds     []MCPServerBind         `json:"mcp_server_binds,omitempty"`
+	CallKwargs         []CallKwargHit          `json:"call_kwargs,omitempty"`
 	SDKsDetected       []SDK                   `json:"sdks_detected"`
 	// HasShellInvocations is true if any discovered ToolDef is a
 	// KindShellInvocation (a Python function whose body calls

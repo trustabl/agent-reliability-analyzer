@@ -372,6 +372,14 @@ rules:
 #       (e.g. an SDK we discovered but did not resolve back to a typed def)
 #       still counts.
 #
+#   transitive_capability_exceeds_direct: [shell]
+#       The agent reaches, through its resolved handoff chain, an agent that wields a named
+#       capability while the agent itself does not. Only "shell" is defined: an agent whose
+#       tools or hosted tools satisfy agent_uses_tool_kind [shell_invocation]. The walk follows
+#       Resolved handoff targets with a visited set (a self edge or a cycle ends it); an
+#       unresolved or external target is not followed, and a handoff target in another file is
+#       resolved only where discovery resolves it. An unknown capability name matches nothing.
+#       OAI-210, OAI-211.
 #   agent_is_subagent_of_any: bool
 #       Returns true if the agent appears as a Resolved entry in any other
 #       agent's HandoffRefs in the inventory. Useful for rules that fire only
@@ -1006,6 +1014,22 @@ rules:
 #       An MCP client config entry is started by npx, bunx, pnpm dlx, uvx, uv tool run or
 #       pipx run on a package that the modelcontextprotocol/servers README lists as
 #       archived, at any version (ProjectConfigFacts.DeprecatedMCPLaunch). MCPCFG-006.
+#   repo_call_kwarg_matches: [ {callee, callee_contains, kwarg, value} ]
+#       Repo code (Python and TypeScript, outside test paths) has a call that passes one keyword
+#       or object property from a closed table with a judged value, and the call matches any
+#       one spec of the list. callee is a list of exact callee names (the last name of the
+#       call), callee_contains a list of lower-case substrings of it; with both empty any
+#       callee matches. kwarg and value are required. The recorded table is:
+#       env on StdioServerParameters (Python, file imports from mcp) or StdioClientTransport
+#       (TypeScript, imported from @modelcontextprotocol/sdk/client/stdio.js), recorded only when the
+#       call's command is not a literal (a string, an f-string with no substitution, sys.executable;
+#       TypeScript: a string or a template with no substitution), value environ
+#       (os.environ, os.environ.copy(), dict(os.environ), a dict display with a **os.environ
+#       entry; process.env or an object spreading it); warn_only, ssrf_protection_enabled and
+#       trust_remote_code on any Python call, values true or false for the literal True or
+#       False. A keyword outside the table, a value held in a variable, a **kwargs splat and a
+#       call under a test path are not recorded, so a spec naming them never matches. One
+#       finding per matching call (RepoInventory.CallKwargs). AGCFG-019, 020, 021.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,
