@@ -10,3 +10,5 @@ confirm flag, and an options order tool with no limit). `safe/` holds the same s
 task-scoped preference, decode and follow in separate sentences, a plain description, an
 accept check, filters, needs_approval and a size limit. `tests/` holds a directive description
 under a test path. No external code. Public-domain.
+
+`agents.py` also sets a run-level `handoff_input_filter` (added with static batch 2) so that OAI-204 stays silent on its handoff.

@@ -372,11 +372,35 @@ rules:
 #       (e.g. an SDK we discovered but did not resolve back to a typed def)
 #       still counts.
 #
+#   transitive_capability_exceeds_direct: [shell]
+#       The agent reaches, through its resolved handoff chain, an agent that wields a named
+#       capability while the agent itself does not. Only "shell" is defined: an agent whose
+#       tools or hosted tools satisfy agent_uses_tool_kind [shell_invocation]. The walk follows
+#       Resolved handoff targets with a visited set (a self edge or a cycle ends it); an
+#       unresolved or external target is not followed, and a handoff target in another file is
+#       resolved only where discovery resolves it. An unknown capability name matches nothing.
+#       OAI-210, OAI-211.
 #   agent_is_subagent_of_any: bool
 #       Returns true if the agent appears as a Resolved entry in any other
 #       agent's HandoffRefs in the inventory. Useful for rules that fire only
 #       on agents that participate in a delegation tree (e.g. ADK's sub_agents
 #       composition or OpenAI's handoffs= edges).
+#
+#   agent_handoff_missing_input_filter: bool
+#       OpenAI Agents SDK (Python and TypeScript). True when an entry of the agent's handoffs
+#       list is a bare agent name, or a handoff(...) call without input_filter (inputFilter in
+#       TypeScript) or with it set to None, and the named agent, defined in the same file,
+#       holds a shell tool (agent_uses_tool_kind shell_invocation), and no call anywhere in
+#       the scanned non-test code passes handoff_input_filter (handoffInputFilter). A Handoff
+#       held in a variable, an imported target and an entry in another form are not judged
+#       (AgentDef.HandoffInputs, RepoInventory.HandoffInputFilterConfigured). OAI-204.
+#
+#   agent_tools_match: {param_names: [name, ...], other_tool_name_regex: regex}
+#       True when one tool in the agent's tools list, resolved to a definition (a reference written as one wrapper call around a name, such as Tool(fn), is looked up by that name in the same file), takes a
+#       parameter equal (case-insensitive) to one of param_names, and a different resolved tool
+#       has a name matching the regex. The tool name is split at lower-to-upper case changes
+#       and hyphens into underscore form and lowercased before the match. OAI-205, LC-203,
+#       CREW-203, ADK-203, PYD-203.
 #
 #   agent_hosted_tool_kwarg_present: {class: ToolClass, kwarg: name}
 #       Returns true if the agent wires a hosted tool of `class` whose `kwarg`
@@ -983,6 +1007,51 @@ rules:
 #       modules. A host from a variable, f-string or environment lookup, a loopback or default
 #       host, and a **kwargs splat are not judged. Test paths are skipped. The host is reduced
 #       to the judgment during discovery and never stored. One finding per bind (MCP-203).
+#   repo_mcp_prefix_containment_unsafe: true | false
+#       In a TypeScript or JavaScript file (outside test paths) that imports a package named
+#       @modelcontextprotocol/..., a startsWith call whose receiver text names a path (path,
+#       file, dir, target, real, resolved, normalized, absolute, requested) and whose one
+#       argument is neither a string, a template nor a number, names a directory (dir, root,
+#       base, allowed, path, cwd, folder, workspace, sandbox) and contains no sep, no slash
+#       string and no trailing slash, and where neither side contains pathname, url, href, route
+#       or endpoint (MCPCodeFact kind prefix_containment). MCP-204.
+#   repo_mcp_stdio_client_nonliteral_command: true | false
+#       Python StdioServerParameters(...), the params dict of MCPServerStdio(...) or an entry
+#       of MultiServerMCPClient(...), or TypeScript new StdioClientTransport({...}), whose
+#       literal command (or identifier assigned once in the file to a literal) is a shell
+#       (bash, sh, zsh, dash, cmd, powershell, pwsh) with a -c, /c, -lc or -Command argument;
+#       or whose command is not a literal and whose expression text contains one of the whole
+#       words request, req, body, payload, query, params, form, json or input, in a file that
+#       names no allow-list (allowlist, allowed commands, whitelist). A command from a
+#       configuration object or a function parameter is not judged (MCPCodeFact kind
+#       stdio_command). The name of the predicate predates this narrowing. MCP-205.
+#   repo_mcp_server_bearer_without_audience: true | false
+#       A Python file that imports mcp or fastmcp calls AuthSettings(...) with
+#       validate_token_resource absent, None or False, names token_verifier, and contains no
+#       aud or audience text outside comments (MCPCodeFact kind bearer_no_audience). MCP-206.
+#   repo_mcp_client_opens_server_url: true | false
+#       A function of one parameter (Python, file imports mcp) or a redirectToAuthorization
+#       method or property (TypeScript) whose body passes that parameter to webbrowser.open,
+#       os.startfile, os.system, a subprocess call running xdg-open, open or start, the open
+#       package, or child_process exec or spawn, and whose body names no scheme, origin or host
+#       check (.protocol, .origin, .hostname, .scheme, urlparse, new URL(, allowed, startsWith
+#       with an http literal) (MCPCodeFact kind client_opens_url). MCP-207.
+#   repo_mcp_server_shares_transport: true | false
+#       In a TypeScript file that imports @modelcontextprotocol/server, a variable declared at
+#       module scope as new McpServer(...) or new Server(...) that a function connects, or as
+#       an imported transport class whose name contains Transport and HTTP that a function
+#       passes a request with handleRequest (MCPCodeFact kind shared_transport). MCP-208.
+#   repo_mcp_server_dns_rebinding_disabled: true | false
+#       A Python file that imports mcp or fastmcp calls TransportSecuritySettings with
+#       enable_dns_rebinding_protection=False and names none of token_verifier,
+#       auth_server_provider, AuthSettings or auth= outside comments (MCPCodeFact kind
+#       dns_rebinding_off). MCP-209.
+#   repo_mcp_server_installs_package_from_input: true | false
+#       In a TypeScript or JavaScript file that imports an @modelcontextprotocol package, an
+#       execFileSync, execFile, spawn, spawnSync, execa or execaSync call whose program is npm
+#       or pnpm and whose argument array holds add, install or i followed by an identifier,
+#       template, concatenation or member expression, in a file with no .test(, semver,
+#       .valid( or .satisfies( outside comments (MCPCodeFact kind pkg_install_spec). MCP-210.
 #   repo_script_runs_agent_cli_with_bypass_flag: true | false
 #       A package.json lifecycle script (preinstall, install, postinstall, prepare), a
 #       .husky hook file line, or a JS/TS process-spawn call (spawn, spawnSync, exec,
@@ -1038,6 +1107,22 @@ rules:
 #       An MCP client config entry is started by npx, bunx, pnpm dlx, uvx, uv tool run or
 #       pipx run on a package that the modelcontextprotocol/servers README lists as
 #       archived, at any version (ProjectConfigFacts.DeprecatedMCPLaunch). MCPCFG-006.
+#   repo_call_kwarg_matches: [ {callee, callee_contains, kwarg, value} ]
+#       Repo code (Python and TypeScript, outside test paths) has a call that passes one keyword
+#       or object property from a closed table with a judged value, and the call matches any
+#       one spec of the list. callee is a list of exact callee names (the last name of the
+#       call), callee_contains a list of lower-case substrings of it; with both empty any
+#       callee matches. kwarg and value are required. The recorded table is:
+#       env on StdioServerParameters (Python, file imports from mcp) or StdioClientTransport
+#       (TypeScript, imported from @modelcontextprotocol/sdk/client/stdio.js), recorded only when the
+#       call's command is not a literal (a string, an f-string with no substitution, sys.executable;
+#       TypeScript: a string or a template with no substitution), value environ
+#       (os.environ, os.environ.copy(), dict(os.environ), a dict display with a **os.environ
+#       entry; process.env or an object spreading it); warn_only, ssrf_protection_enabled and
+#       trust_remote_code on any Python call, values true or false for the literal True or
+#       False. A keyword outside the table, a value held in a variable, a **kwargs splat and a
+#       call under a test path are not recorded, so a spec naming them never matches. One
+#       finding per matching call (RepoInventory.CallKwargs). AGCFG-019, 020, 021.
 #   repo_ci_agent_untrusted_trigger_ungated: true | false
 #       CI workflows (category ci; applies_to github_actions). True when a coding
 #       agent step runs on pull_request_target, issue_comment, issues, discussion,

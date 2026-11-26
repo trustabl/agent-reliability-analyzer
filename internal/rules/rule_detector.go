@@ -168,6 +168,30 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 		}
 		return out
 	}
+	// AGCFG-019..021 report one finding per matching call, so two sites keep their own location.
+	if specs := d.rule.Match.RepoCallKwargMatches; len(specs) > 0 {
+		hits := PredRepoCallKwargHits(specs, inv)
+		out := make([]models.Finding, 0, len(hits))
+		for _, h := range hits {
+			out = append(out, findingFromRule(d.rule, models.ScopeRepo, h.FilePath, h.Line, h.Line, ""))
+		}
+		return out
+	}
+	// MCP-204 to MCP-210 report one finding per site.
+	for _, mc := range mcpCodePredicates(d.rule.Match) {
+		if mc.set == nil || !*mc.set {
+			continue
+		}
+		var out []models.Finding
+		for _, f := range inv.MCPCode {
+			if f.Kind == mc.kind {
+				out = append(out, findingFromRule(d.rule, models.ScopeRepo, f.FilePath, f.Line, f.Line, ""))
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
 	if s := otelLabelsEvidence(d.rule.Match, inv); s != nil {
 		return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, s.File, s.StartLine, s.EndLine, "")}
 	}

@@ -1,0 +1,49 @@
+policy:
+  id: mcp_path_prefix_containment
+  name: MCP server path containment by string prefix
+  category: mcp
+  description: >
+    Repo-scoped rule for TypeScript and JavaScript MCP server code that decides whether a path
+    is inside an allowed directory with startsWith and a root that has no separator appended.
+    It reads the call in the source of files that import an MCP package.
+
+rules:
+  - id: MCP-204
+    title: Path containment check uses startsWith with a root that has no separator
+    severity: high
+    confidence: 0.5
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_prefix_containment_unsafe: true
+    explanation: >
+      A file that imports an MCP package calls startsWith on a path-like value with a
+      directory-like argument that is not a string literal and whose text names no path
+      separator. A prefix test of this form accepts a sibling directory whose name begins with
+      the allowed directory's name. The Cymulate write-up of CVE-2025-53109 and CVE-2025-53110
+      in the filesystem MCP server states that "a naive prefix-matching check lets any path
+      that simply begins with the approved directory (e.g., /private/tmp/allowed_dir) bypass
+      the filter", and GitHub advisory GHSA-hc55-p739-j48w states that versions before 2025.7.1
+      "could allow access to unintended files in cases where the prefix matches an allowed
+      directory". The fixed server code compares against the allowed directory with a
+      separator appended, or for equality, and resolves symlinks with realpath before the
+      check.
+      Limits of this check: it reads TypeScript and JavaScript; Python containment checks
+      are not judged. It reads the call in files that import a package whose name starts with
+      @modelcontextprotocol/, so a helper in a file with no such import is not seen. A call
+      counts when the receiver text contains path, file, dir, target, real, resolved,
+      normalized, absolute or requested, and the argument is an identifier or expression
+      whose text contains dir, root, base, allowed, path, cwd, folder, workspace or sandbox. An
+      argument that is a string literal or template, or whose text contains sep or a slash
+      string, is not judged, so a root that gains its separator in an earlier statement is
+      reported. The rule does not check whether the path was resolved with realpath first, and
+      it does not judge a check built with path.relative. A call whose receiver or argument text contains pathname, url, href, route or endpoint is treated as a URL path and is not judged. It matches a pattern and does not
+      show that a client can supply the path.
+    fix: >
+      Resolve the requested path with fs.realpath, then accept it when it equals the allowed
+      directory or starts with the allowed directory followed by path.sep (compare
+      normalizedDir + path.sep). Alternatively compute path.relative(root, target) and reject a
+      result that starts with .. or is absolute. Run the check on the resolved path that the
+      file operation then uses.
+

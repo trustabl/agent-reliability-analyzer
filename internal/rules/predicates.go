@@ -2243,6 +2243,202 @@ func PredRepoLangGraphPlatformConfigPresent(inv models.RepoInventory) bool {
 	return false
 }
 
+// ─── MCP code predicates (MCP-204 to MCP-210) ─────────────────────────────────
+
+type mcpCodePredicate struct {
+	set  *bool
+	kind models.MCPCodeKind
+}
+
+// mcpCodePredicates lists the repo predicates that read MCPCodeFacts, paired with their kind.
+func mcpCodePredicates(e MatchExpr) []mcpCodePredicate {
+	return []mcpCodePredicate{
+		{e.RepoMCPPrefixContainmentUnsafe, models.MCPCodePrefixContainment},
+		{e.RepoMCPStdioClientNonliteralCommand, models.MCPCodeStdioCommand},
+		{e.RepoMCPServerBearerWithoutAudience, models.MCPCodeBearerNoAudience},
+		{e.RepoMCPClientOpensServerURL, models.MCPCodeClientOpensURL},
+		{e.RepoMCPServerSharesTransport, models.MCPCodeSharedTransport},
+		{e.RepoMCPServerDNSRebindingDisabled, models.MCPCodeDNSRebindingOff},
+		{e.RepoMCPServerInstallsPackageFromInput, models.MCPCodePkgInstallSpec},
+	}
+}
+
+func hasMCPCode(inv models.RepoInventory, k models.MCPCodeKind) bool {
+	for _, f := range inv.MCPCode {
+		if f.Kind == k {
+			return true
+		}
+	}
+	return false
+}
+
+// ─── OpenAI handoff and approval-tool predicates (OAI-204, OAI-205) ───────────
+
+// PredAgentHandoffMissingInputFilter reports whether an OpenAI agent lists, in handoffs=, an
+// agent defined in the same file that holds a shell tool, with no input filter on the entry,
+// and no RunConfig in the scanned code sets handoff_input_filter.
+func PredAgentHandoffMissingInputFilter(a models.AgentDef, inv models.RepoInventory) bool {
+	if a.SDK != models.SDKOpenAIAgents || inv.HandoffInputFilterConfigured {
+		return false
+	}
+	for _, h := range a.HandoffInputs {
+		if h.HasInputFilter || h.Target == "" {
+			continue
+		}
+		for i := range inv.Agents {
+			t := inv.Agents[i]
+			if t.FilePath != a.FilePath || t.SDK != models.SDKOpenAIAgents {
+				continue
+			}
+			if (t.VarName == h.Target || t.Name == h.Target) && PredAgentUsesToolKind([]string{"shell_invocation"}, t, inv) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+var camelBoundaryRe = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+
+func normalizeToolName(n string) string {
+	n = camelBoundaryRe.ReplaceAllString(strings.Trim(n, `"'`), "${1}_${2}")
+	return strings.ToLower(strings.ReplaceAll(n, "-", "_"))
+}
+
+// agentToolDefs returns the definitions of the tools in the agent's tools list. A reference
+// that resolved is used as is; one that is a single wrapper call around a name, such as
+// Tool(fn) or FunctionTool(fn), is looked up by that name among the tools discovered in the
+// agent's file.
+func agentToolDefs(a models.AgentDef, inv models.RepoInventory) []models.ToolDef {
+	var out []models.ToolDef
+	for _, ref := range a.ToolRefs {
+		if ref.Resolved != nil {
+			out = append(out, *ref.Resolved)
+			continue
+		}
+		name := ref.Name
+		if i := strings.Index(name, "("); i > 0 && strings.HasSuffix(name, ")") {
+			name = strings.TrimSpace(name[i+1 : len(name)-1])
+		}
+		for _, t := range inv.Tools {
+			if t.FilePath == a.FilePath && t.Name == name {
+				out = append(out, t)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// PredAgentToolsMatch reports whether one tool of the agent takes a parameter named in
+// expr.ParamNames and another tool has a name matching expr.OtherToolNameRegex.
+func PredAgentToolsMatch(expr AgentToolsMatchExpr, a models.AgentDef, inv models.RepoInventory) bool {
+	re, err := regexp.Compile(expr.OtherToolNameRegex)
+	if err != nil || len(expr.ParamNames) == 0 {
+		return false
+	}
+	tools := agentToolDefs(a, inv)
+	for i, t := range tools {
+		takes := false
+		for _, p := range t.ParamNames {
+			for _, want := range expr.ParamNames {
+				if strings.EqualFold(p, want) {
+					takes = true
+				}
+			}
+		}
+		if !takes {
+			continue
+		}
+		for j, other := range tools {
+			if j != i && re.MatchString(normalizeToolName(other.Name)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// PredRepoCallKwargHits returns the recorded call-site keywords that match any spec of
+// repo_call_kwarg_matches, in inventory order. A spec with no Kwarg or Value matches nothing.
+func PredRepoCallKwargHits(specs []CallKwargSpec, inv models.RepoInventory) []models.CallKwargHit {
+	var out []models.CallKwargHit
+	for _, h := range inv.CallKwargs {
+		for _, sp := range specs {
+			if callKwargSpecMatches(sp, h) {
+				out = append(out, h)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func callKwargSpecMatches(sp CallKwargSpec, h models.CallKwargHit) bool {
+	if sp.Kwarg == "" || sp.Value == "" || sp.Kwarg != h.Kwarg || sp.Value != h.Value {
+		return false
+	}
+	if len(sp.Callee) == 0 && len(sp.CalleeContains) == 0 {
+		return true
+	}
+	for _, c := range sp.Callee {
+		if c == h.Callee {
+			return true
+		}
+	}
+	lower := strings.ToLower(h.Callee)
+	for _, c := range sp.CalleeContains {
+		if c != "" && strings.Contains(lower, strings.ToLower(c)) {
+			return true
+		}
+	}
+	return false
+}
+
+// transitiveCapabilityKinds maps a capability name of transitive_capability_exceeds_direct to
+// the tool kinds PredAgentUsesToolKind judges. Only shell is defined.
+var transitiveCapabilityKinds = map[string][]string{"shell": {"shell_invocation"}}
+
+// PredAgentTransitiveCapabilityExceedsDirect reports whether the agent reaches, through its
+// resolved handoff chain, an agent that wields one of the named capabilities while the agent
+// itself does not. The walk follows Resolved handoff targets with a visited set, so a cycle or
+// a self edge ends it; an unresolved or external target is not followed. An unknown capability
+// name matches nothing.
+func PredAgentTransitiveCapabilityExceedsDirect(caps []string, a models.AgentDef, inv models.RepoInventory) bool {
+	for _, c := range caps {
+		kinds, ok := transitiveCapabilityKinds[c]
+		if !ok || PredAgentUsesToolKind(kinds, a, inv) {
+			continue
+		}
+		type key struct {
+			name, file string
+			line       int
+		}
+		visited := map[key]bool{{a.Name, a.FilePath, a.Line}: true}
+		queue := []*models.AgentDef{}
+		push := func(from models.AgentDef) {
+			for _, ref := range from.HandoffRefs {
+				t := ref.Resolved
+				if t == nil || visited[key{t.Name, t.FilePath, t.Line}] {
+					continue
+				}
+				visited[key{t.Name, t.FilePath, t.Line}] = true
+				queue = append(queue, t)
+			}
+		}
+		push(a)
+		for len(queue) > 0 {
+			t := queue[0]
+			queue = queue[1:]
+			if PredAgentUsesToolKind(kinds, *t, inv) {
+				return true
+			}
+			push(*t)
+		}
+	}
+	return false
+}
+
 // ─── guidance-file and trace predicates (schema 50) ───────────────────────────
 
 // guidancePhraseIn reports whether phrase occurs in sentence (both lowercase). A

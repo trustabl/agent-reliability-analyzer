@@ -99,12 +99,18 @@ type MatchExpr struct {
 	AgentGrantsBuiltinTool         []string                  `yaml:"agent_grants_builtin_tool,omitempty"`
 	AgentUsesHostedToolClass       []string                  `yaml:"agent_uses_hosted_tool_class,omitempty"`
 	AgentIsSubagentOfAny           *bool                     `yaml:"agent_is_subagent_of_any,omitempty"`
+	AgentHandoffMissingInputFilter *bool                     `yaml:"agent_handoff_missing_input_filter,omitempty"`
+	AgentToolsMatch                *AgentToolsMatchExpr      `yaml:"agent_tools_match,omitempty"`
 	AgentHostedToolKwargPresent    *HostedToolKwargExpr      `yaml:"agent_hosted_tool_kwarg_present,omitempty"`
 	AgentHostedToolKwargValue      *HostedToolKwargValueExpr `yaml:"agent_hosted_tool_kwarg_value,omitempty"`
 	AgentRunCallMaxTurnsMissing    *bool                     `yaml:"agent_run_call_max_turns_missing,omitempty"`
 	AgentRunCallUsageLimitsMissing *bool                     `yaml:"agent_run_call_usage_limits_missing,omitempty"`
 	AgentMCPServerKwargMissing     *MCPServerKwargExpr       `yaml:"agent_mcp_server_kwarg_missing,omitempty"`
 	AgentFileURLForceDownload      *bool                     `yaml:"agent_file_url_force_download,omitempty"`
+	// AgentTransitiveCapabilityExceedsDirect names capabilities (only "shell" is defined)
+	// that an agent reaches through its resolved handoff chain and does not wield itself
+	// (OAI-210, OAI-211).
+	AgentTransitiveCapabilityExceedsDirect []string `yaml:"transitive_capability_exceeds_direct,omitempty"`
 	// AgentRunCallWallClockTimeoutMissing: see PredAgentRunCallWallClockTimeoutMissing.
 	AgentRunCallWallClockTimeoutMissing *bool `yaml:"agent_run_call_wall_clock_timeout_missing,omitempty"`
 	// AgentKwargsObserved is true iff discovery resolved the agent's call site
@@ -202,9 +208,24 @@ type MatchExpr struct {
 	RepoClaudeSettingsLocalCommitted       *bool `yaml:"repo_claude_settings_local_committed,omitempty"`
 	RepoMCPConfigLaunchesDeprecatedPackage *bool `yaml:"repo_mcp_config_launches_deprecated_package,omitempty"`
 
+	// RepoCallKwargMatches is a list of call-site specs; the predicate holds when repo code
+	// has a call that matches any one of them (AGCFG-019, 020, 021). It reads
+	// RepoInventory.CallKwargs.
+	RepoCallKwargMatches []CallKwargSpec `yaml:"repo_call_kwarg_matches,omitempty"`
+
 	// RepoMCPServerBindsAllInterfacesUnprotected is true when MCP server code starts an HTTP
 	// transport on a literal wildcard host with no auth or allow-list in the file (MCP-203).
 	RepoMCPServerBindsAllInterfacesUnprotected *bool `yaml:"repo_mcp_server_binds_all_interfaces_unprotected,omitempty"`
+
+	// MCP code predicates (MCP-204 to MCP-210). Each is true when the matching MCPCodeFact kind
+	// is present in the inventory.
+	RepoMCPPrefixContainmentUnsafe        *bool `yaml:"repo_mcp_prefix_containment_unsafe,omitempty"`
+	RepoMCPStdioClientNonliteralCommand   *bool `yaml:"repo_mcp_stdio_client_nonliteral_command,omitempty"`
+	RepoMCPServerBearerWithoutAudience    *bool `yaml:"repo_mcp_server_bearer_without_audience,omitempty"`
+	RepoMCPClientOpensServerURL           *bool `yaml:"repo_mcp_client_opens_server_url,omitempty"`
+	RepoMCPServerSharesTransport          *bool `yaml:"repo_mcp_server_shares_transport,omitempty"`
+	RepoMCPServerDNSRebindingDisabled     *bool `yaml:"repo_mcp_server_dns_rebinding_disabled,omitempty"`
+	RepoMCPServerInstallsPackageFromInput *bool `yaml:"repo_mcp_server_installs_package_from_input,omitempty"`
 
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
@@ -336,6 +357,18 @@ type HostedToolKwargValueExpr struct {
 	Value string `yaml:"value"` // compared after quote-stripping for string literals
 }
 
+// CallKwargSpec is one alternative of repo_call_kwarg_matches. Callee lists exact callee
+// names (the last name of the call, so `mcp.StdioServerParameters(...)` is
+// StdioServerParameters); CalleeContains lists substrings of the callee name, compared in lower
+// case; with both empty any callee matches. Kwarg is the keyword or object-property name and
+// Value is the judged value: environ (the whole parent environment), true or false.
+type CallKwargSpec struct {
+	Callee         []string `yaml:"callee,omitempty"`
+	CalleeContains []string `yaml:"callee_contains,omitempty"`
+	Kwarg          string   `yaml:"kwarg"`
+	Value          string   `yaml:"value"`
+}
+
 // MCPServerKwargExpr matches the absence of a kwarg on an MCP server instance
 // of any of the named classes wired to the agent via mcp_servers=/mcpServers:
 // (e.g. MCPServerStdio's tool_filter). Classes is a list, not a single string
@@ -370,4 +403,13 @@ type CallWithoutKwargExpr struct {
 type CallUsesUnnormalizedPathParamExpr struct {
 	Callees        []string `yaml:"callees,omitempty"`
 	CalleePrefixes []string `yaml:"callee_prefixes,omitempty"`
+}
+
+// AgentToolsMatchExpr fires when one tool the agent holds takes a parameter named in ParamNames
+// (case-insensitive, exact) and a different tool the agent holds has a name that matches
+// OtherToolNameRegex. The tool name is split at lower-to-upper case changes and at hyphens
+// into underscore form and lowercased before the match.
+type AgentToolsMatchExpr struct {
+	ParamNames         []string `yaml:"param_names"`
+	OtherToolNameRegex string   `yaml:"other_tool_name_regex"`
 }

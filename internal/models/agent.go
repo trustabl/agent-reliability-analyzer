@@ -59,6 +59,13 @@ type ToolRef struct {
 	External bool     `json:"external"`
 }
 
+// HandoffInput is one handoffs= entry of an OpenAI agent: the target agent's variable or name
+// text and whether the entry sets an input filter.
+type HandoffInput struct {
+	Target         string
+	HasInputFilter bool
+}
+
 type AgentRef struct {
 	Name     string    `json:"name"`
 	Resolved *AgentDef `json:"-"`
@@ -87,6 +94,10 @@ type AgentDef struct {
 	InputGuards    []GuardrailRef  `json:"input_guards"`
 	OutputGuards   []GuardrailRef  `json:"output_guards"`
 	Opaque         bool            `json:"opaque"` // true if Agent(**config) or tools=non-literal
+	// HandoffInputs records, for an OpenAI agent, each entry of handoffs= as the target agent's
+	// name and whether the entry is a handoff(...) call that sets input_filter (inputFilter in
+	// TypeScript). In-memory only; OAI-204 reads it. HandoffRefs is left as it was.
+	HandoffInputs []HandoffInput `json:"-"`
 	// FileURLForceDownload is the most-dangerous force_download value observed
 	// on a FileUrl-family constructor (FileUrl / ImageUrl / AudioUrl /
 	// VideoUrl / DocumentUrl) in this agent's file. Empty if none set a

@@ -1,0 +1,50 @@
+policy:
+  id: agent_config_trust_remote_code
+  name: Model loaded with trust_remote_code enabled
+  category: agent_config
+  description: >
+    Repo-scoped rule for application code that loads a model with
+    trust_remote_code=True, which lets the model repository supply Python that
+    runs in the host process. The pack loads for each scan (the file has no SDK
+    import), so the rule's own predicate does the gating. Fires once per
+    matching call.
+
+rules:
+  - id: AGCFG-021
+    title: Model is loaded with trust_remote_code=True
+    severity: medium
+    confidence: 0.5
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_call_kwarg_matches:
+        - callee:
+            - from_pretrained
+          kwarg: trust_remote_code
+          value: "true"
+    explanation: >
+      Repo code calls from_pretrained with trust_remote_code=True. The
+      Transformers documentation for this keyword says it allows custom models
+      defined on the Hub in their own modeling files, that it should be set to
+      True for repositories you trust and in which you have read the code,
+      and that it will execute code present on the Hub on your local machine.
+      A model repository that ships modeling code therefore runs that code with
+      the privileges of the process that loads it, at load time and before any
+      prompt is processed. The same keyword that loads a model by name at
+      whatever revision the repository holds now will load whatever the owner
+      publishes next.
+      Limits of this check: it reads the literal True at a from_pretrained
+      call. A value from a variable, a configuration file or a command-line flag
+      is not judged. The check does not know whether the repository is the
+      author's own, whether the revision is pinned, or whether the modeling
+      files were reviewed, and a load from a local path is judged the same as a
+      load from the Hub. Calls other than from_pretrained, such as pipeline,
+      from_config and loaders in other libraries, are not judged. Files under a
+      test path are not read. Python code is read; TypeScript is not.
+    fix: >
+      Load a model that its library supports natively, and drop the keyword. If
+      custom modeling code is needed, review the repository's Python files,
+      pass revision with a full commit hash so the reviewed code is the code that
+      runs, and keep that load out of a process that holds production
+      credentials.
