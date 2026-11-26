@@ -378,6 +378,22 @@ rules:
 #       on agents that participate in a delegation tree (e.g. ADK's sub_agents
 #       composition or OpenAI's handoffs= edges).
 #
+#   agent_handoff_missing_input_filter: bool
+#       OpenAI Agents SDK (Python and TypeScript). True when an entry of the agent's handoffs
+#       list is a bare agent name, or a handoff(...) call without input_filter (inputFilter in
+#       TypeScript) or with it set to None, and the named agent, defined in the same file,
+#       holds a shell tool (agent_uses_tool_kind shell_invocation), and no call anywhere in
+#       the scanned non-test code passes handoff_input_filter (handoffInputFilter). A Handoff
+#       held in a variable, an imported target and an entry in another form are not judged
+#       (AgentDef.HandoffInputs, RepoInventory.HandoffInputFilterConfigured). OAI-204.
+#
+#   agent_tools_match: {param_names: [name, ...], other_tool_name_regex: regex}
+#       True when one tool in the agent's tools list, resolved to a definition (a reference written as one wrapper call around a name, such as Tool(fn), is looked up by that name in the same file), takes a
+#       parameter equal (case-insensitive) to one of param_names, and a different resolved tool
+#       has a name matching the regex. The tool name is split at lower-to-upper case changes
+#       and hyphens into underscore form and lowercased before the match. OAI-205, LC-203,
+#       CREW-203, ADK-203, PYD-203.
+#
 #   agent_hosted_tool_kwarg_present: {class: ToolClass, kwarg: name}
 #       Returns true if the agent wires a hosted tool of `class` whose `kwarg`
 #       is present (e.g. BashTool with a `policy=`). `kwarg` supports dotted
@@ -951,6 +967,51 @@ rules:
 #       modules. A host from a variable, f-string or environment lookup, a loopback or default
 #       host, and a **kwargs splat are not judged. Test paths are skipped. The host is reduced
 #       to the judgment during discovery and never stored. One finding per bind (MCP-203).
+#   repo_mcp_prefix_containment_unsafe: true | false
+#       In a TypeScript or JavaScript file (outside test paths) that imports a package named
+#       @modelcontextprotocol/..., a startsWith call whose receiver text names a path (path,
+#       file, dir, target, real, resolved, normalized, absolute, requested) and whose one
+#       argument is neither a string, a template nor a number, names a directory (dir, root,
+#       base, allowed, path, cwd, folder, workspace, sandbox) and contains no sep, no slash
+#       string and no trailing slash, and where neither side contains pathname, url, href, route
+#       or endpoint (MCPCodeFact kind prefix_containment). MCP-204.
+#   repo_mcp_stdio_client_nonliteral_command: true | false
+#       Python StdioServerParameters(...), the params dict of MCPServerStdio(...) or an entry
+#       of MultiServerMCPClient(...), or TypeScript new StdioClientTransport({...}), whose
+#       literal command (or identifier assigned once in the file to a literal) is a shell
+#       (bash, sh, zsh, dash, cmd, powershell, pwsh) with a -c, /c, -lc or -Command argument;
+#       or whose command is not a literal and whose expression text contains one of the whole
+#       words request, req, body, payload, query, params, form, json or input, in a file that
+#       names no allow-list (allowlist, allowed commands, whitelist). A command from a
+#       configuration object or a function parameter is not judged (MCPCodeFact kind
+#       stdio_command). The name of the predicate predates this narrowing. MCP-205.
+#   repo_mcp_server_bearer_without_audience: true | false
+#       A Python file that imports mcp or fastmcp calls AuthSettings(...) with
+#       validate_token_resource absent, None or False, names token_verifier, and contains no
+#       aud or audience text outside comments (MCPCodeFact kind bearer_no_audience). MCP-206.
+#   repo_mcp_client_opens_server_url: true | false
+#       A function of one parameter (Python, file imports mcp) or a redirectToAuthorization
+#       method or property (TypeScript) whose body passes that parameter to webbrowser.open,
+#       os.startfile, os.system, a subprocess call running xdg-open, open or start, the open
+#       package, or child_process exec or spawn, and whose body names no scheme, origin or host
+#       check (.protocol, .origin, .hostname, .scheme, urlparse, new URL(, allowed, startsWith
+#       with an http literal) (MCPCodeFact kind client_opens_url). MCP-207.
+#   repo_mcp_server_shares_transport: true | false
+#       In a TypeScript file that imports @modelcontextprotocol/server, a variable declared at
+#       module scope as new McpServer(...) or new Server(...) that a function connects, or as
+#       an imported transport class whose name contains Transport and HTTP that a function
+#       passes a request with handleRequest (MCPCodeFact kind shared_transport). MCP-208.
+#   repo_mcp_server_dns_rebinding_disabled: true | false
+#       A Python file that imports mcp or fastmcp calls TransportSecuritySettings with
+#       enable_dns_rebinding_protection=False and names none of token_verifier,
+#       auth_server_provider, AuthSettings or auth= outside comments (MCPCodeFact kind
+#       dns_rebinding_off). MCP-209.
+#   repo_mcp_server_installs_package_from_input: true | false
+#       In a TypeScript or JavaScript file that imports an @modelcontextprotocol package, an
+#       execFileSync, execFile, spawn, spawnSync, execa or execaSync call whose program is npm
+#       or pnpm and whose argument array holds add, install or i followed by an identifier,
+#       template, concatenation or member expression, in a file with no .test(, semver,
+#       .valid( or .satisfies( outside comments (MCPCodeFact kind pkg_install_spec). MCP-210.
 #   repo_script_runs_agent_cli_with_bypass_flag: true | false
 #       A package.json lifecycle script (preinstall, install, postinstall, prepare), a
 #       .husky hook file line, or a JS/TS process-spawn call (spawn, spawnSync, exec,

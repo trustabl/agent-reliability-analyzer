@@ -1,0 +1,42 @@
+policy:
+  id: mcp_package_install
+  name: MCP server installs a package from tool input
+  category: mcp
+  description: >
+    Repo-scoped rule for TypeScript MCP server code that runs npm or pnpm add or install with
+    a package specifier built from a value, in a file with no validation of that value.
+
+rules:
+  - id: MCP-210
+    title: MCP server runs npm or pnpm install with a specifier built from a value
+    severity: high
+    confidence: 0.5
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_server_installs_package_from_input: true
+    explanation: >
+      A TypeScript file that imports an MCP package calls execFileSync, execFile, spawn,
+      spawnSync, execa or execaSync with npm or pnpm as the program, an argument array holding
+      add, install or i, and a later element that is an identifier, template, concatenation or
+      member expression. GitHub advisory GHSA-wcjj-9m6g-2fr2 (functype-mcp-server) shows a tool
+      that built the specifier as functype@ followed by a string parameter and ran
+      execFileSync("pnpm", ["add", spec]), and states that "because npm/pnpm package specifiers
+      support file:, npm:, and other alias syntaxes, an attacker who can send an MCP tools/call
+      request to this tool can cause the server to install an arbitrary local or remote package",
+      with just z.string() validation applied. The program ran without a shell and the
+      specifier was still attacker-controlled.
+      Limits of this check: it reads TypeScript and JavaScript, and the programs npm and pnpm; the
+      advisory does not cover pip, uv or yarn. It does not show that the value comes from a tool
+      parameter: any non-literal element counts. A file that contains a .test( call, semver, a
+      .valid( call or a .satisfies( call, anywhere outside comments, is not judged, and the rule
+      does not check that the check covers the value. The advisory's code then imported the
+      installed package, and the rule does not read that step. A command run through exec with a
+      single string is not read.
+    fix: >
+      Validate the version against a strict pattern before it reaches the install command, and
+      reject any value that contains a colon, slash, backslash, at sign or whitespace, so file:,
+      npm:, git and URL specifiers cannot pass. Prefer a fixed package name and a version chosen
+      from a fixed list, and pass --ignore-scripts to the install.
+

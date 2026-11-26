@@ -366,6 +366,15 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Static batch 2 (2026-11-26, `schema_version` 47 -> 48, provisional; +13 rules):** repo-scope **MCP-204** / **205** / **206** / **207** / **208** / **209** / **210** over `repo_mcp_prefix_containment_unsafe`,
+> `repo_mcp_stdio_client_nonliteral_command`, `repo_mcp_server_bearer_without_audience`, `repo_mcp_client_opens_server_url`, `repo_mcp_server_shares_transport`, `repo_mcp_server_dns_rebinding_disabled` and
+> `repo_mcp_server_installs_package_from_input`, all reading `RepoInventory.MCPCode` (`models.MCPCodeFact`, built by `analysis.DiscoverMCPCode` in `analysis/mcp_code.go`; test paths are skipped and comments are blanked
+> before any credit search). Agent scope: **OAI-204** over `agent_handoff_missing_input_filter` (`AgentDef.HandoffInputs`, `RepoInventory.HandoffInputFilterConfigured`, `analysis/handoff_inputs.go`) and
+> **OAI-205** / **LC-203** / **CREW-203** / **ADK-203** / **PYD-203** over `agent_tools_match` (`approval_token_tools.yaml` in each pack). Pack files: `mcp/path_prefix_containment.yaml`, `client_launch.yaml`,
+> `server_auth_transport.yaml`, `package_install.yaml`, `openai_sdk/handoff_input_filter.yaml`. The fixture holds **429** rules (416 + 13; re-derive). Rulebook docs under `docs/Policy/` with the same file names.
+> Source checks narrowed three rules (Python part of MCP-036, pip and uv part of MCP-057, parameter names other than `authorized_by` for SCOPE-035). Public run: 24 repositories, five rules with hits, MCP-205 narrowed after eight
+> configuration-driven client hits; zero hits for MCP-206, 208, 210, OAI-204/205, LC-203, CREW-203, ADK-203 and PYD-203, so their precision is not measured.
+>
 > **Static batch 1 (2026-11-25, `schema_version` 46 -> 47, provisional; +7 rules):** **AGCFG-017** (high, 0.6) over `repo_settings_allow_unscoped_grant`
 > (`ProjectConfigFacts.UnscopedAllow`), **AGCFG-018** (low, 0.5) over `repo_claude_settings_local_committed` (`LocalSettingsCommitted`), **MCPCFG-006** (high, 0.7)
 > over `repo_mcp_config_launches_deprecated_package` (`DeprecatedMCPLaunch`, package list `archivedMCPPackages` from the `modelcontextprotocol/servers` README),

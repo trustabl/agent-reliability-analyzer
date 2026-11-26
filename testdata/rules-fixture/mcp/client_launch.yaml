@@ -1,0 +1,86 @@
+policy:
+  id: mcp_client_launch
+  name: MCP client launches and opens values supplied by others
+  category: mcp
+  description: >
+    Repo-scoped rules for MCP client code. One reads stdio client constructions whose launch
+    command is not a literal or is a shell given -c. The other reads an OAuth redirect handler
+    that passes the URL an MCP server supplied to an operating-system opener.
+
+rules:
+  - id: MCP-205
+    title: MCP stdio client is started with a shell given -c or a command taken from request input
+    severity: high
+    confidence: 0.4
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_stdio_client_nonliteral_command: true
+    explanation: >
+      Code builds an MCP stdio client (StdioServerParameters, an MCPServerStdio params entry or
+      a MultiServerMCPClient entry in Python; StdioClientTransport in TypeScript) with a
+      shell (bash, sh, cmd, powershell) and a -c style flag, or with a command whose expression
+      text names a request-like source (request, req, body, payload, query, params, form, json
+      or input). GitHub advisory GHSA-w794-rj3p-xv45 (Langflow) states
+      that the MCP stdio transport "launched whatever command / args a user put in an MCP
+      server configuration, with no allowlist and (before 1.10.3) wrapped in bash -c", and that
+      the SDK "starts the process with anyio.open_process, so the command runs before any MCP
+      handshake". Advisory GHSA-378x-q589-34mv (heym) describes an endpoint that accepts the
+      stdio transport and "spawns the attacker-supplied command with attacker-supplied args".
+      The MCP specification's security best practices page lists a malicious startup command in
+      a client configuration as a local server compromise with "arbitrary code execution".
+      Limits of this check: it reads the call in one file. A command that is a variable
+      assigned once in the file to a string literal is treated as a literal. A command that is a
+      configuration value, a function parameter or any other expression with none of the words
+      above is not judged, so a client that launches the servers its user configured is not
+      reported, and neither is a request-derived command that reaches the call through a
+      variable with a neutral name. A word is matched as a whole word, so request_id does not
+      count. The rule does not show that the person who supplies the value is untrusted. A file
+      that names an allow-list (a name containing allowlist, allowed commands or whitelist) is
+      not judged for a request-derived command, and the rule does not check that the list is
+      applied. A shell with -c is reported without that exemption. A command held in a
+      dictionary built elsewhere and passed as one variable is not read.
+    fix: >
+      Launch commands from a fixed set. Compare the command with an allow-list of
+      executables before the client is built, pass the command and arguments as separate values
+      with no shell, and reject a shell or interpreter wrapper such as bash -c. Authorize and
+      validate the request before any process is started.
+
+  - id: MCP-207
+    title: MCP client passes a server-supplied URL to an operating-system opener with no check
+    severity: high
+    confidence: 0.5
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_client_opens_server_url: true
+    explanation: >
+      A function in a file that uses an MCP client package takes the authorization URL (a
+      redirectToAuthorization method in TypeScript, or a function of one parameter in Python)
+      and passes it to an opener: the open package or child_process in TypeScript,
+      webbrowser.open, os.startfile or a subprocess call that runs xdg-open in Python. The
+      function body has no scheme, origin or host check. The Pillar Security write-up of the
+      opencode vulnerability states that the authorization endpoint "is a free-form string. The
+      server being authenticated picks it", that "there was no scheme check on that path, there
+      was no comparison against the origin of the server you configured", and that on Windows
+      the open package version 10.1.2 put the target into a PowerShell command without escaping
+      it; the same page states that an ordinary https URL carries the payload and that scheme
+      validation does not stop it. The MCP specification's security best practices page states
+      that clients "MUST validate authorization URLs", must allow the http and https schemes, and "MUST
+      NOT use shell commands" to open URLs.
+      Limits of this check: it reads one function body at a time. The write-up's exploited
+      sink is the Windows and WSL PowerShell path of the open package; its text says macOS and
+      Linux use an argument vector, so a hit in a function that runs on those systems is a deviation
+      from the spec and not shown to be exploitable. Any text in the body that contains
+      .protocol, .origin, .hostname, .scheme, urlparse, new URL(, allowed or startsWith with an
+      http literal counts as a check, without the rule judging the check. The version of the
+      open package in the lockfile is not read. A handler that is defined in another file, or a
+      URL passed through a helper before the opener, is not seen.
+    fix: >
+      Parse the URL and reject anything but https (or http for loopback), compare its origin
+      with the configured server or issuer, and open it with an argument-vector launcher or
+      print it for the person to open. Keep the open package at a release that escapes
+      PowerShell arguments (11.0.4 or later per the write-up).
+
