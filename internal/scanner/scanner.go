@@ -425,6 +425,9 @@ func Run(cfg Config) (models.ScanResult, error) {
 	// per-agent kwarg-missing outlier rules do not fire on them.
 	analysis.ApplyGlobalInstrumentation(inventory.Agents, inventory.ObservabilitySignals)
 	inventory.OtelLabelsSignals = analysis.DiscoverOtelLabels(allParsed)
+	inventory.SpanAttrWrites = analysis.DiscoverSpanAttrWrites(allParsed)
+	inventory.JudgeModelCalls = analysis.DiscoverJudgeModelCalls(allParsed)
+	inventory.HasConsequentialTool = rules.HasConsequentialTool(inventory.Tools, allParsed)
 	inventory.Subagents = analysis.DiscoverSubagents(profile.Manifest)
 	inventory.Skills = analysis.DiscoverSkills(profile.Manifest)
 	inventory.Dependencies = analysis.DiscoverDependencies(profile.Manifest.RepoRoot)
@@ -432,6 +435,7 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.PluginManifests = analysis.DiscoverPlugins(profile.Manifest)
 	inventory.ClaudeSettings = analysis.DiscoverClaudeSettings(profile.Manifest)
 	inventory.ProjectConfig = analysis.DiscoverProjectConfig(profile.Manifest, inventory.ClaudeSettings)
+	inventory.ProjectConfig.GuidanceInstall = analysis.GuidanceInstallHits(inventory.ProjectConfig.GuidanceSentences, inventory.Dependencies)
 	inventory.CIWorkflows = analysis.DiscoverCIWorkflows(profile.Manifest)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)

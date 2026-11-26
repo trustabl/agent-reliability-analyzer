@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io/fs"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/trustabl/trustabl/internal/analysis"
 	"github.com/trustabl/trustabl/internal/models"
 )
 
@@ -275,6 +277,16 @@ func loadPolicies(fsys fs.FS, lenient bool) ([]PolicyFile, []string, error) {
 			for _, v := range rule.Match.toolClaimUseValues() {
 				if !validToolClaimUse(v) {
 					errs = append(errs, fmt.Errorf("%s: tool_claim_use value %q is not known (want one of: absent, unused, passthrough, checked, wrapped)", tag, v))
+				}
+			}
+			// repo_otel_span_attrs_missing names span attributes. A name the
+			// OpenTelemetry GenAI list in analysis.SpanAttrKeys or the
+			// agent-reliability-otel-labels spec does not define never matches what
+			// the code writes, so the rule would fire on every repo.
+			known := analysis.SpanAttrKeys()
+			for _, k := range rule.Match.otelSpanAttrKeys() {
+				if !slices.Contains(known, k) {
+					errs = append(errs, fmt.Errorf("%s: repo_otel_span_attrs_missing key %q is not a known span attribute (want one of: %s)", tag, k, strings.Join(known, ", ")))
 				}
 			}
 			// A degenerate combinator (empty any/all list, or not: over an empty

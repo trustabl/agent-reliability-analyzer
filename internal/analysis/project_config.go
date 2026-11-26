@@ -84,6 +84,10 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.AnyOriginServer = anyOriginServerHits(manifest)
 	f.AgentServerNoKey = agentServerNoKeyHits(manifest)
 
+	// AGCFG-022 / AGCFG-023: the sentences of the guidance files. The install
+	// check needs the dependency manifests and runs in the scanner.
+	f.GuidanceSentences = guidanceSentences(manifest)
+
 	for _, c := range manifest.Components {
 		switch c.Kind {
 		case models.ComponentClaudeSettings, models.ComponentGeminiSettings:

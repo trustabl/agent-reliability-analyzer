@@ -1,0 +1,152 @@
+policy:
+  id: observability_trace_identity
+  name: Trace identity and served-model records
+  category: observability
+  description: >
+    Cross-SDK rules for hand-written OpenTelemetry tracing: whether the spans
+    record which model served a judge or guardrail call and which run and tool
+    call a span belongs to. Like observability/quality.yaml they list each SDK
+    token in applies_to. They fire when OpenTelemetry is the repo's sole
+    tracing setup, because an instrumentation library such as OpenInference or
+    OpenLLMetry writes some of these attributes itself and the scan cannot see
+    that. Attribute names are the OpenTelemetry GenAI names and the trustabl.*
+    keys that agent-reliability-otel-labels defines.
+
+rules:
+  - id: OBS-015
+    title: A judge or guardrail model call uses a floating alias and the trace does not record the served model
+    severity: medium
+    confidence: 0.45
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_observability_initialized: true
+        - repo_observability_vendor: [otel]
+        - not:
+            repo_observability_vendor:
+              - openinference
+              - openllmetry
+              - langfuse
+              - langsmith
+              - logfire
+              - braintrust
+              - weave
+              - agentops
+              - mlflow
+              - datadog_llmobs
+              - opik
+              - langwatch
+              - native
+        - repo_judge_model_floating_alias: true
+        - repo_otel_span_attrs_missing: [gen_ai.response.model]
+    explanation: >
+      A function named as a judge, guardrail, monitor, moderator, grader or
+      critic sets its model to a name that ends in -latest, and no code in the
+      repo writes gen_ai.response.model to a span. A -latest name can be served
+      by a different model version over time, and the trace then holds no record
+      of which one answered. Evaluate the Stack, Not the Layer (arXiv:2610.07359)
+      stacks runtime gates built from LLM judges, re-collects three judges with
+      the served model recorded on each call, and reports that one judge tier
+      was served by an unrequested model version in 50 of 112 batches. A gate
+      whose verdicts cannot be tied to a model version cannot be compared across
+      weeks. Where Rules End and Judges Begin (arXiv:2610.07657) describes
+      agent defenses in which judges decide the cases the deterministic checks
+      pass on, which is the role this rule looks for.
+      Limits of this check: this is the static check alone. It reads function
+      names and a model written as a string literal in the same function, so a
+      judge whose model comes from configuration, or is named by a function with
+      another name, is not seen. A -latest suffix alone counts as floating; a
+      bare name such as gpt-4o is not judged. A repo that records the served
+      model through an instrumentation library, or in a way other than
+      set_attribute or setAttribute on a span, is a false positive; the rule
+      stays silent when the repo uses any named tracing vendor besides
+      OpenTelemetry. A write to gen_ai.response.model anywhere in non-test code
+      clears the finding, even on a different span. Test paths are not judged.
+    fix: >
+      Pin the judge to a dated or versioned model name, and write the model the
+      response reports to the span: span.set_attribute("gen_ai.response.model",
+      response.model) in Python, span.setAttribute("gen_ai.response.model",
+      response.model) in TypeScript. Keep the requested and served names apart so
+      a change of served version is visible in the trace.
+
+  - id: OBS-016
+    title: Tool-call spans record no run, conversation or tool-call identifier
+    severity: medium
+    confidence: 0.4
+    applies_to:
+      - claude_sdk
+      - openai_agents
+      - langchain
+      - pydantic_ai
+      - vercel_ai
+      - crewai
+      - google_adk
+      - autogen
+      - mcp
+    scope: repo
+    match:
+      all:
+        - repo_observability_initialized: true
+        - repo_observability_vendor: [otel]
+        - not:
+            repo_observability_vendor:
+              - openinference
+              - openllmetry
+              - langfuse
+              - langsmith
+              - logfire
+              - braintrust
+              - weave
+              - agentops
+              - mlflow
+              - datadog_llmobs
+              - opik
+              - langwatch
+              - native
+        - repo_has_consequential_tool: true
+        - repo_otel_span_attrs_missing:
+            - gen_ai.conversation.id
+            - gen_ai.tool.call.id
+            - trustabl.run_id
+    explanation: >
+      This repo wires OpenTelemetry tracing and defines a tool whose body runs a
+      shell command, runs code or writes a file, yet no code in it writes
+      gen_ai.conversation.id, gen_ai.tool.call.id or trustabl.run_id to a span.
+      Without one of them a tool-call span cannot be tied to the run or the
+      model request that caused it, so an action found later cannot be traced
+      back to what led to it. Formal Runtime Verification for Tool-Using LLM
+      Agents (arXiv:2610.09793) reports that the agent benchmark trajectories it
+      replays seldom record approvals and record no timestamps, which leaves
+      history-dependent policies unable to check more than the action type, and
+      proposes a twelve-field trace schema. Correct Answers, Unsupported
+      Findings (arXiv:2610.09581) reports that a citation identifier does not
+      identify a source unless its binding to a record is kept. This rule asks
+      for the identifiers that bind a span to a run or a call; it does not ask
+      for an approval identifier, because neither OpenTelemetry nor the labels
+      spec defines an attribute name for one.
+      Limits of this check: it looks for a literal span attribute write anywhere
+      in non-test code, not on a tool-call span in particular. A consequential
+      tool is one registered with an agent framework whose body shows a shell call,
+      a code-execution call or a file write in the parsed source; a tool that
+      sends a request or changes a database, a bare function that calls a shell,
+      and a tool under a test path are not counted. A repo that carries the identifiers through an
+      instrumentation library, a framework, a context or baggage mechanism, or a
+      name that is not in the list is a false positive; the rule stays silent
+      when the repo uses any named tracing vendor besides OpenTelemetry. Test
+      paths are not judged.
+    fix: >
+      Write an identifier on each tool-call span: the model's tool-call id as
+      gen_ai.tool.call.id, and the conversation or session id as
+      gen_ai.conversation.id. Or install agent-reliability-otel-labels and call
+      run.mark_start(root), which stamps trustabl.run_id on the root span so tool
+      spans can be grouped by run.

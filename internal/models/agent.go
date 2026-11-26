@@ -445,6 +445,15 @@ type ProjectConfigFacts struct {
 	// AGCFG-010 do not read: CLAUDE.md, GEMINI.md, Cursor .mdc rules, Windsurf and
 	// Devin rules, and the GitHub Copilot instruction files (AGCFG-013).
 	HiddenGuidanceText []ConfigHit `json:"hidden_guidance_text,omitempty"`
+	// GuidanceSentences are the sentences of every guidance file AGCFG-022 reads
+	// (AGENTS.md, CLAUDE.md, GEMINI.md, Cursor .mdc rules, Windsurf and Devin
+	// rules, the GitHub Copilot instruction files), lowercased, with the line each
+	// starts on. Kept off the JSON report: it is the matcher's input, not a finding.
+	GuidanceSentences []GuidanceSentence `json:"-"`
+	// GuidanceInstall is an install command or package-index setting in a guidance
+	// file that names a package no dependency manifest declares, or a package index
+	// other than the ecosystem default (AGCFG-023).
+	GuidanceInstall []ConfigHit `json:"guidance_unverified_install,omitempty"`
 	// ExecCapableAllow is a Bash allow rule in .claude/settings*.json that ends
 	// in a trailing wildcard on a bare git, xargs or npx command, not cancelled by
 	// a bare-prefix deny or ask rule in the same .claude/ folder. AGCFG-012 reads
@@ -568,4 +577,13 @@ type EntrypointRef struct {
 	Kind      EntrypointKind `json:"kind"`
 	Framework string         `json:"framework"`
 	Via       string         `json:"via"` // "direct" | "same_file" | "import"
+}
+
+// GuidanceSentence is one sentence of an agent guidance file. Text is lowercased;
+// Raw keeps the original case for the install check.
+type GuidanceSentence struct {
+	File string
+	Line int
+	Text string
+	Raw  string
 }

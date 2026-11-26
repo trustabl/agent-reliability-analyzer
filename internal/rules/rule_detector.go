@@ -195,6 +195,18 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 	if s := otelLabelsEvidence(d.rule.Match, inv); s != nil {
 		return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, s.File, s.StartLine, s.EndLine, "")}
 	}
+	if g := d.rule.Match.RepoGuidanceTextMatches; g != nil {
+		if f, l, ok := FirstGuidanceTextMatch(*g, inv.ProjectConfig); ok {
+			return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, f, l, l, "")}
+		}
+	}
+	if asksJudgeFloatingAlias(d.rule.Match) {
+		for _, c := range inv.JudgeModelCalls {
+			if c.Floating && !c.TestOrigin {
+				return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, c.File, c.StartLine, c.StartLine, "")}
+			}
+		}
+	}
 	file, line := configHitLocation(d.rule.Match, inv.ProjectConfig)
 	return []models.Finding{findingFromRule(d.rule, models.ScopeRepo, file, line, line, "")}
 }
@@ -249,6 +261,8 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.HiddenHarnessText
 	case m.RepoGuidanceFileHasHiddenText != nil:
 		hits = pc.HiddenGuidanceText
+	case m.RepoGuidanceDirectsUnverifiedInstall != nil:
+		hits = pc.GuidanceInstall
 	case m.RepoSettingsPreapproveUserContentFetch != nil:
 		hits = pc.UserContentFetchAllow
 	case m.RepoSettingsAllowExecCapablePrefix != nil:
@@ -630,4 +644,23 @@ func LoadRegistry(fsys fs.FS) (*detectors.Registry, error) {
 		}
 	}
 	return detectors.New(tool, agent, repo, subagent, skill).WithSlashCommand(slashCommand), nil
+}
+
+// asksJudgeFloatingAlias reports whether the match tree requires
+// repo_judge_model_floating_alias: true outside a not: branch.
+func asksJudgeFloatingAlias(e MatchExpr) bool {
+	if on := e.RepoJudgeModelFloatingAlias; on != nil && *on {
+		return true
+	}
+	for _, sub := range e.All {
+		if asksJudgeFloatingAlias(sub) {
+			return true
+		}
+	}
+	for _, sub := range e.Any {
+		if asksJudgeFloatingAlias(sub) {
+			return true
+		}
+	}
+	return false
 }

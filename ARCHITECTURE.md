@@ -567,6 +567,25 @@ hit's Reason names the key. The files AGCFG-006 reads (`.gemini/.env`, root `.en
 `config.toml`) are not read, so the two rules never judge one file and key. Hits land in
 `ProjectConfigFacts.ModelEndpointOverride`.
 
+`repo_guidance_text_matches` (AGCFG-022) and `repo_guidance_directs_unverified_install` (AGCFG-023) read the
+same guidance files as text. `DiscoverProjectConfig` splits AGENTS.md, CLAUDE.md, GEMINI.md, `cursor_rule`,
+`windsurf_rule` and `copilot_instruction` components into sentences (`analysis/guidance_text.go`: a sentence ends
+at a line break or at `.`, `!` or `?` followed by white space, so a dot in a URL does not end it) and keeps them
+in `ProjectConfigFacts.GuidanceSentences`, which is not serialized. The first predicate matches fixed phrase
+groups (`terms`, `require_context`, `exclude_context`) and skips a sentence that forbids what it names. The
+second runs in the scanner once dependency manifests are parsed: `GuidanceInstallHits` compares install
+commands (pip, uv, poetry, pdm, npm, pnpm, yarn, bun) with the declared PyPI and npm names and checks index
+hosts; hits land in `ProjectConfigFacts.GuidanceInstall`.
+
+`repo_judge_model_floating_alias`, `repo_otel_span_attrs_missing` and `repo_has_consequential_tool`
+(OBS-015, OBS-016) read three inventory facts computed in the scanner from all parsed Python and TypeScript
+files: `SpanAttrWrites` (`analysis.DiscoverSpanAttrWrites`: `set_attribute`, `set_attributes`, `setAttribute`
+and `setAttributes` calls under a key in `analysis.SpanAttrKeys`, which the loader also uses to reject an
+unknown name), `JudgeModelCalls` (`DiscoverJudgeModelCalls`: a literal model name inside a function named as a
+judge, guardrail, monitor, moderator, grader or critic; floating means a `-latest` suffix) and
+`HasConsequentialTool` (`rules.HasConsequentialTool`: a tool body with a shell, code-execution or write call).
+These facts are kept apart from `OtelLabelsSignals` so existing label rules and their gating do not change.
+
 `repo_guidance_file_has_hidden_text` (AGCFG-013) runs the AGCFG-009 character test
 (`hiddenTextHits`) over the guidance files AGCFG-009 and AGCFG-010 do not read: CLAUDE.md
 (existing `claude_md` component), GEMINI.md (`gemini_md`), repo-root `.cursor/rules/**/*.mdc`

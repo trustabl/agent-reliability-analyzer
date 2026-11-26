@@ -6,14 +6,31 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 49 (`rules.SupportedSchemaVersion`; 42 to 48 are merged from main, 49 is provisional). The rules fixture
-goes from 389 to 434 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules below). `ScanID` changes, as with every
+Rule schema 41 → 50 (`rules.SupportedSchemaVersion`; 42 to 49 are merged from main, 50 is provisional). The rules fixture
+goes from 389 to 438 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules and the four static batch 5 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
 ### Added
 
+- **Static batch 5: guidance files and OpenTelemetry span attributes (rule schema 49 → 50, provisional; +4 rules, five predicates).**
+  48 is held by static batch 2 and 49 by static batch 4, both merged, so 50 follows them. Repo scope:
+  **AGCFG-022** (high, 0.4, `agent_config/guidance_instructions.yaml`, predicate `repo_guidance_text_matches`) flags a
+  sentence in AGENTS.md, CLAUDE.md, GEMINI.md, a Cursor `.mdc` rule, a Windsurf or Devin rule or a Copilot instruction file
+  that pipes a download into a shell, reads or sends a credential file, switches off approvals or the sandbox, or pushes to a
+  URL or mirror; **AGCFG-023** (high, 0.4, `agent_config/guidance_install.yaml`, `repo_guidance_directs_unverified_install`)
+  flags an install of a package no manifest declares, or a package index other than the default; **OBS-015** (medium, 0.45,
+  `observability/trace_identity.yaml`, `repo_judge_model_floating_alias` and `repo_otel_span_attrs_missing`) flags a judge or
+  guardrail function on a `-latest` model name when no code writes `gen_ai.response.model` to a span; **OBS-016** (medium, 0.4,
+  same pack file, `repo_has_consequential_tool` and `repo_otel_span_attrs_missing`) flags a repo with a shell, code-execution or
+  file-write tool and no write of `gen_ai.conversation.id`, `gen_ai.tool.call.id` or `trustabl.run_id`. The OBS rules fire only
+  when OpenTelemetry is the one tracing setup the scan sees. New facts: `ProjectConfigFacts.GuidanceSentences` (not in the JSON
+  report) and `GuidanceInstall`, `RepoInventory.SpanAttrWrites`, `JudgeModelCalls` and `HasConsequentialTool`. The loader rejects a
+  `repo_otel_span_attrs_missing` name that is neither an OpenTelemetry GenAI name listed in `analysis.SpanAttrKeys` nor a
+  `trustabl.*` key of the labels spec (`spec/keys.json`). Not built from the batch plan: OBS-017, which waits on the owners'
+  decision about the `trustabl.authz.*` attributes. Not checked: an approval identifier (no attribute name is defined),
+  `.clinerules`, and the substitution half of AGCFG-023. Engines without schema 50 skip these rules with META-005.
 - **Static batch 4: call-site keywords and the handoff chain (rule schema 48 → 49, provisional; +5 rules, two predicates).**
   Repo scope, new predicate `repo_call_kwarg_matches` over `RepoInventory.CallKwargs` (a closed table of keywords:
   `env` on `StdioServerParameters` and `StdioClientTransport`, and `warn_only`, `ssrf_protection_enabled` and

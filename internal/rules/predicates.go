@@ -2438,3 +2438,130 @@ func PredAgentTransitiveCapabilityExceedsDirect(caps []string, a models.AgentDef
 	}
 	return false
 }
+
+// ─── guidance-file and trace predicates (schema 50) ───────────────────────────
+
+// guidancePhraseIn reports whether phrase occurs in sentence (both lowercase). A
+// phrase edge that is a letter or digit must sit on a word boundary.
+func guidancePhraseIn(sentence, phrase string) bool {
+	phrase = strings.ToLower(strings.TrimSpace(phrase))
+	if phrase == "" {
+		return false
+	}
+	isWord := func(b byte) bool { return b == '_' || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') }
+	for from := 0; ; {
+		i := strings.Index(sentence[from:], phrase)
+		if i < 0 {
+			return false
+		}
+		i += from
+		end := i + len(phrase)
+		ok := true
+		if isWord(phrase[0]) && i > 0 && isWord(sentence[i-1]) {
+			ok = false
+		}
+		if ok && isWord(phrase[len(phrase)-1]) && end < len(sentence) && isWord(sentence[end]) {
+			ok = false
+		}
+		if ok {
+			return true
+		}
+		from = i + 1
+	}
+}
+
+func guidanceAny(sentence string, phrases []string) bool {
+	for _, p := range phrases {
+		if guidancePhraseIn(sentence, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// FirstGuidanceTextMatch returns the file and line of the first guidance
+// sentence (in file, line order) that a group of e matches. A sentence that
+// forbids what it names (see analysis.GuidanceNegated) is skipped.
+func FirstGuidanceTextMatch(e GuidanceTextMatchExpr, pc models.ProjectConfigFacts) (string, int, bool) {
+	for _, s := range pc.GuidanceSentences {
+		if analysis.GuidanceNegated(s.Text) {
+			continue
+		}
+		for _, g := range e.Groups {
+			if !guidanceAny(s.Text, g.Terms) {
+				continue
+			}
+			if len(g.RequireContext) > 0 && !guidanceAny(s.Text, g.RequireContext) {
+				continue
+			}
+			if guidanceAny(s.Text, g.ExcludeContext) {
+				continue
+			}
+			return s.File, s.Line, true
+		}
+	}
+	return "", 0, false
+}
+
+// PredRepoGuidanceTextMatches implements repo_guidance_text_matches.
+func PredRepoGuidanceTextMatches(e GuidanceTextMatchExpr, pc models.ProjectConfigFacts) bool {
+	_, _, ok := FirstGuidanceTextMatch(e, pc)
+	return ok
+}
+
+// PredRepoJudgeModelFloatingAlias implements repo_judge_model_floating_alias: a
+// judge-style function outside a test path names a chat model by a floating alias.
+func PredRepoJudgeModelFloatingAlias(inv models.RepoInventory) bool {
+	for _, c := range inv.JudgeModelCalls {
+		if c.Floating && !c.TestOrigin {
+			return true
+		}
+	}
+	return false
+}
+
+// PredRepoOtelSpanAttrsMissing implements repo_otel_span_attrs_missing: true when
+// no non-test code writes any listed key to a span by hand. A started
+// agent-reliability-otel-labels run counts as a write of trustabl.run_id, which
+// run.mark_start stamps on the root span.
+func PredRepoOtelSpanAttrsMissing(keys []string, inv models.RepoInventory) bool {
+	for _, k := range keys {
+		for _, w := range inv.SpanAttrWrites {
+			if w.Key == k && !w.TestOrigin {
+				return false
+			}
+		}
+		if k == "trustabl.run_id" {
+			for _, s := range inv.OtelLabelsSignals {
+				if s.Kind == models.OtelLabelsRunStart && !s.TestOrigin {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// HasConsequentialTool reports whether any discovered tool body shows a shell
+// call, a code-execution call or a file write. A bare shell-invoking function
+// (not registered as an agent tool), a tool under a test path and a tool whose
+// file was not parsed are not judged.
+func HasConsequentialTool(tools []models.ToolDef, parsed []analysis.ParsedFile) bool {
+	byPath := make(map[string]analysis.ParsedFile, len(parsed))
+	for _, pf := range parsed {
+		byPath[pf.RelPath] = pf
+	}
+	for _, t := range tools {
+		if t.Kind == models.KindShellInvocation || t.Kind == models.KindUnknown || pathclass.Classify(t.FilePath) == models.OriginTest {
+			continue
+		}
+		pf, ok := byPath[t.FilePath]
+		if !ok {
+			continue
+		}
+		if PredHasShellCall(t, pf) || PredHasCodeExecCall(t, pf) || PredHasWriteCall(t, pf) {
+			return true
+		}
+	}
+	return false
+}

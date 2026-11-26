@@ -181,6 +181,13 @@ type MatchExpr struct {
 	RepoAgentsMdHasHiddenText            *bool `yaml:"repo_agents_md_has_hidden_text,omitempty"`
 	RepoHarnessGuidanceHasHiddenText     *bool `yaml:"repo_harness_guidance_has_hidden_text,omitempty"`
 	RepoGuidanceFileHasHiddenText        *bool `yaml:"repo_guidance_file_has_hidden_text,omitempty"`
+	// Guidance-file text predicates (AGCFG-022, AGCFG-023).
+	RepoGuidanceTextMatches              *GuidanceTextMatchExpr `yaml:"repo_guidance_text_matches,omitempty"`
+	RepoGuidanceDirectsUnverifiedInstall *bool                  `yaml:"repo_guidance_directs_unverified_install,omitempty"`
+	// Trace predicates (OBS-015, OBS-016).
+	RepoJudgeModelFloatingAlias *bool    `yaml:"repo_judge_model_floating_alias,omitempty"`
+	RepoOtelSpanAttrsMissing    []string `yaml:"repo_otel_span_attrs_missing,omitempty"`
+	RepoHasConsequentialTool    *bool    `yaml:"repo_has_consequential_tool,omitempty"`
 
 	// CI workflow predicates (category ci). Each is true when the corresponding
 	// CIWorkflowFacts slice is non-empty (one hit per agent step; per checkout step for CI-003).
@@ -280,6 +287,25 @@ type MatchExpr struct {
 // same word-boundary/inflection matching as Terms.
 type SkillTextMatchExpr struct {
 	Fields         []string `yaml:"fields"`
+	Terms          []string `yaml:"terms"`
+	RequireContext []string `yaml:"require_context,omitempty"`
+	ExcludeContext []string `yaml:"exclude_context,omitempty"`
+}
+
+// GuidanceTextMatchExpr matches the sentences of the agent guidance files
+// (repo_guidance_text_matches). A sentence ends at a line break or at ".", "!"
+// or "?" followed by white space. A group matches a sentence that contains one of
+// its Terms, one of its RequireContext phrases when that list is non-empty, and
+// none of its ExcludeContext phrases. Phrases are fixed text, matched
+// case-insensitively; a phrase that starts or ends with a letter or digit must
+// sit on a word boundary there. The predicate is true when any group matches any
+// sentence.
+type GuidanceTextMatchExpr struct {
+	Groups []GuidanceTextGroup `yaml:"groups"`
+}
+
+// GuidanceTextGroup is one set of phrases for GuidanceTextMatchExpr.
+type GuidanceTextGroup struct {
 	Terms          []string `yaml:"terms"`
 	RequireContext []string `yaml:"require_context,omitempty"`
 	ExcludeContext []string `yaml:"exclude_context,omitempty"`

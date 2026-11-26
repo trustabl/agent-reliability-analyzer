@@ -102,4 +102,10 @@ package rules
 //
 // Schema 49 adds the repo_call_kwarg_matches predicate (repo scope) and the
 // transitive_capability_exceeds_direct predicate (agent scope). Batch 2 holds 48.
-const SupportedSchemaVersion = 49
+//
+// Schema 50 adds repo_guidance_text_matches, repo_guidance_directs_unverified_install (guidance
+// files), repo_judge_model_floating_alias, repo_otel_span_attrs_missing and
+// repo_has_consequential_tool (repo scope). 48 is held by static batch 2 and 49 by static
+// batch 4, both merged; 50 is provisional. A binary below 50 skips the rules that use them
+// with META-005.
+const SupportedSchemaVersion = 50

@@ -491,3 +491,72 @@ func TestLoader_AcceptsObservabilityCategory(t *testing.T) {
 		t.Fatal("observability must be a recognized category")
 	}
 }
+
+// repo_otel_span_attrs_missing accepts the OpenTelemetry GenAI names and the
+// trustabl.* keys of the labels spec, and nothing else (OBS-015, OBS-016).
+func TestLoader_SpanAttrKeyMustBeKnown(t *testing.T) {
+	mk := func(key string) string {
+		return `
+policy:
+  id: test
+  name: Test
+  category: observability
+  description: x
+rules:
+  - id: OBS-900
+    title: A rule
+    severity: low
+    confidence: 0.8
+    applies_to:
+      - openai_agents
+    scope: repo
+    match:
+      repo_otel_span_attrs_missing: [` + key + `]
+    explanation: x
+    fix: x
+`
+	}
+	for _, k := range []string{"gen_ai.response.model", "gen_ai.tool.call.id", "trustabl.run_id"} {
+		if _, err := rules.Load(makeFS(map[string]string{"ok.yaml": mk(k)})); err != nil {
+			t.Errorf("key %s: unexpected error %v", k, err)
+		}
+	}
+	for _, k := range []string{"trustabl.approval_id", "trustabl.authz.scope", "gen_ai.session.id"} {
+		if _, err := rules.Load(makeFS(map[string]string{"bad.yaml": mk(k)})); err == nil {
+			t.Errorf("key %s: expected an error, got nil", k)
+		}
+	}
+}
+
+// The span-attribute name check is scoped to repo_otel_span_attrs_missing. A rule
+// that names a trustabl.* attribute in prose, or in any other predicate, still loads.
+func TestLoader_SpanAttrKeyCheckIsScopedToItsPredicate(t *testing.T) {
+	const src = `
+policy:
+  id: test
+  name: Test
+  category: observability
+  description: x
+rules:
+  - id: OBS-901
+    title: A rule
+    severity: low
+    confidence: 0.8
+    applies_to:
+      - openai_agents
+    scope: repo
+    match:
+      repo_observability_initialized: true
+    explanation: Mentions trustabl.not_in_spec and trustabl.approval_id in prose.
+    fix: x
+`
+	if _, err := rules.Load(makeFS(map[string]string{"ok.yaml": src})); err != nil {
+		t.Errorf("prose mention of an unlisted trustabl.* name must load: %v", err)
+	}
+	for _, k := range []string{"trustabl.expected_tools", "trustabl.retrieval.result_count", "trustabl.progress_marker", "trustabl.handoff_id"} {
+		const tmpl = "policy:\n  id: test\n  name: Test\n  category: observability\n  description: x\nrules:\n  - id: OBS-902\n    title: A rule\n    severity: low\n    confidence: 0.8\n    applies_to:\n      - openai_agents\n    scope: repo\n    match:\n      repo_otel_span_attrs_missing: [KEY]\n    explanation: x\n    fix: x\n"
+		if _, err := rules.Load(makeFS(map[string]string{"k.yaml": strings.ReplaceAll(tmpl, "KEY", k)})); err != nil {
+			t.Errorf("spec key %s must load: %v", k, err)
+		}
+	}
+}
