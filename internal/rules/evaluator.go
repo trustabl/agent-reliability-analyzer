@@ -208,6 +208,21 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if e.RepoGuidanceFileHasHiddenText != nil && (len(inv.ProjectConfig.HiddenGuidanceText) > 0) != *e.RepoGuidanceFileHasHiddenText {
 		return false
 	}
+	if e.RepoGuidanceTextMatches != nil && !PredRepoGuidanceTextMatches(*e.RepoGuidanceTextMatches, inv.ProjectConfig) {
+		return false
+	}
+	if e.RepoGuidanceDirectsUnverifiedInstall != nil && (len(inv.ProjectConfig.GuidanceInstall) > 0) != *e.RepoGuidanceDirectsUnverifiedInstall {
+		return false
+	}
+	if e.RepoJudgeModelFloatingAlias != nil && PredRepoJudgeModelFloatingAlias(inv) != *e.RepoJudgeModelFloatingAlias {
+		return false
+	}
+	if len(e.RepoOtelSpanAttrsMissing) > 0 && !PredRepoOtelSpanAttrsMissing(e.RepoOtelSpanAttrsMissing, inv) {
+		return false
+	}
+	if e.RepoHasConsequentialTool != nil && inv.HasConsequentialTool != *e.RepoHasConsequentialTool {
+		return false
+	}
 	if e.RepoSettingsPreapproveUserContentFetch != nil && (len(inv.ProjectConfig.UserContentFetchAllow) > 0) != *e.RepoSettingsPreapproveUserContentFetch {
 		return false
 	}
@@ -719,6 +734,11 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_agents_md_has_hidden_text":                   true,
 		"repo_harness_guidance_has_hidden_text":            true,
 		"repo_guidance_file_has_hidden_text":               true,
+		"repo_guidance_text_matches":                       true,
+		"repo_guidance_directs_unverified_install":         true,
+		"repo_judge_model_floating_alias":                  true,
+		"repo_otel_span_attrs_missing":                     true,
+		"repo_has_consequential_tool":                      true,
 		"repo_ci_agent_untrusted_trigger_ungated":          true,
 		"repo_ci_agent_untrusted_trigger_privileged":       true,
 		"repo_ci_agent_checkout_persists_credentials":      true,
@@ -847,6 +867,11 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoAgentsMdHasHiddenText != nil, "repo_agents_md_has_hidden_text")
 	add(e.RepoHarnessGuidanceHasHiddenText != nil, "repo_harness_guidance_has_hidden_text")
 	add(e.RepoGuidanceFileHasHiddenText != nil, "repo_guidance_file_has_hidden_text")
+	add(e.RepoGuidanceTextMatches != nil, "repo_guidance_text_matches")
+	add(e.RepoGuidanceDirectsUnverifiedInstall != nil, "repo_guidance_directs_unverified_install")
+	add(e.RepoJudgeModelFloatingAlias != nil, "repo_judge_model_floating_alias")
+	add(len(e.RepoOtelSpanAttrsMissing) > 0, "repo_otel_span_attrs_missing")
+	add(e.RepoHasConsequentialTool != nil, "repo_has_consequential_tool")
 	add(e.RepoCIAgentUntrustedTriggerUngated != nil, "repo_ci_agent_untrusted_trigger_ungated")
 	add(e.RepoCIAgentUntrustedTriggerPrivileged != nil, "repo_ci_agent_untrusted_trigger_privileged")
 	add(e.RepoCIAgentCheckoutPersistsCredentials != nil, "repo_ci_agent_checkout_persists_credentials")
@@ -925,6 +950,22 @@ func (e MatchExpr) toolClaimUseValues() []string {
 	}
 	if e.Not != nil {
 		vals = append(vals, e.Not.toolClaimUseValues()...)
+	}
+	return vals
+}
+
+// otelSpanAttrKeys collects every key passed to repo_otel_span_attrs_missing in
+// the match tree, for the loader's name check.
+func (e MatchExpr) otelSpanAttrKeys() []string {
+	vals := append([]string(nil), e.RepoOtelSpanAttrsMissing...)
+	for _, sub := range e.All {
+		vals = append(vals, sub.otelSpanAttrKeys()...)
+	}
+	for _, sub := range e.Any {
+		vals = append(vals, sub.otelSpanAttrKeys()...)
+	}
+	if e.Not != nil {
+		vals = append(vals, e.Not.otelSpanAttrKeys()...)
 	}
 	return vals
 }

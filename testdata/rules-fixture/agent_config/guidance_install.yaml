@@ -1,0 +1,55 @@
+policy:
+  id: agent_config_guidance_install
+  name: Agent guidance files that direct installs the manifest does not declare
+  category: agent_config
+  description: >
+    Repo-scoped rule over the install commands in agent guidance files
+    (AGENTS.md, CLAUDE.md, GEMINI.md, Cursor .mdc rules, Windsurf and Devin
+    rules, the GitHub Copilot instruction files), compared with the dependency
+    manifests in the repo. The pack loads for each scan (the files it reads have
+    no SDK import), so the predicate does the gating. Fires once per scan,
+    attributed to the first matching sentence.
+
+rules:
+  - id: AGCFG-023
+    title: An agent guidance file directs an install the manifests do not declare
+    severity: high
+    confidence: 0.4
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_guidance_directs_unverified_install: true
+    explanation: >
+      A sentence in an agent guidance file tells the agent to install a package
+      that no dependency manifest in the repo declares, or points an install at
+      a package index other than the default for the ecosystem. The
+      package hallucination attack of Package Hallucination Attacks on Coding
+      Agents through Prompt Injection in Rule Files (arXiv:2610.09264) injects
+      prompts into rule files such as AGENTS.md and .cursorrules to induce a
+      coding agent to replace legitimate dependencies with attacker-controlled
+      packages. An install instruction that the manifest does not back, or an
+      index the project does not otherwise use, is the shape that attack takes
+      in a file the agent trusts. The paper's abstract does not describe the
+      index options this rule also reads; those are this pack's own extension.
+      Limits of this check: it compares package names with the manifests the
+      scan parses (requirements files, pyproject.toml, Pipfile, package.json),
+      not with lockfiles, so a package that is transitive alone is reported. It
+      reads pip, uv, poetry, pdm, npm, pnpm, yarn and bun commands and the
+      --index-url, --extra-index-url, --registry and registry= settings. A
+      global install, a flag, a path, a URL, a requirements file and a
+      placeholder are not packages. An ecosystem with no manifest in the repo
+      is not judged. A development tool that a project installs for contributors
+      and keeps out of its manifest, and an internal package index, match and
+      are false positives; pypi.org, files.pythonhosted.org, registry.npmjs.org,
+      registry.yarnpkg.com and download.pytorch.org are treated as defaults. A
+      sentence with a word of refusal (do not, don't, avoid, must not, should
+      not, forbidden, prohibited, refuse) is skipped, and so is an install command
+      that follows a determiner ("a pip install still gets both"); other prose use
+      of an install command can still match and is a false positive. The substitution of one
+      declared package for another is not checked.
+    fix: >
+      Declare the package in the manifest and pin its version, or remove the
+      install instruction from the guidance file. Name the package index in the
+      project's own configuration file, reviewed like code, and not in a
+      guidance file the agent reads as instructions.

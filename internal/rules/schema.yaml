@@ -922,6 +922,38 @@ rules:
 #       .github/copilot-instructions.md and .github/instructions/**/*.instructions.md
 #       (ProjectConfigFacts.HiddenGuidanceText). Same ranges and exemptions, text
 #       never echoed. AGCFG-013. AGENTS.md stays with repo_agents_md_has_hidden_text.
+#   repo_guidance_text_matches: {groups: [{terms, require_context, exclude_context}]}
+#       Schema 50. Sentence-scoped phrase match over the agent guidance files (AGENTS.md,
+#       CLAUDE.md, GEMINI.md, .cursor/rules/**/*.mdc, .windsurfrules, .windsurf/rules and
+#       .devin/rules *.md, the GitHub Copilot instruction files;
+#       ProjectConfigFacts.GuidanceSentences). A sentence ends at a line break or at . ! ?
+#       followed by white space. A group matches a sentence with one of its terms, one of its
+#       require_context phrases when that list is set, and none of its exclude_context
+#       phrases. Phrases are fixed text, case-insensitive, on a word boundary where the
+#       phrase starts or ends with a letter or digit. A sentence that forbids what it names
+#       (do not, don't, avoid, must not, should not, forbidden, prohibited, ...) is skipped
+#       before any group is tried. True when any group matches any sentence. AGCFG-022.
+#   repo_guidance_directs_unverified_install: true | false
+#       Schema 50. A guidance-file sentence that installs a package no dependency manifest of
+#       that ecosystem declares (pip, uv, poetry, pdm, npm, pnpm, yarn, bun; global installs,
+#       flags, paths, URLs and requirement files are not packages), or that points an install
+#       at a package index host other than the ecosystem default
+#       (ProjectConfigFacts.GuidanceInstall). An ecosystem with no manifest in the repo is not
+#       judged. AGCFG-023.
+#   repo_judge_model_floating_alias: true | false
+#       Schema 50. A function named as a judge, guardrail, monitor, moderator, grader or critic,
+#       outside a test path, sets a model name written as a string literal that ends in
+#       -latest (RepoInventory.JudgeModelCalls). OBS-015.
+#   repo_otel_span_attrs_missing: [span attribute names]
+#       Schema 50. True when no non-test code writes any listed key to a span by hand
+#       (set_attribute, set_attributes, setAttribute, setAttributes; RepoInventory.SpanAttrWrites).
+#       A started agent-reliability-otel-labels run counts as a write of trustabl.run_id. The
+#       loader accepts only gen_ai.response.model, gen_ai.request.model, gen_ai.conversation.id,
+#       gen_ai.tool.call.id and the trustabl.* keys of the labels spec (spec/keys.json). OBS-015,
+#       OBS-016.
+#   repo_has_consequential_tool: true | false
+#       Schema 50. A discovered tool body shows a shell call, a code-execution call or a file
+#       write (RepoInventory.HasConsequentialTool). OBS-016.
 #   repo_settings_env_redirects_model_endpoint: true | false
 #       The env block of .claude/settings.json or settings.local.json sets
 #       ANTHROPIC_BASE_URL to a URL whose host is neither api.anthropic.com nor a

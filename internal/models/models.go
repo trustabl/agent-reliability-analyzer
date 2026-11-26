@@ -695,6 +695,41 @@ type RepoInventory struct {
 	// OtelLabelsSignals are the agent-reliability-otel-labels facts OBSERVED IN
 	// CODE, sorted by (File, StartLine, Kind) for determinism.
 	OtelLabelsSignals []OtelLabelsSignal `json:"otel_labels_signals,omitempty"`
+	// SpanAttrWrites are the span attributes the code writes by hand under a key
+	// OBS-015 and OBS-016 ask about (gen_ai.response.model, gen_ai.conversation.id,
+	// gen_ai.tool.call.id and the trustabl.* keys of the labels spec), sorted by
+	// (File, StartLine, Key).
+	SpanAttrWrites []SpanAttrWrite `json:"span_attr_writes,omitempty"`
+	// JudgeModelCalls are the chat-model calls inside a function named as a judge,
+	// guardrail, monitor or moderator (OBS-015), sorted by (File, StartLine).
+	JudgeModelCalls []JudgeModelCall `json:"judge_model_calls,omitempty"`
+	// HasConsequentialTool is true when a discovered tool body shows a shell call,
+	// a code-execution call or a file write (OBS-016). Computed by the scanner.
+	HasConsequentialTool bool `json:"has_consequential_tool,omitempty"`
+}
+
+// SpanAttrWrite is one span attribute written by hand: the first argument of
+// set_attribute / setAttribute, or a key of the dict or object passed to
+// set_attributes / setAttributes. A test-path write never counts.
+type SpanAttrWrite struct {
+	Key        string   `json:"key"`
+	File       string   `json:"file"`
+	StartLine  int      `json:"start_line"`
+	Language   Language `json:"language"`
+	TestOrigin bool     `json:"test_origin,omitempty"`
+}
+
+// JudgeModelCall is a chat-model call with a literal model name inside a function
+// whose name marks it as a judge, guardrail, monitor or moderator. Floating is
+// set when the name ends in -latest.
+type JudgeModelCall struct {
+	Function   string   `json:"function"`
+	Model      string   `json:"model"`
+	Floating   bool     `json:"floating"`
+	File       string   `json:"file"`
+	StartLine  int      `json:"start_line"`
+	Language   Language `json:"language"`
+	TestOrigin bool     `json:"test_origin,omitempty"`
 }
 
 // Coverage records how thoroughly the scan actually parsed the repo's source.

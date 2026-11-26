@@ -1,0 +1,130 @@
+policy:
+  id: agent_config_guidance_instructions
+  name: Agent guidance files that instruct risky actions
+  category: agent_config
+  description: >
+    Repo-scoped rule over the sentences of the agent guidance files: AGENTS.md,
+    CLAUDE.md, GEMINI.md, Cursor .mdc rules, Windsurf and Devin rules and the
+    GitHub Copilot instruction files. Agents read these files as instructions,
+    so a sentence that tells the agent to run a downloaded script, read a
+    credential file, switch off its approval prompts or push to another
+    location is an instruction the agent may follow. The pack loads for each
+    scan (the files it reads have no SDK import), so the predicate does the
+    gating. AGCFG-009 and AGCFG-013 read the same files for hidden characters;
+    this rule reads the visible words. Fires once per scan, attributed to the
+    first matching sentence.
+
+rules:
+  - id: AGCFG-022
+    title: An agent guidance file instructs a risky action
+    severity: high
+    confidence: 0.4
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_guidance_text_matches:
+        groups:
+          - terms:
+              - "| sh"
+              - "| bash"
+              - "| zsh"
+              - "|sh"
+              - "|bash"
+              - "| sudo sh"
+              - "| sudo bash"
+              - "| python"
+              - "| python3"
+            require_context:
+              - curl
+              - wget
+          - terms:
+              - "bash <(curl"
+              - "bash <(wget"
+              - "sh <(curl"
+              - "sh <(wget"
+          - terms:
+              - "~/.ssh"
+              - "id_rsa"
+              - "id_ed25519"
+              - ".aws/credentials"
+              - "~/.npmrc"
+              - "~/.netrc"
+              - ".git-credentials"
+              - "~/.docker/config.json"
+              - "~/.kube/config"
+            require_context:
+              - cat
+              - read
+              - print
+              - display
+              - show
+              - send
+              - upload
+              - post
+              - copy
+              - echo
+              - include
+              - curl
+              - base64
+            exclude_context:
+              - gitignore
+              - example
+          - terms:
+              - "--dangerously-skip-permissions"
+              - "--dangerously-bypass-approvals-and-sandbox"
+              - "--yolo"
+              - "bypasspermissions"
+              - "dangerouslydisablesandbox"
+              - "skip permissions"
+              - "skip approvals"
+              - "bypass permissions"
+              - "bypass approvals"
+              - "disable approvals"
+              - "disable the sandbox"
+          - terms:
+              - "git push http://"
+              - "git push https://"
+              - "git push git@"
+              - "git push ssh://"
+              - "git push --mirror"
+    explanation: >
+      A sentence in an agent guidance file tells the agent to do one of four
+      things: pipe a downloaded script into a shell (curl or wget into sh, bash,
+      zsh or python), read or send a credential file (an SSH key, the AWS
+      credentials file, .npmrc, .netrc, .git-credentials, the Docker or kube
+      config), switch off its own approval or sandbox (a flag such as
+      --dangerously-skip-permissions, or a phrase such as "skip permissions" or
+      "bypass approvals"), or push to a URL or mirror instead of a named remote.
+      Coding agents read repository rule files such as AGENTS.md and Cursor rules
+      as instructions. Aletheia (arXiv:2609.39678) reports that an attacker can
+      use those files to mislead an agent into requesting excessive permissions
+      or performing unrelated operations such as accessing credentials or
+      transferring data, and GitInject (arXiv:2606.09935) reports configuration
+      files from an unmerged contribution loaded as operator-level instructions
+      in CI agents. A project's own file that gives one of these instructions
+      gives the agent the same reach, and a reviewer skimming a long file may
+      not read each line.
+      AGCFG-009 and AGCFG-013 flag hidden characters in these files; this rule
+      reads the visible words and does not overlap their condition.
+      Limits of this check: it reads fixed phrases in one sentence at a time. A
+      sentence ends at a line break or at a full stop, exclamation or question
+      mark followed by a space. A sentence that contains a word of refusal (do
+      not, don't, avoid, must not, should not, forbidden, prohibited, refuse) is
+      skipped, so a rule that forbids the action is not flagged. It cannot tell
+      an install instruction for a person from an instruction for the agent: a
+      project that documents a curl-to-shell installer for its own tool matches
+      and is a false positive. A credential sentence needs a word for reading or
+      sending in the same sentence and is skipped when it mentions an example or
+      a gitignore. Paraphrases, other languages, instructions split across
+      sentences, encoded text and files outside the listed names (including
+      .clinerules and .cursorrules) are not read. A push to a remote that was
+      added earlier is not flagged; a push to a URL or a mirror is flagged.
+    fix: >
+      Remove the instruction from the guidance file, or move it to a script that
+      a person runs. For an installer, link to the vendor's install page and
+      pin a version and a checksum in a build step instead of piping a download
+      into a shell. Give the agent the narrowest credential it needs through its
+      own environment, not a path to a key file, keep the agent's approval
+      prompts on, and push through the named remote the repository already
+      configures.

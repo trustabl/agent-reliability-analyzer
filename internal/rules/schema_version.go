@@ -92,4 +92,10 @@ package rules
 // skill_bundled_script_destructive_command, skill_bundled_file_is_opaque and
 // skill_unpinned_install (skill scope). A binary below 47 skips the rules that use them with
 // META-005.
-const SupportedSchemaVersion = 47
+//
+// Schema 50 adds repo_guidance_text_matches, repo_guidance_directs_unverified_install (guidance
+// files), repo_judge_model_floating_alias, repo_otel_span_attrs_missing and
+// repo_has_consequential_tool (repo scope). 48 is held by static batch 2 and 49 by static
+// batch 4; both are open, so 50 is provisional. A binary below 50 skips the rules that use them
+// with META-005.
+const SupportedSchemaVersion = 50
