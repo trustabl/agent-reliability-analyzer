@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"github.com/trustabl/trustabl/internal/pathclass"
 	"io"
 	"io/fs"
 	"os"
@@ -76,6 +77,7 @@ func DiscoverSkills(manifest models.ScanManifest) []models.SkillDef {
 			HasDynamicArgs:         hasDynamicArgs,
 			ReferencesSkills:       skillRefs,
 			BundledFiles:           bundledFiles(manifest.RepoRoot, p),
+			BodyUnpinnedInstall:    bodyUnpinnedInstall(string(body)),
 			Body:                   string(body),
 			Location:               models.Location{FilePath: p, Line: startLine, EndLine: endLine},
 		})
@@ -309,6 +311,11 @@ func bundledFiles(repoRoot, skillPath string) []models.BundledFile {
 				return nil
 			}
 			bf := models.BundledFile{Path: filepath.ToSlash(rel), Kind: classifyBundledFile(d.Name())}
+			isTest := pathclass.Classify(bf.Path) == models.OriginTest
+			if !isTest {
+				head, _ := readCapped(abs, opaqueHeadBytes)
+				bf.Opaque = opaqueKind(d.Name(), head)
+			}
 			// Content-scan every non-binary bundled file: a skill can run its scripts
 			// (egress / secret reads), and any text file can carry a committed secret
 			// literal — both surfaces that scanning SKILL.md alone misses.
@@ -322,6 +329,9 @@ func bundledFiles(repoRoot, skillPath string) []models.BundledFile {
 						code := bundledCommentRe.ReplaceAll(content, nil)
 						bf.HasNetworkEgress = bundledEgressRe.Match(code)
 						bf.ReadsSecrets = bundledSecretRe.Match(code)
+						if !isTest {
+							scriptFacts(&bf, d.Name(), content)
+						}
 					}
 				}
 			}

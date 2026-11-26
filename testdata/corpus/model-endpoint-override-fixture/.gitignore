@@ -1,0 +1,2 @@
+# Keeps AGCFG-018 silent on this fixture; the settings.local.json beside it is added to git with -f.
+.claude/settings.local.json

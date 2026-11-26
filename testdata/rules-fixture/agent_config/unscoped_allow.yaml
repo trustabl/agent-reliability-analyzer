@@ -1,0 +1,62 @@
+policy:
+  id: agent_config_unscoped_allow
+  name: Pre-approved interpreter prefix or unscoped tool
+  category: agent_config
+  description: >
+    Repo-scoped rule for Claude Code allow rules committed to a repository
+    that approve an interpreter prefix, an unscoped web fetch, an unscoped file
+    edit, or all tools of one MCP server. Claude Code applies a project's allow
+    rules after the user accepts the workspace trust dialog. The pack loads for
+    each scan (the files it reads have no SDK import), so the rule's own
+    predicate does the gating. Fires once per scan, attributed to the first
+    offending allow entry.
+
+rules:
+  - id: AGCFG-017
+    title: Project settings pre-approve an interpreter prefix or an unscoped tool
+    severity: high
+    confidence: 0.6
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_settings_allow_unscoped_grant: true
+    explanation: >
+      A committed .claude/settings.json or .claude/settings.local.json lists an
+      entry in permissions.allow that approves a whole class of calls: a Bash
+      rule that is a bare python, python3, node, bash, sh, curl or wget command
+      followed by a trailing wildcard (Bash(python:*), Bash(curl *)); WebFetch
+      with no domain; Edit or Write with no path, or with a bare wildcard; or an
+      mcp__ entry that names a server and no tool (mcp__github,
+      mcp__github__*).
+      Claude Code's permissions page states that a bare WebFetch rule matches
+      all web fetch requests, that a bare Edit or Write rule pre-approves the
+      tool for paths outside the working directories as well, and that
+      mcp__server matches any tool the server provides. It also states that a
+      Bash rule matches the command text, and shows a command run as sh -c or
+      bash -c that a rule for the inner command does not match. An interpreter
+      prefix leaves the program that runs to whoever writes the command, and curl
+      or wget leaves the URL. The HarnessSecurity study (arXiv 2610.07639) reports
+      a trial in which an agent reached an operation its harness's own gate had
+      rejected through an allowed Python interpreter. Claude Code applies these allow rules once
+      the user accepts the workspace trust dialog, and no prompt lets the
+      developer stop a call that an entry covers.
+      Limits of this check: it reads the permissions block of the .claude/
+      settings files in the repo, at any depth. A deny or ask rule of the same
+      shape in a settings file in the same .claude/ folder cancels the finding;
+      a narrower deny does not. Deny and ask rules in user or managed settings,
+      hooks, sandbox settings and prompt-time approvals are not seen. Writes to
+      the protected paths that the permission-modes page lists still prompt
+      under an Edit or Write allow rule. A bare Bash or Bash(*) entry is
+      AGCFG-016's concern, git, xargs, npx, env, sed and awk prefixes are
+      AGCFG-012's, and a WebFetch rule for a named host is AGCFG-011's. Other
+      interpreters, such as ruby, perl and uvx, are not judged. The program list
+      is fixed.
+    fix: >
+      Replace the entry with exact commands, domains or paths: Bash(python
+      scripts/lint.py) in place of Bash(python:*), WebFetch(domain:docs.python.org)
+      in place of WebFetch, Edit(src/**) in place of Edit, and
+      mcp__github__get_issue in place of mcp__github. To make a class of calls
+      prompt for the whole team, add it to permissions.ask or permissions.deny in
+      the committed settings; deny rules win over allow rules and ask rules are
+      evaluated before allow rules.

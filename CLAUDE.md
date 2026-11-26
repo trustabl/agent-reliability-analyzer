@@ -366,6 +366,16 @@ When changing a rule (add / remove / edit severity, confidence, match, text):
 6. Commit and push the rules repo **and** the rulebook (the user pushes engine
    commits manually; confirm before pushing any of the three).
 
+> **Static batch 1 (2026-11-25, `schema_version` 46 -> 47, provisional; +7 rules):** **AGCFG-017** (high, 0.6) over `repo_settings_allow_unscoped_grant`
+> (`ProjectConfigFacts.UnscopedAllow`), **AGCFG-018** (low, 0.5) over `repo_claude_settings_local_committed` (`LocalSettingsCommitted`), **MCPCFG-006** (high, 0.7)
+> over `repo_mcp_config_launches_deprecated_package` (`DeprecatedMCPLaunch`, package list `archivedMCPPackages` from the `modelcontextprotocol/servers` README),
+> and skill-scope **CSKILL-088** / **089** / **090** / **091** over `skill_bundled_script_decodes_and_executes`, `skill_bundled_script_destructive_command`,
+> `skill_bundled_file_is_opaque` and `skill_unpinned_install` (facts in `analysis/skills_content.go`; test-path files are not judged). Pack files:
+> `agent_config/unscoped_allow.yaml`, `settings_local_committed.yaml`, `mcp_client_config.yaml` (appended), `claude_skill/skill_bundled_content.yaml`,
+> `skill_unpinned_install.yaml`. The fixture holds **416** rules (409 + 7; re-derive). Rulebook docs: `docs/Policy/agent_config/unscoped_allow.md`,
+> `settings_local_committed.md`, `mcp_client_config.md`, `docs/Policy/claude_skill/skill_bundled_content.md`, `skill_unpinned_install.md`.
+> Dropped from the batch plan with reasons: CSDK-113, AGCFG-011, AGCFG-015.
+>
 > **Static batch 3 (2026-11-25, no schema change; +9 rules, 409 in the fixture):** **CSKILL-092/093** (`claude_skill/skill_selection_and_decoding.yaml`), **MCP-211/213** (`mcp/tool_description_directives.yaml`), **MCP-212/214** (`mcp/elicitation.yaml`; needs a shell, code or write fact and no `accept` in the body), **OAI-206** (`openai_sdk/agent_tool_wiring.yaml`), **OAI-208/209** (`openai_sdk/tool_safety_overrides.yaml`). All reuse existing predicates (`skill_text_matches`, `has_description_text`, `has_body_text`, `agent_is_subagent_of_any`, `param_name_matches`). OAI-208/209 exist for the OpenAI pack and no other. The fixture holds **409** rules (re-derive). Rulebook docs under `docs/Policy/` for the five pack files.
 >
 > **MCP tool description hidden text and MCP server bind (2026-11-12, `schema_version` 45 -> 46, provisional; +3 rules):** **MCP-036** (Python) /

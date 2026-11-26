@@ -68,6 +68,12 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	// AGCFG-014: ANTHROPIC_BASE_URL in a settings env block pointing off-vendor.
 	f.ModelEndpointOverride = modelEndpointOverrideHits(manifest.RepoRoot, claude)
 
+	// AGCFG-017: interpreter prefixes and unscoped tool grants.
+	f.UnscopedAllow = unscopedAllowHits(manifest.RepoRoot, claude)
+
+	// AGCFG-018: settings.local.json present and not git-ignored.
+	f.LocalSettingsCommitted = localSettingsCommittedHits(manifest)
+
 	// AGCFG-016: a bare Bash or Bash(*) allow entry.
 	f.AllowAllBash = allowAllBashHits(manifest.RepoRoot, claude)
 
@@ -116,6 +122,9 @@ func DiscoverProjectConfig(manifest models.ScanManifest, claude []models.ClaudeS
 	f.UnpinnedMCPLaunch = sortHits(f.UnpinnedMCPLaunch)
 	f.UnscopedMCPCredential = sortHits(f.UnscopedMCPCredential)
 	f.PlainHTTPMCPServer = sortHits(f.PlainHTTPMCPServer)
+	f.DeprecatedMCPLaunch = sortHits(f.DeprecatedMCPLaunch)
+	f.UnscopedAllow = sortHits(f.UnscopedAllow)
+	f.LocalSettingsCommitted = sortHits(f.LocalSettingsCommitted)
 	f.CodexRiskyHooks = sortHits(f.CodexRiskyHooks)
 	f.HiddenAgentText = sortHits(f.HiddenAgentText)
 	f.HiddenHarnessText = sortHits(f.HiddenHarnessText)
@@ -465,7 +474,7 @@ func classifyMCPLaunch(s mcpServer) string {
 
 // mcpFileHits are the hits of one config file, one list per MCP rule.
 type mcpFileHits struct {
-	local, unpinned, scope, plainHTTP []models.ConfigHit
+	local, unpinned, scope, plainHTTP, deprecated []models.ConfigHit
 }
 
 // mcpHits classifies one server entry. A repo-controlled launch (MCPCFG-002)
@@ -489,6 +498,9 @@ func mcpHits(s mcpServer, path string, line int, name string) mcpFileHits {
 	if why := classifyMCPRemoteURL(s); why != "" {
 		add(&h.plainHTTP, why)
 	}
+	if why := classifyMCPDeprecated(s); why != "" {
+		add(&h.deprecated, why)
+	}
 	return h
 }
 
@@ -497,6 +509,7 @@ func (h *mcpFileHits) merge(o mcpFileHits) {
 	h.unpinned = append(h.unpinned, o.unpinned...)
 	h.scope = append(h.scope, o.scope...)
 	h.plainHTTP = append(h.plainHTTP, o.plainHTTP...)
+	h.deprecated = append(h.deprecated, o.deprecated...)
 }
 
 func addMCPHits(f *models.ProjectConfigFacts, h mcpFileHits) {
@@ -504,6 +517,7 @@ func addMCPHits(f *models.ProjectConfigFacts, h mcpFileHits) {
 	f.UnpinnedMCPLaunch = append(f.UnpinnedMCPLaunch, h.unpinned...)
 	f.UnscopedMCPCredential = append(f.UnscopedMCPCredential, h.scope...)
 	f.PlainHTTPMCPServer = append(f.PlainHTTPMCPServer, h.plainHTTP...)
+	f.DeprecatedMCPLaunch = append(f.DeprecatedMCPLaunch, h.deprecated...)
 }
 
 func jsonMCPHits(path string, raw []byte) mcpFileHits {

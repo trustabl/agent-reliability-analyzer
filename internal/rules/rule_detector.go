@@ -239,6 +239,12 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.AnyOriginServer
 	case m.RepoAgentServerExposedWithoutKey != nil:
 		hits = pc.AgentServerNoKey
+	case m.RepoSettingsAllowUnscopedGrant != nil:
+		hits = pc.UnscopedAllow
+	case m.RepoClaudeSettingsLocalCommitted != nil:
+		hits = pc.LocalSettingsCommitted
+	case m.RepoMCPConfigLaunchesDeprecatedPackage != nil:
+		hits = pc.DeprecatedMCPLaunch
 	}
 	if len(hits) == 0 {
 		return "", 0

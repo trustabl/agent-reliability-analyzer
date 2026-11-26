@@ -1482,6 +1482,48 @@ func TestScan_ExecAllowFixture(t *testing.T) {
 	}
 }
 
+// End to end: the static-batch-1 fixture. Each new rule fires once, in the root
+// tree; nothing under safe/ or under the skill's tests/ folder is attributed.
+func TestScan_StaticBatch1Fixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "static-batch-1-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := map[string]string{
+		"AGCFG-017":  ".claude/settings.json",
+		"AGCFG-018":  ".claude/settings.local.json",
+		"MCPCFG-006": ".mcp.json",
+		"CSKILL-088": "skills/demo/SKILL.md",
+		"CSKILL-089": "skills/demo/SKILL.md",
+		"CSKILL-090": "skills/demo/SKILL.md",
+		"CSKILL-091": "skills/demo/SKILL.md",
+	}
+	got := map[string][]models.Finding{}
+	for _, f := range res.Findings {
+		if _, ok := want[f.RuleID]; ok {
+			got[f.RuleID] = append(got[f.RuleID], f)
+		}
+		if f.RuleID == "AGCFG-012" || f.RuleID == "AGCFG-016" || f.RuleID == "MCPCFG-003" || f.RuleID == "MCPCFG-002" {
+			t.Errorf("%s fired on the static-batch-1 fixture (%s:%d)", f.RuleID, f.FilePath, f.StartLine)
+		}
+	}
+	for id, file := range want {
+		fs := got[id]
+		if len(fs) != 1 {
+			t.Errorf("%s fired %d times, want once", id, len(fs))
+			continue
+		}
+		if !strings.HasSuffix(fs[0].FilePath, file) {
+			t.Errorf("%s attributed to %s, want %s", id, fs[0].FilePath, file)
+		}
+	}
+	if fs := got["AGCFG-017"]; len(fs) == 1 && fs[0].StartLine != 5 {
+		t.Errorf("AGCFG-017 attributed to line %d, want 5 (the python prefix)", fs[0].StartLine)
+	}
+}
+
 // End to end: the model-endpoint-override fixture sets ANTHROPIC_BASE_URL in four
 // settings env blocks. AGCFG-014 fires once, on the root file's off-vendor host;
 // the vendor host, the loopback host and the variable reference stay silent, and

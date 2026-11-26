@@ -1,0 +1,42 @@
+policy:
+  id: claude_skill_unpinned_install
+  name: Skill installs without an exact version
+  category: claude_skill
+  description: >
+    Skill-scoped rule over the install commands in a skill's instructions and
+    bundled scripts.
+
+rules:
+  - id: CSKILL-091
+    title: Skill installs a package without an exact version or pipes a remote script to a shell
+    severity: medium
+    confidence: 0.5
+    applies_to:
+      - claude_skill
+    scope: skill
+    match:
+      skill_unpinned_install: true
+    explanation: >
+      A shell code block in this skill's SKILL.md, or a script in the skill's
+      directory, installs a registry package with pip, uv pip, pipx, npm, yarn,
+      pnpm or bun with no exact version, runs a package with npx, bunx, pnpm dlx,
+      uvx, uv tool run or pipx run with no exact version, runs go install with
+      @latest, or pipes curl or wget to a shell. What gets installed or run is
+      decided when the skill runs, not when it was reviewed. The skills studies
+      (arXiv 2601.10338 and 2607.01136) report unpinned dependencies and external
+      script fetching among the supply-chain patterns and note that skill
+      dependencies are implicit and unversioned.
+      Limits of this check: it reads fenced shell code blocks of SKILL.md (prose
+      outside a block is not read) and script files with comments removed, one
+      command per line. In a script, a line counts when it starts with the command
+      or passes it to a process API such as os.system or subprocess; an install
+      named in a message, a log line, an assertion or a list item is not judged. A requirements file, a lockfile, a path, a URL, a git spec
+      and a variable are not judged, and neither is an install built at run time.
+      A package pinned with an exact version, or an npm package with an exact
+      semantic version, is silent. Whether the registry version has changed since
+      review is not checked.
+    fix: >
+      Pin each package to an exact version (pip install requests==2.32.3,
+      npm install left-pad@1.3.0), or install from a lockfile that the skill ships.
+      Download a script to a file, check it against a known hash, and run it from
+      the file in place of piping it to a shell.

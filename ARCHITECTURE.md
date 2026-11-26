@@ -490,6 +490,16 @@ rule. The classifiers added by MCPCFG-004 and MCPCFG-005 live in
 option, the deprecated npm GitHub package with that token, the Supabase server with neither
 `--read-only` nor `--project-ref`, or an env key containing `SERVICE_ROLE`; a command inside
 the repo is skipped) and `classifyMCPRemoteURL` (an `http` URL on a non-loopback host).
+`classifyMCPDeprecated` (MCPCFG-006, [project_config_batch1.go](internal/analysis/project_config_batch1.go))
+reduces the package a runner launches to its registry name and looks it up in
+`archivedMCPPackages`, the packages the `modelcontextprotocol/servers` README lists as archived.
+In the same file, `repo_settings_allow_unscoped_grant` (AGCFG-017) reads the parsed allow rules:
+`unscopedAllowHits` flags a `python`, `python3`, `node`, `bash`, `sh`, `curl` or `wget` Bash prefix with
+a trailing wildcard, a bare `WebFetch`, a bare or `(*)` `Edit`/`Write`, and a whole-server `mcp__` entry; a
+deny or ask rule of the same shape in the same `.claude/` folder cancels it.
+`repo_claude_settings_local_committed` (AGCFG-018) flags a `settings.local.json` component that no
+`.gitignore` from the scan root down ignores (`gitignored`: a small matcher with `*`, `**`, `?`, anchors,
+directory patterns, `!` and last-match-wins; global excludes are not read).
 Server `env` maps and docker `-e` arguments are read by key name; the value of
 `GITHUB_READ_ONLY` and `GITHUB_TOOLSETS` is reduced to a state at once and never stored.
 `repo_settings_preapprove_user_content_fetch` (AGCFG-011) reads the already-parsed
@@ -922,7 +932,16 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   stamped onto the `BundledFile`: scripts for network egress and credential
   reads, and any file for a committed secret literal (an AWS/GitHub/Slack/Google
   token or a private-key header) — the payload-in-aux-file surface that scanning
-  `SKILL.md` alone misses. No frontmatter or no `name` → skipped.
+  `SKILL.md` alone misses. `analysis/skills_content.go` adds four more facts, all skipped
+  for files under a `pathclass` test path: for scripts (comments removed first),
+  `DecodesAndExecutes` (`base64 -d` piped to a shell or interpreter, or `eval`/`exec` over a
+  decoder call; CSKILL-088), `DestructiveCommand` (recursive `rm` on exactly `/`, `~` or
+  `$HOME`, `mkfs`, `dd`/`shred` to a block device, the fork-bomb form;
+  CSKILL-089) and `UnpinnedInstall` (CSKILL-091); for any file, `Opaque`, from the extension
+  or the first 512 bytes (archive, native binary, WebAssembly, bytecode; zip-based document
+  containers skipped; CSKILL-090). `SkillDef.BodyUnpinnedInstall` applies the install check
+  to the fenced shell blocks of the `SKILL.md` body; the check reuses `npmSpecPinned`,
+  `pySpecPinned` and `classifyMCPPin` from MCPCFG-003. No frontmatter or no `name` → skipped.
   CSKILL-080/081/084/085/086 use `skill_text_matches`, not the raw-substring
   `skill_*_has_text` family: a sentence-scoped, word-boundary predicate added to fix
   confirmed false positives a bare substring match produces (a term inside an unrelated

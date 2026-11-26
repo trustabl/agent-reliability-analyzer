@@ -1,0 +1,99 @@
+policy:
+  id: claude_skill_bundled_content
+  name: Skill bundled file content
+  category: claude_skill
+  description: >
+    Skill-scoped rules over the files shipped in a skill's directory: scripts that
+    decode a payload and run it or run a destructive host command, and files that
+    a reviewer cannot read. A bundled script can be run by the skill through Bash,
+    so its content is part of what the skill does.
+
+rules:
+  - id: CSKILL-088
+    title: Bundled skill script decodes a payload and runs it
+    severity: high
+    confidence: 0.7
+    applies_to:
+      - claude_skill
+    scope: skill
+    match:
+      skill_bundled_script_decodes_and_executes: true
+    explanation: >
+      A script in this skill's directory pipes base64 -d (or --decode) to a shell or
+      interpreter, evaluates or sources a command substitution over base64 -d, or
+      passes the result of a decoder (b64decode, b32decode, b85decode, a85decode,
+      decodebytes, decompress, fromhex, unhexlify, atob, codecs.decode, or
+      Buffer.from with base64) to eval, exec or new Function. The code that runs
+      is not in the file; a reviewer reading the script sees an encoded string.
+      The skills study (arXiv 2601.10338) lists obfuscated code, with base64-encoded
+      segments, among its supply-chain patterns and treats it as a high-severity
+      pattern. Limits of this check: it matches the forms above in script files
+      (shell, Python, JavaScript, TypeScript and similar) with comments removed,
+      on one line; a decoder call on a separate line from the eval, a decode into a
+      file that is run later, and other encodings are not matched. A match inside a
+      string literal or heredoc counts. Files under test paths are not judged.
+      The content that is decoded is not read.
+    fix: >
+      Ship the script as readable source. If a value must be decoded, decode it to
+      data and read it, and do not pass it to a shell, eval or exec. Review a
+      skill's scripts as you would a dependency, and pin the skill to a commit.
+
+  - id: CSKILL-089
+    title: Bundled skill script runs a destructive host command
+    severity: high
+    confidence: 0.6
+    applies_to:
+      - claude_skill
+    scope: skill
+    match:
+      skill_bundled_script_destructive_command: true
+    explanation: >
+      A script in this skill's directory runs a command that destroys host data
+      outside the project: rm with a recursive flag on exactly /, ~ or $HOME (or
+      their /* form), mkfs, dd or shred writing to a block device, or the fork-bomb
+      form. The skill-injection study (arXiv 2602.20156) shows a
+      skill script that runs rm -rf to delete a user's files under the name of an
+      integrity check, and the SkillsMetric study (arXiv 2608.08468) reports that
+      a scanner stage for destructive commands is too noisy to flag rm in
+      general, so this rule matches the root, home and device targets above and no relative target.
+      Limits of this check: it matches those forms in script files with comments
+      removed. A relative or nested target such as rm -rf ./build or
+      rm -rf /tmp/work is not matched, and neither is a target held in a variable,
+      a delete through a language API, or a command built at run time. A match
+      inside a string literal counts. Files under test paths are not judged.
+    fix: >
+      Remove the command. A cleanup script should name the one directory it
+      created, with a path that cannot resolve to the root or home directory, and
+      check that the variable holding it is set before use.
+
+  - id: CSKILL-090
+    title: Skill ships an archive, native binary, WebAssembly or bytecode file
+    severity: medium
+    confidence: 0.6
+    applies_to:
+      - claude_skill
+    scope: skill
+    match:
+      skill_bundled_file_is_opaque: true
+    explanation: >
+      This skill's directory holds a file that a reviewer cannot read as text: an
+      archive (zip, tar, gz, bz2, xz, 7z, rar, whl), a native executable or
+      library (ELF, Mach-O, PE, .so, .dll, .dylib, .exe, .class, .jar, .node),
+      WebAssembly, or Python bytecode. The file is recognised by its extension or
+      by the first bytes of the file. Skill scanners that read the skill's text and
+      source do not see inside such a file: the PyCache Trap study (arXiv
+      2610.10612) pairs benign Python source with a substituted bytecode cache the
+      loader accepts, and the Cloak and Detonate study (arXiv 2607.02357) lists
+      binary blobs among the parts of a bundle that surveyed scanners do not
+      inspect and describes a skill whose original content is archived and
+      unpacked by a decoder script when the agent runs it.
+      Limits of this check: it reads the file name and the first 512 bytes. A
+      document container such as .docx, .xlsx or .pptx is not judged, an archive
+      under a name with a different extension and no recognised magic number is
+      not found, and size and entropy are not measured. What the file does is not
+      examined. Files under test paths are not judged.
+    fix: >
+      Ship the source and build the artifact where it is used, or document where
+      the file comes from and pin the skill to a commit. Delete bytecode caches
+      (.pyc) from the skill directory, and do not ship an archive that a script
+      unpacks at run time.
