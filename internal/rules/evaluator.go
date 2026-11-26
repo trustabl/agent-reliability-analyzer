@@ -51,6 +51,9 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if len(e.AgentUsesToolKind) > 0 && !PredAgentUsesToolKind(e.AgentUsesToolKind, a, inv) {
 		return false
 	}
+	if len(e.AgentTransitiveCapabilityExceedsDirect) > 0 && !PredAgentTransitiveCapabilityExceedsDirect(e.AgentTransitiveCapabilityExceedsDirect, a, inv) {
+		return false
+	}
 	if len(e.AgentGrantsBuiltinTool) > 0 && !PredAgentGrantsBuiltinTool(e.AgentGrantsBuiltinTool, a) {
 		return false
 	}
@@ -242,6 +245,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 		return false
 	}
 	if e.RepoMCPConfigLaunchesDeprecatedPackage != nil && (len(inv.ProjectConfig.DeprecatedMCPLaunch) > 0) != *e.RepoMCPConfigLaunchesDeprecatedPackage {
+		return false
+	}
+	if len(e.RepoCallKwargMatches) > 0 && len(PredRepoCallKwargHits(e.RepoCallKwargMatches, inv)) == 0 {
 		return false
 	}
 	if e.RepoMCPServerBindsAllInterfacesUnprotected != nil && (len(inv.MCPServerBinds) > 0) != *e.RepoMCPServerBindsAllInterfacesUnprotected {
@@ -639,9 +645,10 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"agent_class": true, "agent_kwarg_present": true, "agent_kwarg_missing": true,
 		"agent_kwarg_list_empty": true, "agent_kwarg_value": true,
 		"agent_uses_tool_kind": true, "agent_grants_builtin_tool": true,
-		"agent_uses_hosted_tool_class":       true,
-		"agent_is_subagent_of_any":           true,
-		"agent_handoff_missing_input_filter": true, "agent_tools_match": true,
+		"transitive_capability_exceeds_direct": true,
+		"agent_uses_hosted_tool_class":         true,
+		"agent_is_subagent_of_any":             true,
+		"agent_handoff_missing_input_filter":   true, "agent_tools_match": true,
 		"agent_hosted_tool_kwarg_present": true, "agent_hosted_tool_kwarg_value": true,
 		"agent_run_call_max_turns_missing": true, "agent_run_call_usage_limits_missing": true,
 		// Dual-scope: a repo-level fact used to gate agent-scope observability
@@ -754,6 +761,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_mcp_server_shares_transport":                 true,
 		"repo_mcp_server_dns_rebinding_disabled":           true,
 		"repo_mcp_server_installs_package_from_input":      true,
+		"repo_call_kwarg_matches":                          true,
 	},
 }
 
@@ -800,6 +808,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(len(e.AgentKwargListEmpty) > 0, "agent_kwarg_list_empty")
 	add(e.AgentKwargValue != nil, "agent_kwarg_value")
 	add(len(e.AgentUsesToolKind) > 0, "agent_uses_tool_kind")
+	add(len(e.AgentTransitiveCapabilityExceedsDirect) > 0, "transitive_capability_exceeds_direct")
 	add(len(e.AgentGrantsBuiltinTool) > 0, "agent_grants_builtin_tool")
 	add(len(e.AgentUsesHostedToolClass) > 0, "agent_uses_hosted_tool_class")
 	add(e.AgentIsSubagentOfAny != nil, "agent_is_subagent_of_any")
@@ -891,6 +900,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoMCPServerSharesTransport != nil, "repo_mcp_server_shares_transport")
 	add(e.RepoMCPServerDNSRebindingDisabled != nil, "repo_mcp_server_dns_rebinding_disabled")
 	add(e.RepoMCPServerInstallsPackageFromInput != nil, "repo_mcp_server_installs_package_from_input")
+	add(len(e.RepoCallKwargMatches) > 0, "repo_call_kwarg_matches")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")

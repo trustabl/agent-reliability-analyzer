@@ -675,6 +675,7 @@ type RepoInventory struct {
 	AgentRunCalls      []AgentRunCallDef       `json:"agent_run_calls,omitempty"`
 	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	MCPServerBinds     []MCPServerBind         `json:"mcp_server_binds,omitempty"`
+	CallKwargs         []CallKwargHit          `json:"call_kwargs,omitempty"`
 	MCPCode            []MCPCodeFact           `json:"mcp_code,omitempty"`
 	// HandoffInputFilterConfigured is true when a RunConfig sets handoff_input_filter
 	// (handoffInputFilter in TypeScript) anywhere in the scanned code. OAI-204 reads it.

@@ -6,13 +6,28 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 48 (`rules.SupportedSchemaVersion`; 42 to 47 are merged from main, 48 is provisional). The rules fixture
-goes from 389 to 429 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules and the thirteen static batch 2 rules below). `ScanID` changes, as with every
+Rule schema 41 → 49 (`rules.SupportedSchemaVersion`; 42 to 48 are merged from main, 49 is provisional). The rules fixture
+goes from 389 to 434 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
 ### Added
+
+- **Static batch 4: call-site keywords and the handoff chain (rule schema 48 → 49, provisional; +5 rules, two predicates).**
+  Repo scope, new predicate `repo_call_kwarg_matches` over `RepoInventory.CallKwargs` (a closed table of keywords:
+  `env` on `StdioServerParameters` and `StdioClientTransport`, and `warn_only`, `ssrf_protection_enabled` and
+  `trust_remote_code` as literals; one finding per call): **AGCFG-019** (medium, 0.4, `agent_config/mcp_client_env.yaml`)
+  flags an MCP stdio launch whose `env` is the whole parent environment and whose command is not a literal (a variable, a config lookup or input), in Python and TypeScript; **AGCFG-020** (medium, 0.5,
+  `agent_config/guard_warn_only.yaml`) flags `warn_only=True` at a call whose name contains `ssrf` and
+  `ssrf_protection_enabled=False`; **AGCFG-021** (medium, 0.5, `agent_config/trust_remote_code.yaml`) flags
+  `from_pretrained(..., trust_remote_code=True)`. Agent scope, new predicate `transitive_capability_exceeds_direct` (`shell`; a
+  visited-set walk over resolved handoffs): **OAI-210** (medium, 0.5) for an agent with no `input_guardrails` and **OAI-211** (low, 0.5)
+  for one with them, in `openai_sdk/handoff_shell_chain.yaml`. Not built from the batch plan: CSDK-209 (no read source names the
+  spawn-site shape, and omitting `tools` already gives a subagent every tool). Narrowed from the plan: AGCFG-019 drops
+  `subprocess.*` and `ClaudeAgentOptions` (a child inherits the whole environment when `env` is omitted, so passing `os.environ`
+  changes nothing), AGCFG-020 keeps only the two keywords the Langflow advisory names, and OAI-211 is low, not high. Engines
+  without schema 49 skip these rules with META-005.
 
 - **Static batch 1: config and skill files (rule schema 46 → 47, provisional; +7 rules, seven predicates).**
   Repo scope: **AGCFG-017** (high, 0.6, `agent_config/unscoped_allow.yaml`, predicate

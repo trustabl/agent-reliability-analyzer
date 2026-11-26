@@ -1,0 +1,50 @@
+policy:
+  id: agent_config_guard_warn_only
+  name: Security guard set to log instead of block
+  category: agent_config
+  description: >
+    Repo-scoped rule for application code that configures a request-validation
+    guard to log what it would block, or turns the guard off, by a literal
+    keyword at the call. The pack loads for each scan (the file has no SDK
+    import), so the rule's own predicate does the gating. Fires once per
+    matching call.
+
+rules:
+  - id: AGCFG-020
+    title: SSRF guard is called in logging mode or switched off by a literal
+    severity: medium
+    confidence: 0.5
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_call_kwarg_matches:
+        - callee_contains:
+            - ssrf
+          kwarg: warn_only
+          value: "true"
+        - kwarg: ssrf_protection_enabled
+          value: "false"
+    explanation: >
+      Repo code calls a function whose name contains ssrf with warn_only=True,
+      or passes ssrf_protection_enabled=False. GHSA-j8f7-x8jm-wmm4 (Langflow)
+      describes both: the SSRF guard shipped with ssrf_protection_enabled set to
+      False, and its caller invoked validate_url_for_ssrf(url, warn_only=True),
+      so a request to a loopback, private-network or cloud-metadata address was
+      logged and then sent. The advisory states that a flow author or a prompt
+      that controls the URL could reach those addresses and read the response.
+      A guard in logging mode records the request and lets it through, so
+      nothing stops the call that the guard exists to stop.
+      Limits of this check: it reads the literal keyword at the call; a default value in a function definition
+      (def check(url, warn_only=True)) is not a call and is not judged. A mode set
+      through a variable, a configuration file, an environment variable or a
+      class attribute is not judged. warn_only is judged on a call whose
+      name contains ssrf and on no other call, because the same keyword name belongs to unrelated
+      libraries; ssrf_protection_enabled is judged on any call. Other guard
+      keywords and mode strings such as monitor or audit are not judged, and the
+      check does not know whether a second guard blocks the same request. Files
+      under a test path are not read. Python code is read; TypeScript is not.
+    fix: >
+      Remove warn_only=True so the guard blocks, and set ssrf_protection_enabled
+      to True. If a logging period is needed to measure what would be blocked,
+      confine it to a staging configuration and keep the committed call blocking.

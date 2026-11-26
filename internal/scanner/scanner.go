@@ -437,6 +437,8 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
 	// MCP-203: MCP server code binding an HTTP transport to a literal wildcard host.
 	inventory.MCPServerBinds = analysis.DiscoverMCPServerBinds(parsed, tsFiles)
+	// AGCFG-019..021: call-site keywords with a literal or whole-environment value.
+	inventory.CallKwargs = analysis.DiscoverCallKwargs(parsed, tsFiles)
 	// MCP-204 to MCP-210: MCP server and client code patterns, and the run-level handoff filter
 	// credit for OAI-204.
 	inventory.MCPCode = analysis.DiscoverMCPCode(parsed, tsFiles)

@@ -99,4 +99,7 @@ package rules
 // repo_mcp_server_dns_rebinding_disabled and repo_mcp_server_installs_package_from_input (repo
 // scope), and agent_handoff_missing_input_filter and agent_tools_match (agent scope). A binary
 // below 48 skips the rules that use them with META-005.
-const SupportedSchemaVersion = 48
+//
+// Schema 49 adds the repo_call_kwarg_matches predicate (repo scope) and the
+// transitive_capability_exceeds_direct predicate (agent scope). Batch 2 holds 48.
+const SupportedSchemaVersion = 49

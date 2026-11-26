@@ -107,6 +107,10 @@ type MatchExpr struct {
 	AgentRunCallUsageLimitsMissing *bool                     `yaml:"agent_run_call_usage_limits_missing,omitempty"`
 	AgentMCPServerKwargMissing     *MCPServerKwargExpr       `yaml:"agent_mcp_server_kwarg_missing,omitempty"`
 	AgentFileURLForceDownload      *bool                     `yaml:"agent_file_url_force_download,omitempty"`
+	// AgentTransitiveCapabilityExceedsDirect names capabilities (only "shell" is defined)
+	// that an agent reaches through its resolved handoff chain and does not wield itself
+	// (OAI-210, OAI-211).
+	AgentTransitiveCapabilityExceedsDirect []string `yaml:"transitive_capability_exceeds_direct,omitempty"`
 	// AgentRunCallWallClockTimeoutMissing: see PredAgentRunCallWallClockTimeoutMissing.
 	AgentRunCallWallClockTimeoutMissing *bool `yaml:"agent_run_call_wall_clock_timeout_missing,omitempty"`
 	// AgentKwargsObserved is true iff discovery resolved the agent's call site
@@ -196,6 +200,11 @@ type MatchExpr struct {
 	RepoSettingsAllowUnscopedGrant         *bool `yaml:"repo_settings_allow_unscoped_grant,omitempty"`
 	RepoClaudeSettingsLocalCommitted       *bool `yaml:"repo_claude_settings_local_committed,omitempty"`
 	RepoMCPConfigLaunchesDeprecatedPackage *bool `yaml:"repo_mcp_config_launches_deprecated_package,omitempty"`
+
+	// RepoCallKwargMatches is a list of call-site specs; the predicate holds when repo code
+	// has a call that matches any one of them (AGCFG-019, 020, 021). It reads
+	// RepoInventory.CallKwargs.
+	RepoCallKwargMatches []CallKwargSpec `yaml:"repo_call_kwarg_matches,omitempty"`
 
 	// RepoMCPServerBindsAllInterfacesUnprotected is true when MCP server code starts an HTTP
 	// transport on a literal wildcard host with no auth or allow-list in the file (MCP-203).
@@ -320,6 +329,18 @@ type HostedToolKwargValueExpr struct {
 	Class string `yaml:"class"`
 	Kwarg string `yaml:"kwarg"`
 	Value string `yaml:"value"` // compared after quote-stripping for string literals
+}
+
+// CallKwargSpec is one alternative of repo_call_kwarg_matches. Callee lists exact callee
+// names (the last name of the call, so `mcp.StdioServerParameters(...)` is
+// StdioServerParameters); CalleeContains lists substrings of the callee name, compared in lower
+// case; with both empty any callee matches. Kwarg is the keyword or object-property name and
+// Value is the judged value: environ (the whole parent environment), true or false.
+type CallKwargSpec struct {
+	Callee         []string `yaml:"callee,omitempty"`
+	CalleeContains []string `yaml:"callee_contains,omitempty"`
+	Kwarg          string   `yaml:"kwarg"`
+	Value          string   `yaml:"value"`
 }
 
 // MCPServerKwargExpr matches the absence of a kwarg on an MCP server instance

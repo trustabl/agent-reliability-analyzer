@@ -1524,6 +1524,42 @@ func TestScan_StaticBatch1Fixture(t *testing.T) {
 	}
 }
 
+// End to end: the static-batch-4 fixture. Each new rule fires at the listed sites in the
+// root tree; nothing under safe/ or tests/ is attributed, and the two OpenAI rules do not
+// fire on one agent.
+func TestScan_StaticBatch4Fixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "static-batch-4-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := map[string][]string{
+		"AGCFG-019": {"client.py:7", "client.ts:5"},
+		"AGCFG-020": {"guards.py:2", "guards.py:6"},
+		"AGCFG-021": {"loader.py:3"},
+		"OAI-210":   {"agents.py:19", "agents.py:22"},
+		"OAI-211":   {"agents.py:25"},
+	}
+	got := map[string][]string{}
+	for _, f := range res.Findings {
+		if _, ok := want[f.RuleID]; !ok {
+			continue
+		}
+		if strings.Contains(f.FilePath, "safe/") || strings.Contains(f.FilePath, "tests/") {
+			t.Errorf("%s fired under %s", f.RuleID, f.FilePath)
+		}
+		got[f.RuleID] = append(got[f.RuleID], fmt.Sprintf("%s:%d", filepath.Base(f.FilePath), f.StartLine))
+	}
+	for id, sites := range want {
+		g := got[id]
+		sort.Strings(g)
+		if strings.Join(g, ",") != strings.Join(sites, ",") {
+			t.Errorf("%s fired at %v, want %v", id, g, sites)
+		}
+	}
+}
+
 // End to end: the model-endpoint-override fixture sets ANTHROPIC_BASE_URL in four
 // settings env blocks. AGCFG-014 fires once, on the root file's off-vendor host;
 // the vendor host, the loopback host and the variable reference stay silent, and

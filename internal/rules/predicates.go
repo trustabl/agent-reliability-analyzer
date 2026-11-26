@@ -2358,3 +2358,83 @@ func PredAgentToolsMatch(expr AgentToolsMatchExpr, a models.AgentDef, inv models
 	}
 	return false
 }
+
+// PredRepoCallKwargHits returns the recorded call-site keywords that match any spec of
+// repo_call_kwarg_matches, in inventory order. A spec with no Kwarg or Value matches nothing.
+func PredRepoCallKwargHits(specs []CallKwargSpec, inv models.RepoInventory) []models.CallKwargHit {
+	var out []models.CallKwargHit
+	for _, h := range inv.CallKwargs {
+		for _, sp := range specs {
+			if callKwargSpecMatches(sp, h) {
+				out = append(out, h)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func callKwargSpecMatches(sp CallKwargSpec, h models.CallKwargHit) bool {
+	if sp.Kwarg == "" || sp.Value == "" || sp.Kwarg != h.Kwarg || sp.Value != h.Value {
+		return false
+	}
+	if len(sp.Callee) == 0 && len(sp.CalleeContains) == 0 {
+		return true
+	}
+	for _, c := range sp.Callee {
+		if c == h.Callee {
+			return true
+		}
+	}
+	lower := strings.ToLower(h.Callee)
+	for _, c := range sp.CalleeContains {
+		if c != "" && strings.Contains(lower, strings.ToLower(c)) {
+			return true
+		}
+	}
+	return false
+}
+
+// transitiveCapabilityKinds maps a capability name of transitive_capability_exceeds_direct to
+// the tool kinds PredAgentUsesToolKind judges. Only shell is defined.
+var transitiveCapabilityKinds = map[string][]string{"shell": {"shell_invocation"}}
+
+// PredAgentTransitiveCapabilityExceedsDirect reports whether the agent reaches, through its
+// resolved handoff chain, an agent that wields one of the named capabilities while the agent
+// itself does not. The walk follows Resolved handoff targets with a visited set, so a cycle or
+// a self edge ends it; an unresolved or external target is not followed. An unknown capability
+// name matches nothing.
+func PredAgentTransitiveCapabilityExceedsDirect(caps []string, a models.AgentDef, inv models.RepoInventory) bool {
+	for _, c := range caps {
+		kinds, ok := transitiveCapabilityKinds[c]
+		if !ok || PredAgentUsesToolKind(kinds, a, inv) {
+			continue
+		}
+		type key struct {
+			name, file string
+			line       int
+		}
+		visited := map[key]bool{{a.Name, a.FilePath, a.Line}: true}
+		queue := []*models.AgentDef{}
+		push := func(from models.AgentDef) {
+			for _, ref := range from.HandoffRefs {
+				t := ref.Resolved
+				if t == nil || visited[key{t.Name, t.FilePath, t.Line}] {
+					continue
+				}
+				visited[key{t.Name, t.FilePath, t.Line}] = true
+				queue = append(queue, t)
+			}
+		}
+		push(a)
+		for len(queue) > 0 {
+			t := queue[0]
+			queue = queue[1:]
+			if PredAgentUsesToolKind(kinds, *t, inv) {
+				return true
+			}
+			push(*t)
+		}
+	}
+	return false
+}
