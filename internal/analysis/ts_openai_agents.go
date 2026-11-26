@@ -127,6 +127,7 @@ func buildTSOpenAIAgent(n *sitter.Node, pf ParsedFile, aliases map[string]string
 	populateTSOpenAIIdentifierList(opts, "handoffs", pf.Source, func(name string) {
 		a.HandoffRefs = append(a.HandoffRefs, models.AgentRef{Name: name})
 	})
+	a.HandoffInputs = tsHandoffInputs(opts, pf.Source)
 	populateTSOpenAIIdentifierList(opts, "inputGuardrails", pf.Source, func(name string) {
 		a.InputGuards = append(a.InputGuards, models.GuardrailRef{Name: name})
 	})

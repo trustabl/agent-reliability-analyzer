@@ -345,6 +345,9 @@ func ResolveEdges(inv *models.RepoInventory, parsed []ParsedFile) {
 			if hk := agentKwarg(a, "handoffs"); hk != nil && hk.Value != nil && hk.Value.Kind == models.ExprList {
 				for _, item := range hk.Value.List {
 					a.HandoffRefs = append(a.HandoffRefs, models.AgentRef{Name: item.Text})
+					if hi, ok := pyHandoffInput(item); ok {
+						a.HandoffInputs = append(a.HandoffInputs, hi)
+					}
 				}
 			}
 		}

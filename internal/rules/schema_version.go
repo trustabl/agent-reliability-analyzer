@@ -92,4 +92,11 @@ package rules
 // skill_bundled_script_destructive_command, skill_bundled_file_is_opaque and
 // skill_unpinned_install (skill scope). A binary below 47 skips the rules that use them with
 // META-005.
-const SupportedSchemaVersion = 47
+//
+// Schema 48 adds nine predicates: repo_mcp_prefix_containment_unsafe,
+// repo_mcp_stdio_client_nonliteral_command, repo_mcp_server_bearer_without_audience,
+// repo_mcp_client_opens_server_url, repo_mcp_server_shares_transport,
+// repo_mcp_server_dns_rebinding_disabled and repo_mcp_server_installs_package_from_input (repo
+// scope), and agent_handoff_missing_input_filter and agent_tools_match (agent scope). A binary
+// below 48 skips the rules that use them with META-005.
+const SupportedSchemaVersion = 48

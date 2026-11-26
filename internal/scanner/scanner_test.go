@@ -2783,3 +2783,39 @@ func TestScan_ForgeBackendSetupScansAsInstrumented(t *testing.T) {
 		}
 	}
 }
+
+// End to end: the static-batch-2 fixture. Each new rule fires once, in the root tree; nothing
+// under safe/ or tests/ is attributed.
+func TestScan_StaticBatch2Fixture(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	target := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", "corpus", "static-batch2-fixture")
+	res, err := scanner.Run(scanner.Config{Target: target, RulesFS: rulesFixture(t)})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := map[string]string{
+		"MCP-204": "fs_server.ts", "MCP-205": "client.py", "MCP-206": "auth_server.py", "MCP-207": "client.py",
+		"MCP-208": "shared.ts", "MCP-209": "rebind_server.py", "MCP-210": "install_tool.ts",
+		"OAI-204": "agents.py", "OAI-205": "agents.py", "LC-203": "lc_agent.py", "CREW-203": "crew_agent.py",
+		"ADK-203": "adk_agent.py", "PYD-203": "pyd_agent.py",
+	}
+	got := map[string][]models.Finding{}
+	for _, f := range res.Findings {
+		if _, ok := want[f.RuleID]; ok {
+			got[f.RuleID] = append(got[f.RuleID], f)
+		}
+	}
+	for id, file := range want {
+		fs := got[id]
+		if len(fs) != 1 {
+			t.Errorf("%s fired %d times, want once: %+v", id, len(fs), fs)
+			continue
+		}
+		if fs[0].FilePath != file {
+			t.Errorf("%s attributed to %s, want %s", id, fs[0].FilePath, file)
+		}
+		if strings.Contains(fs[0].FilePath, "safe/") || strings.Contains(fs[0].FilePath, "tests/") {
+			t.Errorf("%s attributed under a silent folder: %s", id, fs[0].FilePath)
+		}
+	}
+}

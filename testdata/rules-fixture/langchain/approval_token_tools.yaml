@@ -1,0 +1,49 @@
+policy:
+  id: langchain_approval_token_tools
+  name: LangChain agent that can request and redeem an approval token
+  category: langchain
+  description: >
+    Agent-scoped rule for LangChain that reads the agent constructor and its tools list and flags an agent that holds both a tool
+    taking an authorized_by parameter and a tool whose name asks for an approval or access grant.
+
+rules:
+  - id: LC-203
+    title: Agent holds a tool taking authorized_by and a tool that requests an approval
+    severity: high
+    confidence: 0.4
+    applies_to:
+      - langchain_agent
+      - langchain_agent_executor
+      - langchain_deep_agent
+    scope: agent
+    match:
+      agent_tools_match:
+        param_names:
+          - authorized_by
+        other_tool_name_regex: "^(request|obtain|issue|create|grant)_([a-z0-9_]*_)?(approval|access)([a-z0-9_]*)$"
+    explanation: >
+      One tool this agent holds takes an authorized_by parameter, and another tool it holds has a
+      name such as request_approval, request_access, issue_approval_token or grant_access. The
+      paper "When Approval Becomes Execution" (arXiv 2610.23077) describes a workflow in which
+      "the agent requests a normal approval token from the local approval service, and the
+      returned token is supplied to the document service through authorized_by", and reports
+      that the document service accepted the token. The paper's own mitigation, which it labels
+      not experimentally validated, is that "protected services should not treat token possession
+      through a stand-alone field such as authorized_by as sufficient".
+      Limits of this check: the paper names the parameter authorized_by; no other parameter name
+      is sourced, so no other name is read. The name of the second tool is matched against a
+      pattern chosen for this rule, after names in camel case are split at case changes; the
+      paper does not state that a tool with such a name is an approval service, and it does not
+      recommend keeping the two tools on separate agents. Tools are matched when both resolve to
+      a definition in the scanned code (a reference written as one wrapper call around a name,
+      such as Tool(fn), is looked up by that name in the same file), and the rule does not read what the tools do, whether the
+      service binds the token to the requester, or whether a person approves the second call.
+      In the paper's scenario the request named another user as approver; the rule does not read
+      that. A tool taking authorized_by with an unrelated meaning is reported.
+    fix: >
+      Have the protected service bind the approval to the requester, the approver, the resource,
+      the action and an expiry, and issue it outside the agent's tool list. Remove the
+      approval-requesting tool from the agent that calls the protected tool, or require a person
+      to approve the second call, and do not accept a bare token in authorized_by as proof of
+      authorization.
+
