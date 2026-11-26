@@ -380,6 +380,5 @@ func batch3AgentCases() []policyAgentCase {
 		{"OAI-206 fires on a handoff target with a shell tool", "OAI-206", child, invWithHandoff, true},
 		{"OAI-206 silent on a handoff target with no shell tool", "OAI-206", plainChild, invPlain, false},
 		{"OAI-206 silent on a shell agent that is not a handoff target", "OAI-206", soloShell, models.RepoInventory{Agents: []models.AgentDef{soloShell}}, false},
-
 	}
 }

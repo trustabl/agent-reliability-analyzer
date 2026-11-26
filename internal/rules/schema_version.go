@@ -93,6 +93,13 @@ package rules
 // skill_unpinned_install (skill scope). A binary below 47 skips the rules that use them with
 // META-005.
 //
+// Schema 48 adds nine predicates: repo_mcp_prefix_containment_unsafe,
+// repo_mcp_stdio_client_nonliteral_command, repo_mcp_server_bearer_without_audience,
+// repo_mcp_client_opens_server_url, repo_mcp_server_shares_transport,
+// repo_mcp_server_dns_rebinding_disabled and repo_mcp_server_installs_package_from_input (repo
+// scope), and agent_handoff_missing_input_filter and agent_tools_match (agent scope). A binary
+// below 48 skips the rules that use them with META-005.
+//
 // Schema 49 adds the repo_call_kwarg_matches predicate (repo scope) and the
-// transitive_capability_exceeds_direct predicate (agent scope). Provisional: batch 2 holds 48.
+// transitive_capability_exceeds_direct predicate (agent scope). Batch 2 holds 48.
 const SupportedSchemaVersion = 49

@@ -1,0 +1,108 @@
+policy:
+  id: mcp_server_auth_transport
+  name: MCP server authentication and transport lifetime
+  category: mcp
+  description: >
+    Repo-scoped rules for MCP server code. They read bearer-token settings without an audience
+    check, a server or transport shared across HTTP clients, and DNS-rebinding protection that
+    is switched off with no authentication in the file.
+
+rules:
+  - id: MCP-206
+    title: MCP server verifies bearer tokens with no audience check
+    severity: high
+    confidence: 0.6
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_server_bearer_without_audience: true
+    explanation: >
+      A Python file builds AuthSettings and names a token_verifier, leaves
+      validate_token_resource unset, None or False, and names no audience (aud or audience)
+      anywhere in the file. GitHub advisory GHSA-w4fh-qvv9-3v23 states that a server is
+      affected "if your HTTP server uses the SDK's bearer authentication (auth=AuthSettings(...)
+      with token_verifier=), its authorization server also issues tokens for other services,
+      and your TokenVerifier does not check the token's audience (aud) itself". It adds that
+      "upgrading alone changes nothing. The patched versions add a validate_token_resource
+      setting that is off unless you set it", and that the fix needs validate_token_resource=True
+      with resource_server_url set, and the token's audience returned from verify_token() as
+      AccessToken.resource.
+      Limits of this check: it reads Python and one file at a time. Any occurrence of aud
+      or audience in the file, including in an unrelated identifier, string or doc text outside
+      comments, counts as an audience check. A settings call with validate_token_resource set to
+      True is not judged, and the rule does not check that verify_token returns the resource.
+      A verifier in another file than the settings call is not seen. The installed version of
+      the mcp package is not read, so a server on a release that predates the setting is
+      reported the same way. The TypeScript requireBearerAuth variant is not judged.
+    fix: >
+      Set validate_token_resource=True in AuthSettings with resource_server_url set to the
+      audience your authorization server puts in tokens for this server, and return the token's
+      audience from verify_token() as AccessToken.resource. A verifier that already checks the
+      audience can reject tokens whose aud does not include this server.
+
+  - id: MCP-208
+    title: MCP server shares one server or HTTP transport across requests
+    severity: high
+    confidence: 0.4
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_server_shares_transport: true
+    explanation: >
+      A TypeScript file that imports the @modelcontextprotocol/server package builds an McpServer
+      or Server, or an HTTP transport, at module scope, and a function connects the server or
+      hands a request to the transport. GitHub advisory GHSA-jm63-cq47-j5jp states that the
+      problem occurs "when clients shared one stateless transport, or one McpServer or Server
+      instance", that "messages were matched to a connection by JSON-RPC id alone", and that the
+      issue applies if "your code creates the transport or the server once at startup, instead
+      of once per request or per session". It lists @modelcontextprotocol/server 2.0.0 through
+      2.2.0 as affected and states that stdio servers and createMcpHandler() with a factory
+      that builds a new server on each call are not affected.
+      Limits of this check: it reads files that import @modelcontextprotocol/server or one of its
+      subpaths. The same advisory states that @modelcontextprotocol/sdk 1.26.0 and later is not
+      affected by this issue, so code on that package is not judged. The installed version is
+      not read: release 2.3.0 rejects the second connect, so a hit on a patched version marks
+      code that fails on the second client and no longer delivers its messages to another
+      client. A transport is recognized by an imported class whose name contains Transport and
+      HTTP. A server created in another module and imported here is not seen. A shared
+      InMemoryTaskStore, covered by GHSA-22jm-h49p-29qw for @modelcontextprotocol/sdk 1.24.0
+      through 1.31.0, is not judged.
+    fix: >
+      Build a new McpServer and a new transport inside the request handler, or with
+      createMcpHandler pass a factory that builds a new server on each call. For stateful
+      sessions set sessionIdGenerator and keep one server and one transport per session.
+      Upgrade @modelcontextprotocol/server to 2.3.0 or later.
+
+  - id: MCP-209
+    title: MCP server switches DNS-rebinding protection off and names no authentication
+    severity: high
+    confidence: 0.5
+    applies_to:
+      - mcp
+    scope: repo
+    match:
+      repo_mcp_server_dns_rebinding_disabled: true
+    explanation: >
+      A Python file builds TransportSecuritySettings with enable_dns_rebinding_protection=False
+      and names no token_verifier, auth_server_provider, AuthSettings or auth= argument. GitHub
+      advisory GHSA-j9xx-59ph-wmr6 (AnkiMCP, fixed in 0.21.0) states that the server "starts a
+      local Streamable HTTP MCP listener by default and explicitly disables FastMCP's
+      DNS-rebinding protection", and that there is "no bearer token, API key, session secret,
+      strict Host allowlist, or strict Origin allowlist before MCP dispatch". The MCP Python SDK
+      source sets the setting to True by default in TransportSecuritySettings, and its FastMCP
+      class turns protection on for a loopback host when no settings are passed.
+      Limits of this check: it reads Python and one file at a time, and it judges a literal
+      False. Settings with empty allowed_hosts and allowed_origins lists, middleware that checks
+      Host and Origin in another file, and a SseServerTransport with no settings are not judged.
+      Any mention of the auth names above in the file outside comments counts as authentication,
+      and the rule does not check that it is wired to the server. The sources describe one
+      product; they do not show that a proxy or tunnel setup is unsafe. The rule does not read
+      the bind address. MCP-203 reads a wildcard bind and a different condition.
+    fix: >
+      Leave enable_dns_rebinding_protection at its default of True and list the hosts and
+      origins the server serves in allowed_hosts and allowed_origins, for example for a tunnel
+      or proxy host name. Add bearer authentication through AuthSettings with a token verifier
+      when the listener is reachable by a browser.
+

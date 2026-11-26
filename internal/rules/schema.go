@@ -92,23 +92,25 @@ type MatchExpr struct {
 	AgentClass        []string `yaml:"agent_class,omitempty"`
 	AgentKwargPresent []string `yaml:"agent_kwarg_present,omitempty"`
 	// AgentKwargMissing treats a kwarg named by AgentDef.InstrumentedBy as set.
-	AgentKwargMissing   []string             `yaml:"agent_kwarg_missing,omitempty"`
-	AgentKwargListEmpty []string             `yaml:"agent_kwarg_list_empty,omitempty"`
-	AgentKwargValue     *AgentKwargValueExpr `yaml:"agent_kwarg_value,omitempty"`
-	AgentUsesToolKind   []string             `yaml:"agent_uses_tool_kind,omitempty"`
+	AgentKwargMissing              []string                  `yaml:"agent_kwarg_missing,omitempty"`
+	AgentKwargListEmpty            []string                  `yaml:"agent_kwarg_list_empty,omitempty"`
+	AgentKwargValue                *AgentKwargValueExpr      `yaml:"agent_kwarg_value,omitempty"`
+	AgentUsesToolKind              []string                  `yaml:"agent_uses_tool_kind,omitempty"`
+	AgentGrantsBuiltinTool         []string                  `yaml:"agent_grants_builtin_tool,omitempty"`
+	AgentUsesHostedToolClass       []string                  `yaml:"agent_uses_hosted_tool_class,omitempty"`
+	AgentIsSubagentOfAny           *bool                     `yaml:"agent_is_subagent_of_any,omitempty"`
+	AgentHandoffMissingInputFilter *bool                     `yaml:"agent_handoff_missing_input_filter,omitempty"`
+	AgentToolsMatch                *AgentToolsMatchExpr      `yaml:"agent_tools_match,omitempty"`
+	AgentHostedToolKwargPresent    *HostedToolKwargExpr      `yaml:"agent_hosted_tool_kwarg_present,omitempty"`
+	AgentHostedToolKwargValue      *HostedToolKwargValueExpr `yaml:"agent_hosted_tool_kwarg_value,omitempty"`
+	AgentRunCallMaxTurnsMissing    *bool                     `yaml:"agent_run_call_max_turns_missing,omitempty"`
+	AgentRunCallUsageLimitsMissing *bool                     `yaml:"agent_run_call_usage_limits_missing,omitempty"`
+	AgentMCPServerKwargMissing     *MCPServerKwargExpr       `yaml:"agent_mcp_server_kwarg_missing,omitempty"`
+	AgentFileURLForceDownload      *bool                     `yaml:"agent_file_url_force_download,omitempty"`
 	// AgentTransitiveCapabilityExceedsDirect names capabilities (only "shell" is defined)
 	// that an agent reaches through its resolved handoff chain and does not wield itself
 	// (OAI-210, OAI-211).
-	AgentTransitiveCapabilityExceedsDirect []string                  `yaml:"transitive_capability_exceeds_direct,omitempty"`
-	AgentGrantsBuiltinTool                 []string                  `yaml:"agent_grants_builtin_tool,omitempty"`
-	AgentUsesHostedToolClass               []string                  `yaml:"agent_uses_hosted_tool_class,omitempty"`
-	AgentIsSubagentOfAny                   *bool                     `yaml:"agent_is_subagent_of_any,omitempty"`
-	AgentHostedToolKwargPresent            *HostedToolKwargExpr      `yaml:"agent_hosted_tool_kwarg_present,omitempty"`
-	AgentHostedToolKwargValue              *HostedToolKwargValueExpr `yaml:"agent_hosted_tool_kwarg_value,omitempty"`
-	AgentRunCallMaxTurnsMissing            *bool                     `yaml:"agent_run_call_max_turns_missing,omitempty"`
-	AgentRunCallUsageLimitsMissing         *bool                     `yaml:"agent_run_call_usage_limits_missing,omitempty"`
-	AgentMCPServerKwargMissing             *MCPServerKwargExpr       `yaml:"agent_mcp_server_kwarg_missing,omitempty"`
-	AgentFileURLForceDownload              *bool                     `yaml:"agent_file_url_force_download,omitempty"`
+	AgentTransitiveCapabilityExceedsDirect []string `yaml:"transitive_capability_exceeds_direct,omitempty"`
 	// AgentRunCallWallClockTimeoutMissing: see PredAgentRunCallWallClockTimeoutMissing.
 	AgentRunCallWallClockTimeoutMissing *bool `yaml:"agent_run_call_wall_clock_timeout_missing,omitempty"`
 	// AgentKwargsObserved is true iff discovery resolved the agent's call site
@@ -207,6 +209,16 @@ type MatchExpr struct {
 	// RepoMCPServerBindsAllInterfacesUnprotected is true when MCP server code starts an HTTP
 	// transport on a literal wildcard host with no auth or allow-list in the file (MCP-203).
 	RepoMCPServerBindsAllInterfacesUnprotected *bool `yaml:"repo_mcp_server_binds_all_interfaces_unprotected,omitempty"`
+
+	// MCP code predicates (MCP-204 to MCP-210). Each is true when the matching MCPCodeFact kind
+	// is present in the inventory.
+	RepoMCPPrefixContainmentUnsafe        *bool `yaml:"repo_mcp_prefix_containment_unsafe,omitempty"`
+	RepoMCPStdioClientNonliteralCommand   *bool `yaml:"repo_mcp_stdio_client_nonliteral_command,omitempty"`
+	RepoMCPServerBearerWithoutAudience    *bool `yaml:"repo_mcp_server_bearer_without_audience,omitempty"`
+	RepoMCPClientOpensServerURL           *bool `yaml:"repo_mcp_client_opens_server_url,omitempty"`
+	RepoMCPServerSharesTransport          *bool `yaml:"repo_mcp_server_shares_transport,omitempty"`
+	RepoMCPServerDNSRebindingDisabled     *bool `yaml:"repo_mcp_server_dns_rebinding_disabled,omitempty"`
+	RepoMCPServerInstallsPackageFromInput *bool `yaml:"repo_mcp_server_installs_package_from_input,omitempty"`
 
 	// Observability predicates. repo_has_observability is ALSO valid at agent
 	// scope (the first dual-scope predicate in the catalog) — see EvaluateAgent.
@@ -365,4 +377,13 @@ type CallWithoutKwargExpr struct {
 type CallUsesUnnormalizedPathParamExpr struct {
 	Callees        []string `yaml:"callees,omitempty"`
 	CalleePrefixes []string `yaml:"callee_prefixes,omitempty"`
+}
+
+// AgentToolsMatchExpr fires when one tool the agent holds takes a parameter named in ParamNames
+// (case-insensitive, exact) and a different tool the agent holds has a name that matches
+// OtherToolNameRegex. The tool name is split at lower-to-upper case changes and at hyphens
+// into underscore form and lowercased before the match.
+type AgentToolsMatchExpr struct {
+	ParamNames         []string `yaml:"param_names"`
+	OtherToolNameRegex string   `yaml:"other_tool_name_regex"`
 }

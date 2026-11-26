@@ -6,8 +6,8 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 49 (`rules.SupportedSchemaVersion`; 42 to 46 are merged from main, 47 and 49 are provisional; batch 2 holds 48). The rules fixture
-goes from 389 to 421 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules below and the five static batch 4 rules). `ScanID` changes, as with every
+Rule schema 41 → 49 (`rules.SupportedSchemaVersion`; 42 to 48 are merged from main, 49 is provisional). The rules fixture
+goes from 389 to 434 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
@@ -48,6 +48,24 @@ upgraded.
   main conversation already runs in that mode and is ignored otherwise), AGCFG-011 (`.claude/**` and `.mcp.json` are protected paths that
   allow rules do not pre-approve) and AGCFG-015 (its approval-policy half is AGCFG-006). Engines
   without schema 47 skip these rules with META-005.
+
+- **Static batch 2: MCP server and client code, OpenAI handoffs and approval-token agents (rule schema 47 → 48, provisional; +13 rules, nine predicates).**
+  Repo scope, one finding per site, from `analysis/mcp_code.go` (`MCPCodeFact`, `RepoInventory.MCPCode`): **MCP-204**
+  (high, 0.5, `mcp/path_prefix_containment.yaml`, `repo_mcp_prefix_containment_unsafe`) flags a TypeScript `startsWith`
+  containment check whose directory argument names no separator; **MCP-205** (high, 0.4, `mcp/client_launch.yaml`,
+  `repo_mcp_stdio_client_nonliteral_command`) flags a stdio client started by a shell given `-c` or with a command taken from
+  request-like input; **MCP-207** (high, 0.5, same file, `repo_mcp_client_opens_server_url`) flags an OAuth redirect handler that opens the
+  server-supplied URL with no check; **MCP-206** (high, 0.6, `mcp/server_auth_transport.yaml`, `repo_mcp_server_bearer_without_audience`),
+  **MCP-208** (high, 0.4, `repo_mcp_server_shares_transport`, the `@modelcontextprotocol/server` package) and **MCP-209** (high, 0.5,
+  `repo_mcp_server_dns_rebinding_disabled`); **MCP-210** (high, 0.5, `mcp/package_install.yaml`, `repo_mcp_server_installs_package_from_input`,
+  npm and pnpm). Agent scope: **OAI-204** (medium, 0.4, `openai_sdk/handoff_input_filter.yaml`, `agent_handoff_missing_input_filter`;
+  new `AgentDef.HandoffInputs` and `RepoInventory.HandoffInputFilterConfigured`) and the approval-token rule over `agent_tools_match`
+  in five packs, **OAI-205**, **LC-203**, **CREW-203**, **ADK-203** and **PYD-203** (high, 0.4, `<pack>/approval_token_tools.yaml`).
+  Not built as triaged: MCP-036's Python part, MCP-057's pip and uv part and SCOPE-035's other parameter names have no source;
+  MCP-038 fires on a shell with `-c` or a request-derived command (a command from the user's own configuration is a client's normal
+  input and produced nothing but false positives in the public run); OAI-121 is medium, not high, because the OpenAI pages support the
+  full-history default and not an impact. AutoGen and Vercel AI have no approval-token rule; their tool resolution was not checked for this batch.
+  Engines without schema 48 skip these rules with META-005.
 
 ### Fixed
 

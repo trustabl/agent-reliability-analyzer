@@ -63,6 +63,12 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentIsSubagentOfAny != nil && PredAgentIsSubagentOfAny(a, inv) != *e.AgentIsSubagentOfAny {
 		return false
 	}
+	if e.AgentHandoffMissingInputFilter != nil && PredAgentHandoffMissingInputFilter(a, inv) != *e.AgentHandoffMissingInputFilter {
+		return false
+	}
+	if e.AgentToolsMatch != nil && !PredAgentToolsMatch(*e.AgentToolsMatch, a, inv) {
+		return false
+	}
 	if e.AgentHostedToolKwargPresent != nil && !PredAgentHostedToolKwargPresent(*e.AgentHostedToolKwargPresent, a) {
 		return false
 	}
@@ -246,6 +252,11 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	}
 	if e.RepoMCPServerBindsAllInterfacesUnprotected != nil && (len(inv.MCPServerBinds) > 0) != *e.RepoMCPServerBindsAllInterfacesUnprotected {
 		return false
+	}
+	for _, mc := range mcpCodePredicates(e) {
+		if mc.set != nil && hasMCPCode(inv, mc.kind) != *mc.set {
+			return false
+		}
 	}
 	if e.RepoOtelLabelsInstalled != nil && !PredRepoOtelLabelsInstalled(*e.RepoOtelLabelsInstalled, p, inv) {
 		return false
@@ -637,7 +648,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"transitive_capability_exceeds_direct": true,
 		"agent_uses_hosted_tool_class":         true,
 		"agent_is_subagent_of_any":             true,
-		"agent_hosted_tool_kwarg_present":      true, "agent_hosted_tool_kwarg_value": true,
+		"agent_handoff_missing_input_filter":   true, "agent_tools_match": true,
+		"agent_hosted_tool_kwarg_present": true, "agent_hosted_tool_kwarg_value": true,
 		"agent_run_call_max_turns_missing": true, "agent_run_call_usage_limits_missing": true,
 		// Dual-scope: a repo-level fact used to gate agent-scope observability
 		// rules. EvaluateAgent receives the inventory, so this is free.
@@ -742,6 +754,13 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_claude_settings_local_committed":             true,
 		"repo_mcp_config_launches_deprecated_package":      true,
 		"repo_mcp_server_binds_all_interfaces_unprotected": true,
+		"repo_mcp_prefix_containment_unsafe":               true,
+		"repo_mcp_stdio_client_nonliteral_command":         true,
+		"repo_mcp_server_bearer_without_audience":          true,
+		"repo_mcp_client_opens_server_url":                 true,
+		"repo_mcp_server_shares_transport":                 true,
+		"repo_mcp_server_dns_rebinding_disabled":           true,
+		"repo_mcp_server_installs_package_from_input":      true,
 		"repo_call_kwarg_matches":                          true,
 	},
 }
@@ -793,6 +812,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(len(e.AgentGrantsBuiltinTool) > 0, "agent_grants_builtin_tool")
 	add(len(e.AgentUsesHostedToolClass) > 0, "agent_uses_hosted_tool_class")
 	add(e.AgentIsSubagentOfAny != nil, "agent_is_subagent_of_any")
+	add(e.AgentHandoffMissingInputFilter != nil, "agent_handoff_missing_input_filter")
+	add(e.AgentToolsMatch != nil, "agent_tools_match")
 	add(e.AgentHostedToolKwargPresent != nil, "agent_hosted_tool_kwarg_present")
 	add(e.AgentHostedToolKwargValue != nil, "agent_hosted_tool_kwarg_value")
 	add(e.AgentRunCallMaxTurnsMissing != nil, "agent_run_call_max_turns_missing")
@@ -872,6 +893,13 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoClaudeSettingsLocalCommitted != nil, "repo_claude_settings_local_committed")
 	add(e.RepoMCPConfigLaunchesDeprecatedPackage != nil, "repo_mcp_config_launches_deprecated_package")
 	add(e.RepoMCPServerBindsAllInterfacesUnprotected != nil, "repo_mcp_server_binds_all_interfaces_unprotected")
+	add(e.RepoMCPPrefixContainmentUnsafe != nil, "repo_mcp_prefix_containment_unsafe")
+	add(e.RepoMCPStdioClientNonliteralCommand != nil, "repo_mcp_stdio_client_nonliteral_command")
+	add(e.RepoMCPServerBearerWithoutAudience != nil, "repo_mcp_server_bearer_without_audience")
+	add(e.RepoMCPClientOpensServerURL != nil, "repo_mcp_client_opens_server_url")
+	add(e.RepoMCPServerSharesTransport != nil, "repo_mcp_server_shares_transport")
+	add(e.RepoMCPServerDNSRebindingDisabled != nil, "repo_mcp_server_dns_rebinding_disabled")
+	add(e.RepoMCPServerInstallsPackageFromInput != nil, "repo_mcp_server_installs_package_from_input")
 	add(len(e.RepoCallKwargMatches) > 0, "repo_call_kwarg_matches")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")

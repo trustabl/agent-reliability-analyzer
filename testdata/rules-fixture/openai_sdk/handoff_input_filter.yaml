@@ -1,0 +1,45 @@
+policy:
+  id: openai_sdk_handoff_input_filter
+  name: OpenAI Agents SDK handoff without an input filter
+  category: openai_sdk
+  description: >
+    Agent-scoped rule for the OpenAI Agents SDK that reads the handoffs list of an agent and
+    flags an entry with no input filter whose target, defined in the same file, holds a shell
+    tool.
+
+rules:
+  - id: OAI-204
+    title: Handoff to an agent with a shell tool sets no input filter
+    severity: medium
+    confidence: 0.4
+    applies_to:
+      - openai_agent
+      - openai_sandbox_agent
+    scope: agent
+    match:
+      agent_handoff_missing_input_filter: true
+    explanation: >
+      This agent lists, in handoffs, another agent from the same file that holds a shell tool,
+      as a bare agent or as a handoff(...) call with no input_filter, and no RunConfig in the
+      scanned code sets handoff_input_filter. The OpenAI Agents SDK handoffs page states that
+      "when a handoff occurs, it's as though the new agent takes over the conversation, and gets
+      to see the entire previous conversation history. If you want to change this, you can set
+      an input_filter", and that the per-handoff filter takes precedence over the run-level
+      one. The target therefore receives all earlier messages, including tool output and
+      content from other sources, before it runs its shell tool.
+      Limits of this check: it reads handoffs entries that are a bare agent name or a
+      handoff(...) call, and targets defined in the same file. A target imported from another
+      module, a handoff built in a loop, and a Handoff object held in a variable are not seen.
+      Shell tools count as privileged: file, network and side-effect tools are not judged.
+      The page does not define a privileged tool; that choice is the rule's. The page states
+      that remove_all_tools "does not redact tool arguments or results already copied into
+      ordinary messages or nested-history summaries", so an entry that sets a filter is not
+      judged and the rule does not check what the filter removes. Any handoff_input_filter
+      argument in the scanned code silences the rule for the whole repository. OAI-206 flags the
+      same target for holding a shell tool, and both rules can report one agent.
+    fix: >
+      Set input_filter on the handoff (for example handoff(target, input_filter=
+      handoff_filters.remove_all_tools) in Python, or inputFilter in TypeScript) so the target
+      receives what it needs, or set handoff_input_filter on the RunConfig. Keep shell
+      tools off agents that receive handoffs, or gate them with needs_approval.
+

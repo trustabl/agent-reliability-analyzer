@@ -1199,6 +1199,18 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   mis-attributed. Emitting `KindMCPTool` routes through the existing
   `SDKMCP` → `mcp` pack plumbing. Low-level `Server` + `setRequestHandler`
   tools are not extracted (gap).
+- **DiscoverMCPCode** (`mcp_code.go`) — the facts behind MCP-204 to MCP-210, over the Python and TS/JS parsed
+  files (test paths skipped via `pathclass`; comments blanked before any credit search). Each pass reads one file
+  that imports an MCP package and records a site as an `MCPCodeFact` of one kind: `startsWith` containment with a
+  directory argument that names no separator (TS), a stdio client built with a shell and `-c` or a request-derived
+  command (Python, TS), `AuthSettings` with a `token_verifier` and no audience text (Python), an OAuth redirect handler
+  that opens its URL parameter with no check (Python, TS), a module-scope server or HTTP transport used in a handler
+  (TS, `@modelcontextprotocol/server`), `TransportSecuritySettings` with protection off and no auth name (Python), and an
+  `npm`/`pnpm` install with a built specifier (TS). `repo_mcp_*` predicates test for one kind; `rule_detector.go` emits one
+  finding per site.
+- **handoff_inputs.go** — `AgentDef.HandoffInputs` (OpenAI `handoffs` entries: target and whether `input_filter` / `inputFilter`
+  is set; `HandoffRefs` is untouched) and `DiscoverHandoffInputFilterConfigured` (a `handoff_input_filter` /
+  `handoffInputFilter` argument in non-test code), read by `agent_handoff_missing_input_filter` (OAI-204).
 - **DiscoverCallKwargs** (`repo_call_kwargs.go`) — the fact behind `repo_call_kwarg_matches` (AGCFG-019, 020,
   021), over the Python and TS/JS parsed files (test paths skipped via `pathclass`). It records a call that
   passes one keyword from a closed table with a judged value: `env` on `StdioServerParameters` (Python, file imports from `mcp`)

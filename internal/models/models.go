@@ -676,7 +676,11 @@ type RepoInventory struct {
 	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	MCPServerBinds     []MCPServerBind         `json:"mcp_server_binds,omitempty"`
 	CallKwargs         []CallKwargHit          `json:"call_kwargs,omitempty"`
-	SDKsDetected       []SDK                   `json:"sdks_detected"`
+	MCPCode            []MCPCodeFact           `json:"mcp_code,omitempty"`
+	// HandoffInputFilterConfigured is true when a RunConfig sets handoff_input_filter
+	// (handoffInputFilter in TypeScript) anywhere in the scanned code. OAI-204 reads it.
+	HandoffInputFilterConfigured bool  `json:"handoff_input_filter_configured,omitempty"`
+	SDKsDetected                 []SDK `json:"sdks_detected"`
 	// HasShellInvocations is true if any discovered ToolDef is a
 	// KindShellInvocation (a Python function whose body calls
 	// subprocess.* / os.system / os.popen). This is the "openshell" risk
