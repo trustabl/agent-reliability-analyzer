@@ -112,4 +112,8 @@ package rules
 // Schema 51 adds the tool_source_reaches_sink predicate (tool scope) over
 // ToolDef.TaintFlows, the one-function taint pass in analysis/taint*.go. A binary below 51 skips
 // the rules that use it with META-005.
-const SupportedSchemaVersion = 51
+//
+// Schema 52 adds agent_consequential_tool_ungated (agent scope), repo_agent_code_approves_prs and
+// repo_codeowners_gap (repo scope). Static batch 8 holds 52 on top of batch 6's 51 (merged).
+// A binary below 52 skips the rules that use them with META-005.
+const SupportedSchemaVersion = 52

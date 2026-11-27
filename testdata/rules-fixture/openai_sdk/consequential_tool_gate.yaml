@@ -1,0 +1,51 @@
+policy:
+  id: openai_sdk_consequential_tool_gate
+  name: OpenAI Agents SDK agent with a side-effecting tool and no approval
+  category: openai_sdk
+  description: >
+    Agent-scoped rule for the OpenAI Agents SDK that reads the Agent(...) constructor and its
+    tools= list and flags an agent holding a send, pay, delete or deploy tool with no
+    needs_approval and no tool input guardrail.
+
+rules:
+  - id: OAI-212
+    title: Agent holds a send, pay, delete or deploy tool with no needs_approval
+    severity: high
+    confidence: 0.4
+    language: python
+    applies_to:
+      - openai_agent
+      - openai_sandbox_agent
+    scope: agent
+    match:
+      agent_consequential_tool_ungated:
+        effects: [named]
+        tool_gate_kwargs: [needs_approval, tool_input_guardrails]
+    explanation: >
+      This agent holds a tool whose name starts with a send, pay, delete or deploy verb and that
+      tool sets neither needs_approval nor tool_input_guardrails. The OpenAI Agents SDK
+      documents needs_approval as the option that lets a run "pause agent execution until a
+      person approves or rejects sensitive tool calls" (pending calls come back in
+      result.interruptions), and documents tool input guardrails as checks that run before the
+      tool executes and "can skip the call, replace the output with a message, or raise a
+      tripwire". The paper "Blocking at the Boundary" (arXiv 2610.05163) reports staged prompt
+      injection against Claude Code and Codex and states that "Stopping such attacks requires a
+      decision before each consequential action". The paper tests those two agents; it does not
+      test this SDK. Limits of this check: the tool name is the one signal read here: the name
+      words are send_, notify_, refund_, charge_, pay_, payout_, transfer_, delete_, drop_,
+      destroy_, deploy_, publish_, terminate_, revoke_ and truncate_ after camel case and
+      hyphens are split into underscore form. A tool that shells out, evaluates code or writes a
+      file under a neutral name is judged by OAI-014, not here. Any needs_approval value other
+      than False and any tool_input_guardrails value counts as a gate; the rule does not read
+      what the guardrail or the approval callable decides. A needs_approval or
+      tool_input_guardrails attribute set on the tool variable after it is built
+      (tool.needs_approval = ...) counts as the kwarg. An approval granted outside the SDK, such
+      as in the tool body or in the code that runs the agent, is not seen. An agent built from
+      unpacked or non-literal arguments is not judged, and a tool that discovery cannot resolve
+      to a definition is not judged. A tool imported from a module other than the one that
+      builds the agent is not resolved. The rule reports one finding per agent.
+    fix: >
+      Pass needs_approval=True (or a callable that returns True for the calls that need review)
+      to the @function_tool decorator of each send, pay, delete or deploy tool, and handle the
+      pending items in result.interruptions. Where a person cannot be asked, put a deterministic
+      check on the arguments in tool_input_guardrails.

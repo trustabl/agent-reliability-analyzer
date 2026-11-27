@@ -577,6 +577,19 @@ second runs in the scanner once dependency manifests are parsed: `GuidanceInstal
 commands (pip, uv, poetry, pdm, npm, pnpm, yarn, bun) with the declared PyPI and npm names and checks index
 hosts; hits land in `ProjectConfigFacts.GuidanceInstall`.
 
+`agent_consequential_tool_ungated` (OAI-212, ADK-204, LC-206, PYD-204) reads two per-tool facts that
+`rules.AttachToolEffects` ([tool_effects.go](internal/rules/tool_effects.go)) stamps in place on `RepoInventory.Tools`
+after discovery, so the agents' resolved tool pointers see them: `ToolDef.Effects` (`named` from the tool name,
+`shell`, `code_exec`, `file_write` from the existing body tests) and `ToolDef.BodyGates` (`interrupt` and
+`request_confirmation` calls, a raise of `ApprovalRequired`, and an attribute assignment on the tool variable). Neither is
+serialized. The predicate passes when a resolved tool has a listed effect and no gate: a decorator kwarg
+(`ToolDef.Config`), a body gate, an agent kwarg or a name in an agent kwarg's text, all listed in the rule. An agent with
+`Opaque` set is not judged. `repo_agent_code_approves_prs` (CI-006) reads `ProjectConfigFacts.AgentPRSelfApproval`
+(`analysis/agent_pr_approval.go`: shell segments in fenced code blocks of SKILL.md and slash command files, bundled skill
+scripts, Claude Code hook commands and `.sh` files under `.claude/`). `repo_codeowners_gap` (CI-007) reads
+`CIWorkflowFacts.CodeownersGap` (`analysis/codeowners.go`: CODEOWNERS from `.github/`, the root or `docs/`, parsed with the
+last-match rule, against `CIWorkflowFacts.AgentWorkflowFiles` and the agent-config files in the manifest).
+
 `repo_judge_model_floating_alias`, `repo_otel_span_attrs_missing` and `repo_has_consequential_tool`
 (OBS-015, OBS-016) read three inventory facts computed in the scanner from all parsed Python and TypeScript
 files: `SpanAttrWrites` (`analysis.DiscoverSpanAttrWrites`: `set_attribute`, `set_attributes`, `setAttribute`

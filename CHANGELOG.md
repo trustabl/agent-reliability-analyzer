@@ -6,14 +6,35 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 50 (`rules.SupportedSchemaVersion`; 42 to 49 are merged from main, 50 is provisional). The rules fixture
-goes from 389 to 438 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules and the four static batch 5 rules below). `ScanID` changes, as with every
+Rule schema 41 → 52 (`rules.SupportedSchemaVersion`; 42 to 51 are merged from main, 52 is provisional). The rules fixture
+goes from 389 to 451 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules and the four static batch 5 rules, the seven static batch 6 rules and the six static batch 8 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
 ### Added
 
+- **Static batch 8: side-effecting tools with no approval, agent-invocable PR approval and CODEOWNERS (rule schema 51 → 52, provisional; +6 rules, three predicates).**
+  Agent scope, one rule for each pack: **OAI-212** (high, 0.4, `openai_sdk/consequential_tool_gate.yaml`), **ADK-204**,
+  **LC-206** and **PYD-204** (high, 0.4, same file name in `google_adk/`, `langchain/`, `pydantic_ai/`) over the predicate
+  `agent_consequential_tool_ungated`: the agent holds a tool with a listed effect and neither the tool nor the agent shows the
+  SDK's approval option. The effect fact `ToolDef.Effects` (`named`: the tool name starts with send_, notify_, refund_, charge_, pay_,
+  payout_, transfer_, delete_, drop_, destroy_, deploy_, publish_, terminate_, revoke_ or truncate_; `shell`, `code_exec`,
+  `file_write`: the existing body tests) and the gate fact `ToolDef.BodyGates` (calls of `interrupt` and `request_confirmation`, a
+  raise of `ApprovalRequired`, an attribute such as `tool.needs_approval = ...` set after the tool is built) are stamped by
+  `rules.AttachToolEffects` (`internal/rules/tool_effects.go`); both stay off the JSON report. OAI-212 reads the name words
+  only, because OAI-014 already reports a shell, code-execution or write body. Repo scope: **CI-006** (high, 0.5,
+  `ci/agent_pr_controls.yaml`, `repo_agent_code_approves_prs`, `ProjectConfigFacts.AgentPRSelfApproval`) flags `gh pr review
+  --approve` (or `-a`) and `gh pr merge --admin` in a fenced code block of a SKILL.md or slash command, a script bundled in a
+  skill, a Claude Code hook command, or a `.sh` file under `.claude/`; **CI-007** (high, 0.4, same pack file,
+  `repo_codeowners_gap`, `CIWorkflowFacts.CodeownersGap`) flags a repo with a coding-agent workflow and no CODEOWNERS file, or
+  CODEOWNERS with no owner for that workflow file or for CLAUDE.md, AGENTS.md, GEMINI.md, `.mcp.json` or `.claude/settings.json`
+  (new `ScanManifest.CodeownersFiles`; `analysis/codeowners.go`). CI-007 changes the claim of planning rows CI-009 and CI-010
+  (repo files only; no branch protection or API data), and the owners approve its wording. Not built: MCP-222 (the MCP
+  specification places the confirmation in the host application, so a server tool has no option to read), CREW-204 (CrewAI
+  tool hooks are registered repo-wide and are not read), SCOPE-023, SCOPE-012 and SCOPE-005 (no source for the model-judged
+  gate, memory-write and untrusted-ingest sets). Engines without schema 52 skip these rules with META-005. Three existing CI
+  scanner tests now skip CI-006 and CI-007.
 - **Static batch 6: one-function taint pass and parameter-to-sink rules (rule schema 50 → 51; +7 rules, one predicate).**
   New tool-scope predicate `tool_source_reaches_sink` (sources `param`; sinks `shell`, `code_exec`, `file_write`, `path_io`,
   `sql_execute`, `vector_filter`, `store_namespace`, `memory_scope_key`) over the new `ToolDef.TaintFlows`

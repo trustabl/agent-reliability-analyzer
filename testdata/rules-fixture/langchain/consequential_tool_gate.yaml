@@ -1,0 +1,54 @@
+policy:
+  id: langchain_consequential_tool_gate
+  name: LangChain agent with a side-effecting tool and no interrupt
+  category: langchain
+  description: >
+    Agent-scoped rule for LangChain and LangGraph that reads the create_agent or
+    create_react_agent call and its tools= list and flags an agent holding a side-effecting tool
+    with no interrupt() call, no interrupt_on, no interrupt_before and no
+    HumanInTheLoopMiddleware.
+
+rules:
+  - id: LC-206
+    title: Agent holds a side-effecting tool with no interrupt, interrupt_on or human-in-the-loop middleware
+    severity: high
+    confidence: 0.4
+    language: python
+    applies_to:
+      - langchain_agent
+      - langchain_agent_executor
+      - langchain_deep_agent
+    scope: agent
+    match:
+      agent_consequential_tool_ungated:
+        effects: [named, shell, code_exec, file_write]
+        tool_gate_calls: [interrupt]
+        agent_gate_kwargs: [interrupt_on, interrupt_before]
+        agent_gate_text: [HumanInTheLoopMiddleware]
+    explanation: >
+      This agent holds a tool that sends, pays, deletes or deploys by name, or whose body runs a
+      subprocess, evaluates code or writes a file, and neither the tool nor the agent shows a
+      decision point before the call. LangChain documents HumanInTheLoopMiddleware, which works
+      by "checking each tool call against a configurable policy" and, when intervention is
+      needed, "issues an interrupt that halts execution" until a person approves, edits or
+      rejects the call. The paper "Blocking at the Boundary" (arXiv 2610.05163) reports staged
+      prompt injection against Claude Code and Codex and states that "Stopping such attacks
+      requires a decision before each consequential action". The paper tests those two agents;
+      it does not test this SDK. Limits of this check: a tool counts when its name starts with
+      one of send_, notify_, refund_, charge_, pay_, payout_, transfer_, delete_, drop_,
+      destroy_, deploy_, publish_, terminate_, revoke_ and truncate_ (after camel case and
+      hyphens are split into underscore form), or its body shows a subprocess call, a bare eval,
+      exec or compile call, or a file-opening write. The pack sets these name words and states
+      no reasoning for them. A tool imported from a module other than the one that builds the
+      agent is not resolved. An interrupt() call in the tool body, an interrupt_on or
+      interrupt_before kwarg, or the name HumanInTheLoopMiddleware in any agent kwarg counts as
+      a gate; the rule does not read which tools the policy covers (a policy that leaves this
+      tool out is not seen), and interrupt_before is counted although the LangGraph page
+      presents it as a debugging breakpoint. A gate set outside the constructor call is not
+      seen. LC-115 reports a LangGraph node with a side effect and no interrupt(); LC-117
+      reports a privileged create_agent without human approval. An agent built from unpacked or
+      non-literal arguments is not judged. The rule reports one finding per agent.
+    fix: >
+      Add HumanInTheLoopMiddleware(interrupt_on={...}) to the agent with an entry for each side-
+      effecting tool, or call interrupt(...) in the tool before the side effect and resume with
+      a person's decision.

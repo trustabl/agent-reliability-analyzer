@@ -1913,7 +1913,9 @@ func TestScan_CIAgentWorkflowFixtureFiresEveryRule(t *testing.T) {
 	}
 	got := map[string][]string{}
 	for _, f := range res.Findings {
-		if !strings.HasPrefix(f.RuleID, "CI-") {
+		// CI-006 and CI-007 are repo-level rules (static batch 8) with their own tests; this
+		// test covers the per-step CI-001..005 rules.
+		if !strings.HasPrefix(f.RuleID, "CI-") || f.RuleID == "CI-006" || f.RuleID == "CI-007" {
 			continue
 		}
 		t.Logf("%s %s %s:%d job=%s", f.RuleID, f.Severity, f.FilePath, f.StartLine, f.ToolName)
@@ -2035,7 +2037,8 @@ jobs:
 		t.Fatalf("scan: %v", err)
 	}
 	for _, f := range res.Findings {
-		if strings.HasPrefix(f.RuleID, "CI-") {
+		// CI-007 reads CODEOWNERS, which this temp tree does not hold; it has its own tests.
+		if strings.HasPrefix(f.RuleID, "CI-") && f.RuleID != "CI-007" {
 			t.Errorf("%s fired on a hardened workflow (%s:%d job=%s)", f.RuleID, f.FilePath, f.StartLine, f.ToolName)
 		}
 	}
@@ -2095,7 +2098,7 @@ jobs:
 	}
 	got := map[string][]site{}
 	for _, f := range res.Findings {
-		if strings.HasPrefix(f.RuleID, "CI-") {
+		if strings.HasPrefix(f.RuleID, "CI-") && f.RuleID != "CI-006" && f.RuleID != "CI-007" {
 			got[f.RuleID] = append(got[f.RuleID], site{f.ToolName, f.StartLine})
 		}
 	}
