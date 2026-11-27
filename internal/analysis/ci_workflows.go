@@ -986,6 +986,14 @@ func DiscoverCIWorkflows(manifest models.ScanManifest) models.CIWorkflowFacts {
 	}
 	sort.Strings(order)
 	sort.Strings(f.Unparsed)
+	for _, rel := range order {
+		for _, j := range parsed[rel].jobs {
+			if len(ciAgentsInJob(j)) > 0 {
+				f.AgentWorkflowFiles = append(f.AgentWorkflowFiles, rel)
+				break
+			}
+		}
+	}
 
 	for _, rel := range order {
 		wf := parsed[rel]

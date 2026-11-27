@@ -108,4 +108,9 @@ package rules
 // repo_has_consequential_tool (repo scope). 48 is held by static batch 2 and 49 by static
 // batch 4, both merged; 50 is provisional. A binary below 50 skips the rules that use them
 // with META-005.
-const SupportedSchemaVersion = 50
+//
+// Schema 52 adds agent_consequential_tool_ungated (agent scope), repo_agent_code_approves_prs and
+// repo_codeowners_gap (repo scope). Static batch 8 holds 52; batch 6 holds 51 on its own branch,
+// so whichever merges second renumbers. A binary below 52 skips the rules that use them with
+// META-005.
+const SupportedSchemaVersion = 52

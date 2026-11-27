@@ -475,6 +475,9 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 		// dropped from the manifest. Matching the OS-native `path` here was both
 		// case-sensitive and inconsistent with the rel that gets stored.
 		lower := strings.ToLower(rel)
+		if rel == "CODEOWNERS" || rel == ".github/CODEOWNERS" || rel == "docs/CODEOWNERS" {
+			manifest.CodeownersFiles = append(manifest.CodeownersFiles, rel)
+		}
 		// Only repo-root workflow files are kept from .github/. Everything else
 		// directly under it (dependabot.yml, CODEOWNERS, copilot-instructions.md)
 		// stays out of the manifest, and workflows stay out of YAMLFiles.
@@ -561,6 +564,7 @@ func Normalize(src *Source, onFile func(string)) (models.ScanManifest, error) {
 	sort.Strings(manifest.WorkflowFiles)
 	sort.Strings(manifest.GuidanceFiles)
 	sort.Strings(manifest.HuskyFiles)
+	sort.Strings(manifest.CodeownersFiles)
 	sort.Strings(manifest.PropertiesFiles)
 	sort.Strings(manifest.ServerScriptFiles)
 

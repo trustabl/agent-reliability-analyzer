@@ -428,6 +428,9 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.SpanAttrWrites = analysis.DiscoverSpanAttrWrites(allParsed)
 	inventory.JudgeModelCalls = analysis.DiscoverJudgeModelCalls(allParsed)
 	inventory.HasConsequentialTool = rules.HasConsequentialTool(inventory.Tools, allParsed)
+	// OAI-212, LC-206, ADK-204, PYD-204: effect and approval-call facts on each tool, stamped in
+	// place so the agents' resolved tool pointers see them.
+	rules.AttachToolEffects(inventory.Tools, allParsed)
 	inventory.Subagents = analysis.DiscoverSubagents(profile.Manifest)
 	inventory.Skills = analysis.DiscoverSkills(profile.Manifest)
 	inventory.Dependencies = analysis.DiscoverDependencies(profile.Manifest.RepoRoot)
@@ -437,6 +440,10 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.ProjectConfig = analysis.DiscoverProjectConfig(profile.Manifest, inventory.ClaudeSettings)
 	inventory.ProjectConfig.GuidanceInstall = analysis.GuidanceInstallHits(inventory.ProjectConfig.GuidanceSentences, inventory.Dependencies)
 	inventory.CIWorkflows = analysis.DiscoverCIWorkflows(profile.Manifest)
+	// CI-007: CODEOWNERS coverage of the agent workflows and agent-config files.
+	inventory.CIWorkflows.CodeownersGap = analysis.DiscoverCodeownersGap(profile.Manifest, inventory.CIWorkflows)
+	// CI-006: agent-invocable code that approves or admin-merges a pull request.
+	inventory.ProjectConfig.AgentPRSelfApproval = analysis.DiscoverAgentPRSelfApproval(profile.Manifest, inventory.Skills, inventory.SlashCommands, inventory.ClaudeSettings)
 	inventory.ClaudeAgentOptions = analysis.DiscoverClaudeAgentOptions(parsed)
 	inventory.AgentRunCalls = analysis.DiscoverAgentRunCalls(parsed)
 	// MCP-203: MCP server code binding an HTTP transport to a literal wildcard host.

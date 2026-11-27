@@ -224,7 +224,14 @@ type ToolDef struct {
 	// apart from ParamNames, which the CSDK rules read as the signature.
 	InputKeys []string          `json:"input_keys,omitempty"`
 	Facts     map[string]string `json:"facts,omitempty"`
-	Config    map[string]string `json:"config,omitempty"` // decorator kwargs
+	Config    map[string]string `json:"config,omitempty"` // decorator kwargs	// Effects lists why a tool is judged to have a consequential effect: "named" (its name
+	// starts with a send, pay, delete or deploy verb), "shell", "code_exec" or "file_write"
+	// (its body shows one). BodyGates lists the approval calls its body makes
+	// ("interrupt", "request_confirmation", "ApprovalRequired"). Both are set by
+	// rules.AttachToolEffects after discovery, are empty for a tool under a test path, and
+	// stay off the JSON report. OAI-212, LC-206, ADK-204 and PYD-204 read them.
+	Effects   []string `json:"-"`
+	BodyGates []string `json:"-"`
 }
 
 // FactClaimUse is the ToolDef.Facts key for how a tool uses its EBTE-style
@@ -417,7 +424,10 @@ type ScanManifest struct {
 	// .windsurf/rules and .devin/rules *.md, .github/copilot-instructions.md and
 	// .github/instructions/**/*.instructions.md, all at the repo root. Sorted.
 	// Kept apart from MarkdownFiles so no existing consumer sees them.
-	GuidanceFiles          []string         `json:"guidance_files,omitempty"`
+	GuidanceFiles []string `json:"guidance_files,omitempty"`
+	// CodeownersFiles holds the CODEOWNERS files GitHub reads: CODEOWNERS at the repo root,
+	// .github/CODEOWNERS and docs/CODEOWNERS. Sorted. Read by CI-007 only.
+	CodeownersFiles        []string         `json:"codeowners_files,omitempty"`
 	HasClaudeSDKDependency bool             `json:"has_claude_sdk_dependency"`
 	HasOpenShellArtifact   bool             `json:"has_openshell_artifact"`
 	Components             []AgentComponent `json:"components,omitempty"`

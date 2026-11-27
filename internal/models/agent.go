@@ -495,6 +495,12 @@ type ProjectConfigFacts struct {
 	// DeprecatedMCPLaunch is a server started by a package runner on a package
 	// that the modelcontextprotocol/servers README lists as archived. MCPCFG-006.
 	DeprecatedMCPLaunch []ConfigHit `json:"deprecated_mcp_launch,omitempty"`
+	// AgentPRSelfApproval is a command line in agent-invocable code that runs gh pr review
+	// with --approve (or -a), or gh pr merge with --admin: a skill's SKILL.md code block or
+	// bundled script, a slash command's code block, a Claude Code hook command, or a shell
+	// script under .claude/. The Reason names the surface and the command only. CI-006
+	// reads this list.
+	AgentPRSelfApproval []ConfigHit `json:"agent_pr_self_approval,omitempty"`
 }
 
 // ClaudeAgentOptionsDef is one ClaudeAgentOptions(...) construction discovered

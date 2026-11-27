@@ -112,6 +112,9 @@ func (e MatchExpr) EvaluateAgent(a models.AgentDef, inv models.RepoInventory) bo
 	if e.AgentFileURLForceDownload != nil && PredAgentFileURLForceDownload(a) != *e.AgentFileURLForceDownload {
 		return false
 	}
+	if e.AgentConsequentialToolUngated != nil && !PredAgentConsequentialToolUngated(*e.AgentConsequentialToolUngated, a, inv) {
+		return false
+	}
 	return true
 }
 
@@ -230,6 +233,12 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 		return false
 	}
 	if e.RepoHasConsequentialTool != nil && inv.HasConsequentialTool != *e.RepoHasConsequentialTool {
+		return false
+	}
+	if e.RepoAgentCodeApprovesPRs != nil && (len(inv.ProjectConfig.AgentPRSelfApproval) > 0) != *e.RepoAgentCodeApprovesPRs {
+		return false
+	}
+	if e.RepoCodeownersGap != nil && (len(inv.CIWorkflows.CodeownersGap) > 0) != *e.RepoCodeownersGap {
 		return false
 	}
 	if e.RepoSettingsPreapproveUserContentFetch != nil && (len(inv.ProjectConfig.UserContentFetchAllow) > 0) != *e.RepoSettingsPreapproveUserContentFetch {
@@ -671,6 +680,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_has_observability":                    true,
 		"agent_mcp_server_kwarg_missing":            true,
 		"agent_file_url_force_download":             true,
+		"agent_consequential_tool_ungated":          true,
 		"agent_run_call_wall_clock_timeout_missing": true,
 		"agent_kwargs_observed":                     true,
 		"agent_checkpointer_in_memory":              true,
@@ -758,6 +768,8 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_judge_model_floating_alias":                  true,
 		"repo_otel_span_attrs_missing":                     true,
 		"repo_has_consequential_tool":                      true,
+		"repo_agent_code_approves_prs":                     true,
+		"repo_codeowners_gap":                              true,
 		"repo_ci_agent_untrusted_trigger_ungated":          true,
 		"repo_ci_agent_untrusted_trigger_privileged":       true,
 		"repo_ci_agent_checkout_persists_credentials":      true,
@@ -840,6 +852,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.AgentRunCallUsageLimitsMissing != nil, "agent_run_call_usage_limits_missing")
 	add(e.AgentMCPServerKwargMissing != nil, "agent_mcp_server_kwarg_missing")
 	add(e.AgentFileURLForceDownload != nil, "agent_file_url_force_download")
+	add(e.AgentConsequentialToolUngated != nil, "agent_consequential_tool_ungated")
 	add(e.AgentRunCallWallClockTimeoutMissing != nil, "agent_run_call_wall_clock_timeout_missing")
 	add(e.AgentKwargsObserved != nil, "agent_kwargs_observed")
 	add(e.AgentCheckpointerInMemory != nil, "agent_checkpointer_in_memory")
@@ -902,6 +915,8 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoJudgeModelFloatingAlias != nil, "repo_judge_model_floating_alias")
 	add(len(e.RepoOtelSpanAttrsMissing) > 0, "repo_otel_span_attrs_missing")
 	add(e.RepoHasConsequentialTool != nil, "repo_has_consequential_tool")
+	add(e.RepoAgentCodeApprovesPRs != nil, "repo_agent_code_approves_prs")
+	add(e.RepoCodeownersGap != nil, "repo_codeowners_gap")
 	add(e.RepoCIAgentUntrustedTriggerUngated != nil, "repo_ci_agent_untrusted_trigger_ungated")
 	add(e.RepoCIAgentUntrustedTriggerPrivileged != nil, "repo_ci_agent_untrusted_trigger_privileged")
 	add(e.RepoCIAgentCheckoutPersistsCredentials != nil, "repo_ci_agent_checkout_persists_credentials")
