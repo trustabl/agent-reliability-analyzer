@@ -75,6 +75,8 @@ type MatchExpr struct {
 	ParamNameMatches              *ParamNameMatchExpr                `yaml:"param_name_matches,omitempty"`
 	CallWithoutKwarg              *CallWithoutKwargExpr              `yaml:"call_without_kwarg,omitempty"`
 	CallUsesUnnormalizedPathParam *CallUsesUnnormalizedPathParamExpr `yaml:"call_uses_unnormalized_path_param,omitempty"`
+	// ToolSourceReachesSink: a one-function flow from a tool parameter to a sink; see ToolSourceReachesSinkExpr.
+	ToolSourceReachesSink *ToolSourceReachesSinkExpr `yaml:"tool_source_reaches_sink,omitempty"`
 
 	// Tool-scope decorator predicates
 	ToolDecoratorKwargValue   *ToolDecoratorKwargValueExpr `yaml:"tool_decorator_kwarg_value,omitempty"`

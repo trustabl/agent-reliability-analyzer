@@ -312,6 +312,25 @@ rules:
 #       callee_prefixes: [shutil., os.]  OPTIONAL. Prefix-match callees.
 #
 #
+#   tool_source_reaches_sink:
+#       Fires when the one-function taint pass (internal/analysis/taint*.go)
+#       found a flow from a tool parameter to a sink call inside the tool's own
+#       handler. Python and TypeScript. No flow is followed into another
+#       function, class state or a container element; a cast, a normalising
+#       call or a guard that raises or returns ends it. The finding is placed
+#       on the sink line.
+#
+#       sources:     [param]            REQUIRED. Closed set: param.
+#       sinks:       [shell, code_exec, file_write, path_io, sql_execute,
+#                     vector_filter, store_namespace, memory_scope_key]
+#                                        REQUIRED. Closed set; the rule fires on any listed one.
+#       param_names: [query, path]       OPTIONAL. Source parameter name, case-insensitive.
+#       param_regex: "(?i)^(id|user)"    OPTIONAL. Source parameter name regex.
+#
+#       memory_scope_key matches only a scope value built by joining the
+#       parameter with other text (f-string, +, format, join), not a bare pass-through.
+#
+#
 #   tool_decorator_kwarg_value:
 #       Fires when the tool's decorator call has a specific kwarg equal to a
 #       specific value (literal text comparison against the source). Use for

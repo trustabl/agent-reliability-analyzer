@@ -108,4 +108,8 @@ package rules
 // repo_has_consequential_tool (repo scope). 48 is held by static batch 2 and 49 by static
 // batch 4, both merged; 50 is provisional. A binary below 50 skips the rules that use them
 // with META-005.
-const SupportedSchemaVersion = 50
+//
+// Schema 51 adds the tool_source_reaches_sink predicate (tool scope) over
+// ToolDef.TaintFlows, the one-function taint pass in analysis/taint*.go. A binary below 51 skips
+// the rules that use it with META-005.
+const SupportedSchemaVersion = 51
