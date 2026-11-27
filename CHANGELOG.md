@@ -6,15 +6,15 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 52 (`rules.SupportedSchemaVersion`; 42 to 49 are merged from main, 50 is provisional; static batch 6 holds 51 on its own branch and static batch 8 holds 52, so whichever merges second renumbers). The rules fixture
-goes from 389 to 444 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules and the four static batch 5 rules and the six static batch 8 rules below). `ScanID` changes, as with every
+Rule schema 41 → 52 (`rules.SupportedSchemaVersion`; 42 to 51 are merged from main, 52 is provisional). The rules fixture
+goes from 389 to 451 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules and the four static batch 5 rules, the seven static batch 6 rules and the six static batch 8 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
 ### Added
 
-- **Static batch 8: side-effecting tools with no approval, agent-invocable PR approval and CODEOWNERS (rule schema 50 → 52, provisional; +6 rules, three predicates).**
+- **Static batch 8: side-effecting tools with no approval, agent-invocable PR approval and CODEOWNERS (rule schema 51 → 52, provisional; +6 rules, three predicates).**
   Agent scope, one rule for each pack: **OAI-212** (high, 0.4, `openai_sdk/consequential_tool_gate.yaml`), **ADK-204**,
   **LC-206** and **PYD-204** (high, 0.4, same file name in `google_adk/`, `langchain/`, `pydantic_ai/`) over the predicate
   `agent_consequential_tool_ungated`: the agent holds a tool with a listed effect and neither the tool nor the agent shows the
@@ -35,6 +35,22 @@ upgraded.
   tool hooks are registered repo-wide and are not read), SCOPE-023, SCOPE-012 and SCOPE-005 (no source for the model-judged
   gate, memory-write and untrusted-ingest sets). Engines without schema 52 skip these rules with META-005. Three existing CI
   scanner tests now skip CI-006 and CI-007.
+- **Static batch 6: one-function taint pass and parameter-to-sink rules (rule schema 50 → 51; +7 rules, one predicate).**
+  New tool-scope predicate `tool_source_reaches_sink` (sources `param`; sinks `shell`, `code_exec`, `file_write`, `path_io`,
+  `sql_execute`, `vector_filter`, `store_namespace`, `memory_scope_key`) over the new `ToolDef.TaintFlows`
+  (`taint_flows` in the JSON report, omitted when empty), computed by `analysis.AttachTaintFlows` (`taint.go`,
+  `taint_py.go`, `taint_ts.go`, `taint_sinks.go`). The sole source is a tool parameter; one function, Python and
+  TypeScript; no call into another function, no class state, no container element beyond a literal. A cast, a
+  `.resolve()` or `realpath` call, `shlex.quote`, a schema `.parse` and an `if` test that raises or returns end a flow.
+  The finding sits on the sink line and the explanation names the parameter. Rules: **MCP-215** (Python) and **MCP-219**
+  (TypeScript) (high, 0.5 and 0.45: parameter reaches a subprocess, git or file call), **MCP-216** and **MCP-220**
+  (critical, 0.55: `eval`, `exec`, `compile`, `new Function`), **MCP-217** (high, 0.4: mem0 scope key built by joining
+  parameters) in `mcp/param_flow_sinks.yaml`; **LC-204** (high, 0.4: vector-store filter) and **LC-205** (medium, 0.4:
+  LangGraph store namespace) in `langchain/param_flow_sinks.yaml`. The shell, code-exec and TypeScript write callee
+  lists are now shared by the older predicates and the taint pass. Held: **MCP-218** (SQL), which the owners asked to
+  hold; the `sql_execute` sink is built and has no rule. Not built: clones for the OpenAI, Claude, CrewAI, ADK and
+  Pydantic AI packs, a TypeScript MCP-217, and LangChain.js rules. Engines without schema 51 skip these rules with META-005.
+
 - **Static batch 5: guidance files and OpenTelemetry span attributes (rule schema 49 → 50, provisional; +4 rules, five predicates).**
   48 is held by static batch 2 and 49 by static batch 4, both merged, so 50 follows them. Repo scope:
   **AGCFG-022** (high, 0.4, `agent_config/guidance_instructions.yaml`, predicate `repo_guidance_text_matches`) flags a

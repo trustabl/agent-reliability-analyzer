@@ -698,6 +698,22 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   `args["claim"]` / `args.get("claim")` reads the way `pythonClaimUse`
   classifies a `claim` parameter; a whole-`args` read counts as a claim read.
   `tool_claim_use` treats `claim` in `InputKeys` as declared.
+- **Taint flows** (`analysis/taint.go`, `taint_py.go`, `taint_ts.go`, `taint_sinks.go`, schema 51) —
+  `AttachTaintFlows` runs in the scanner after tool order is fixed and before `ResolveEdges`. For each tool it
+  resolves the function (Python: `FindFunctionNode`; TypeScript: the handler function, arrow function or method
+  reached from the tool's call node, through an inline argument, an object key such as `execute`, or a same-file
+  name) and walks the body in source order with a set of tainted names. The sole source is a tool parameter
+  (a Claude Agent SDK handler's declared input keys when it reads one `args` dict); parameters annotated `int`,
+  `float`, `bool`, `Literal` or an `Enum`, and Zod `number`, `boolean` or `enum` schema keys, are not sources.
+  Propagation: assignment, tuple unpack, augmented assignment, f-strings and template literals, `+`, `%`,
+  `format`, `join`, a fixed wrapper list, and dict, list and tuple literals (a literal's element reads are not
+  followed); branches union, loops are walked twice up to three levels deep. A cast, a result-returning
+  sanitizer, a `.resolve()` / `realpath` / schema `.parse` call on the name, and an `if` test that raises or
+  returns end a flow. Sink tables live in `taint_sinks.go`; `IsPyShellCallee`, `IsPyCodeExecCallee`,
+  `TSShellCallees` and `TSWriteCallees` are shared with `has_shell_call`, `has_code_exec_call` and the TS handler
+  facts. Flows land in `ToolDef.TaintFlows`; the predicate `tool_source_reaches_sink` reads them and the rule
+  detector places the finding on the sink line. Not followed: another function, class state, module globals,
+  closures over outer variables, container element reads, attribute mutation.
 - **TypeScript OpenAI tool claims** (`ts_claim_use.go`, schema 35) —
   `extractTSOpenAITool` calls `stampTSOpenAIClaim`, which stamps `claim_use`
   when the zod `parameters` declare `claim` and `execute` is an inline function

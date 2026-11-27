@@ -2,6 +2,7 @@ package rules
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 
 	"github.com/trustabl/trustabl/internal/analysis"
@@ -63,7 +64,13 @@ func (d toolRuleDetector) Detect(t models.ToolDef, pf analysis.ParsedFile, inv m
 	if !d.rule.Match.EvaluateTool(t, pf) {
 		return nil
 	}
-	return []models.Finding{findingFromRule(d.rule, models.ScopeTool, t.FilePath, t.Line, t.EndLine, t.Name)}
+	f := findingFromRule(d.rule, models.ScopeTool, t.FilePath, t.Line, t.EndLine, t.Name)
+	if fl := taintEvidence(d.rule.Match, t); fl != nil {
+		// The finding sits on the sink call; the explanation names the source.
+		f.StartLine, f.EndLine = fl.SinkLine, fl.SinkLine
+		f.Explanation += fmt.Sprintf("\n\nFlow found: parameter `%s` (line %d) reaches `%s` (%s) at line %d.", fl.Param, fl.SourceLine, fl.SinkCallee, fl.SinkClass, fl.SinkLine)
+	}
+	return []models.Finding{f}
 }
 
 // agentRuleDetector adapts an agent-scoped RuleDef into an AgentDetector.

@@ -46,6 +46,14 @@ func tsHandlerFacts(handler *sitter.Node, src []byte) map[string]string {
 			return true
 		}
 		text := astutil.NodeText(fn, src)
+		// Shell and write callee lists are shared with the taint pass
+		// (taint_sinks.go) so there is one list.
+		if TSShellCallees[text] {
+			out["shells_out"] = "true"
+		}
+		if TSWriteCallees[text] {
+			out["writes_fs"] = "true"
+		}
 		switch text {
 		case "fetch", "axios", "axios.get", "axios.post", "axios.put", "axios.delete",
 			"axios.patch", "axios.request", "got", "got.get", "got.post",
@@ -60,24 +68,6 @@ func tsHandlerFacts(handler *sitter.Node, src []byte) map[string]string {
 			if !httpCallHasTimeout(n, src) {
 				out["http_no_timeout"] = "true"
 			}
-		case "execSync", "exec", "execFile", "execFileSync", "spawn", "spawnSync", "fork",
-			// Namespace-import / require shape: `child_process.exec(...)` from
-			// `import * as child_process` or `const child_process = require(...)`.
-			// The bare cases above catch the destructured `const { exec } = ...`.
-			"child_process.exec", "child_process.execSync",
-			"child_process.spawn", "child_process.spawnSync",
-			"child_process.execFile", "child_process.execFileSync",
-			"child_process.fork":
-			out["shells_out"] = "true"
-		case "writeFile", "writeFileSync", "appendFile", "appendFileSync",
-			"createWriteStream",
-			// Namespace-import shape: `fs.writeFileSync(...)` /
-			// `fsPromises.writeFile(...)`. The bare cases above catch the
-			// destructured `const { writeFileSync } = require("fs")` form.
-			"fs.writeFile", "fs.writeFileSync", "fs.appendFile",
-			"fs.appendFileSync", "fs.createWriteStream",
-			"fsPromises.writeFile", "fsPromises.appendFile":
-			out["writes_fs"] = "true"
 		case "console.log", "console.info", "console.debug", "process.stdout.write":
 			// STDOUT ONLY. console.warn/console.error and process.stderr.write
 			// are deliberately absent: Node routes them to stderr, which is the
