@@ -620,6 +620,9 @@ func (e MatchExpr) EvaluateTool(t models.ToolDef, pf analysis.ParsedFile) bool {
 	if e.CallUsesUnnormalizedPathParam != nil && !PredCallUsesUnnormalizedPathParam(*e.CallUsesUnnormalizedPathParam, t, pf) {
 		return false
 	}
+	if e.ToolSourceReachesSink != nil && !PredToolSourceReachesSink(*e.ToolSourceReachesSink, t) {
+		return false
+	}
 	if e.ToolDecoratorKwargValue != nil && !PredToolDecoratorKwargValue(*e.ToolDecoratorKwargValue, t) {
 		return false
 	}
@@ -655,6 +658,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"call_uses_unnormalized_path_param": true,
 		"tool_decorator_kwarg_value":        true, "tool_decorator_kwarg_present": true,
 		"tool_claim_use": true, "tool_description_has_hidden_text": true,
+		"tool_source_reaches_sink": true,
 	},
 	models.ScopeAgent: {
 		"agent_class": true, "agent_kwarg_present": true, "agent_kwarg_missing": true,
@@ -817,6 +821,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.ParamNameMatches != nil, "param_name_matches")
 	add(e.CallWithoutKwarg != nil, "call_without_kwarg")
 	add(e.CallUsesUnnormalizedPathParam != nil, "call_uses_unnormalized_path_param")
+	add(e.ToolSourceReachesSink != nil, "tool_source_reaches_sink")
 	add(e.ToolDecoratorKwargValue != nil, "tool_decorator_kwarg_value")
 	add(len(e.ToolDecoratorKwargPresent) > 0, "tool_decorator_kwarg_present")
 	add(len(e.ToolClaimUse) > 0, "tool_claim_use")

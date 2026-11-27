@@ -411,6 +411,9 @@ func Run(cfg Config) (models.ScanResult, error) {
 	allParsed = append(allParsed, csFiles...)
 	allParsed = append(allParsed, phpFiles...)
 	allParsed = append(allParsed, rustFiles...)
+	// One-function taint flows from tool parameters to sinks (schema 51). Runs
+	// after the tool order is fixed and before ResolveEdges stores tool pointers.
+	analysis.AttachTaintFlows(tools, allParsed)
 	analysis.ResolveEdges(&inventory, allParsed)
 	// Observability signals span Python and TS/JS, so they are computed from
 	// allParsed rather than the Python-only `parsed` slice that

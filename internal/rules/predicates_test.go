@@ -51,7 +51,10 @@ func parsePy(t *testing.T, src string, kind models.ToolKind) (models.ToolDef, an
 		ParamNames:     filtered,
 		Facts:          map[string]string{},
 	}
-	return tool, pf
+	// Run the taint pass the scanner runs, so tool_source_reaches_sink cases see flows.
+	ts := []models.ToolDef{tool}
+	analysis.AttachTaintFlows(ts, []analysis.ParsedFile{pf})
+	return ts[0], pf
 }
 
 // parseTSTool parses a TypeScript snippet and runs the TS tool discovery
@@ -84,6 +87,7 @@ func parseTSTool(t *testing.T, src string, kind models.ToolKind) (models.ToolDef
 	if len(tools) == 0 {
 		t.Fatal("parseTSTool: no tool discovered (check the import gate in the snippet)")
 	}
+	analysis.AttachTaintFlows(tools, []analysis.ParsedFile{pf})
 	return tools[0], pf
 }
 

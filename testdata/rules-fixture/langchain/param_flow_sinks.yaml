@@ -1,0 +1,80 @@
+policy:
+  id: langchain_param_flow_sinks
+  name: LangChain tool parameters that reach a retrieval or store boundary
+  category: langchain
+  description: >
+    Rules for a LangChain tool parameter that flows, inside the tool's own function, into a
+    vector-store filter or into a LangGraph store namespace. The flow comes from the
+    one-function taint pass: the sole source is a parameter of the tool, and no call into
+    another function is followed.
+
+rules:
+  - id: LC-204
+    title: LangChain tool parameter is built into a vector-store filter
+    severity: high
+    confidence: 0.4
+    language: python
+    applies_to:
+      - langchain_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [vector_filter]
+    explanation: >
+      A parameter of this LangChain tool reaches the `filter`, `filters`, `where`, `expr` or
+      `search_kwargs` argument of a vector-store search call, or of `as_retriever`, inside
+      the same function. The model chooses the parameter value. When the filter is the
+      tenant or document access boundary, a value that carries filter syntax can widen the
+      search. GitHub advisory GHSA-5x6v-p487-7qh2 (CVE-2026-105799) describes
+      `@langchain/redis` filters that did not escape values, so an application that passed
+      attacker-controlled values into a TAG or TEXT filter could have its query altered;
+      the advisory concerns the JavaScript package and the pack cites it for the mechanism
+      and for nothing more. The finding sits on the search call and the explanation names
+      the parameter.
+      Limits of this check: a parameter placed in a dict value such as `{"tenant": value}`
+      is flagged, and so is a plain pass-through that the store escapes correctly, so some
+      findings are false positives. Just the tool's own function is read. A filter built in
+      a helper, or from a class attribute, is not seen. A cast, a Literal or Enum
+      annotation, and an `if` test on the parameter that raises or returns end the flow,
+      and the check does not judge whether the test is a sound allowlist. Which argument a
+      given store treats as its filter is matched by name.
+    fix: >
+      Take the tenant or access value from the authenticated session, not from a tool
+      parameter, and add it to the filter on the server side. Check a parameter that must
+      appear in a filter against an allowlist or a format, and use the store's structured
+      filter objects instead of building a filter string.
+
+  - id: LC-205
+    title: LangChain tool parameter reaches a LangGraph store namespace
+    severity: medium
+    confidence: 0.4
+    language: python
+    applies_to:
+      - langchain_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [store_namespace]
+    explanation: >
+      A parameter of this LangChain tool reaches the namespace argument of `get`, `put`,
+      `search`, `delete` or `list_namespaces` (or an async form) on a store object inside
+      the same function. The model chooses the parameter value. GitHub advisory
+      GHSA-6hmw-9432-67qq (CVE-2026-115883) describes the LangGraph Postgres and SQLite
+      stores, which save a namespace as its labels joined with `.`, so `("tenant", "bob")`
+      and `("tenant.bob",)` map to one stored namespace and a caller who could pass such a
+      label could read, overwrite or delete another namespace's items. The pack cites it
+      for that mechanism and for nothing more; the fix it describes is a library release,
+      and the version part is outside this rule. The finding sits on the store call and the
+      explanation names the parameter.
+      Limits of this check: a store is recognized by a receiver name that contains `store`.
+      A namespace built in a helper, or taken from the run configuration, is not seen. A
+      cast, a Literal or Enum annotation, and an `if` test on the parameter that raises or
+      returns end the flow. The check does not know the store backend or library version, so
+      an in-memory store, which compares namespaces as tuples, is flagged too.
+    fix: >
+      Build the namespace from the authenticated user or tenant held by the server, and do
+      not take a namespace element from a tool parameter. Check any value that must come
+      from a parameter against an allowlist, and reject values that contain `.`. Update
+      `langgraph-checkpoint-postgres` and `langgraph-checkpoint-sqlite` to a fixed release.

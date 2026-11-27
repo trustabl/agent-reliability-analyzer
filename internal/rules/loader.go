@@ -279,6 +279,12 @@ func loadPolicies(fsys fs.FS, lenient bool) ([]PolicyFile, []string, error) {
 					errs = append(errs, fmt.Errorf("%s: tool_claim_use value %q is not known (want one of: absent, unused, passthrough, checked, wrapped)", tag, v))
 				}
 			}
+			// tool_source_reaches_sink names source and sink classes from closed sets.
+			for _, x := range rule.Match.taintExprs() {
+				if err := x.validate(); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %v", tag, err))
+				}
+			}
 			// repo_otel_span_attrs_missing names span attributes. A name the
 			// OpenTelemetry GenAI list in analysis.SpanAttrKeys or the
 			// agent-reliability-otel-labels spec does not define never matches what

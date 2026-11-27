@@ -14,6 +14,22 @@ upgraded.
 
 ### Added
 
+- **Static batch 6: one-function taint pass and parameter-to-sink rules (rule schema 50 → 51; +7 rules, one predicate).**
+  New tool-scope predicate `tool_source_reaches_sink` (sources `param`; sinks `shell`, `code_exec`, `file_write`, `path_io`,
+  `sql_execute`, `vector_filter`, `store_namespace`, `memory_scope_key`) over the new `ToolDef.TaintFlows`
+  (`taint_flows` in the JSON report, omitted when empty), computed by `analysis.AttachTaintFlows` (`taint.go`,
+  `taint_py.go`, `taint_ts.go`, `taint_sinks.go`). The sole source is a tool parameter; one function, Python and
+  TypeScript; no call into another function, no class state, no container element beyond a literal. A cast, a
+  `.resolve()` or `realpath` call, `shlex.quote`, a schema `.parse` and an `if` test that raises or returns end a flow.
+  The finding sits on the sink line and the explanation names the parameter. Rules: **MCP-215** (Python) and **MCP-219**
+  (TypeScript) (high, 0.5 and 0.45: parameter reaches a subprocess, git or file call), **MCP-216** and **MCP-220**
+  (critical, 0.55: `eval`, `exec`, `compile`, `new Function`), **MCP-217** (high, 0.4: mem0 scope key built by joining
+  parameters) in `mcp/param_flow_sinks.yaml`; **LC-204** (high, 0.4: vector-store filter) and **LC-205** (medium, 0.4:
+  LangGraph store namespace) in `langchain/param_flow_sinks.yaml`. The shell, code-exec and TypeScript write callee
+  lists are now shared by the older predicates and the taint pass. Held: **MCP-218** (SQL), which the owners asked to
+  hold; the `sql_execute` sink is built and has no rule. Not built: clones for the OpenAI, Claude, CrewAI, ADK and
+  Pydantic AI packs, a TypeScript MCP-217, and LangChain.js rules. Engines without schema 51 skip these rules with META-005.
+
 - **Static batch 5: guidance files and OpenTelemetry span attributes (rule schema 49 → 50, provisional; +4 rules, five predicates).**
   48 is held by static batch 2 and 49 by static batch 4, both merged, so 50 follows them. Repo scope:
   **AGCFG-022** (high, 0.4, `agent_config/guidance_instructions.yaml`, predicate `repo_guidance_text_matches`) flags a

@@ -1,0 +1,183 @@
+policy:
+  id: mcp_param_flow_sinks
+  name: MCP tool parameters that reach a dangerous call
+  category: mcp
+  description: >
+    Rules for a tool parameter that flows, inside the tool's own function, into a shell or
+    subprocess call, a file or path call, a code-execution call, or a memory scope key. The
+    flow comes from the one-function taint pass: the sole source is a parameter of the tool,
+    and no call into another function is followed.
+
+rules:
+  - id: MCP-215
+    title: MCP tool parameter reaches a subprocess, git or file call without normalization
+    severity: high
+    confidence: 0.5
+    language: python
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [shell, path_io, file_write]
+    explanation: >
+      A parameter of this MCP tool reaches an argument of a subprocess call, a GitPython
+      call or a file or path call inside the same function, through assignments,
+      f-strings, concatenation, format and a fixed list of string and path wrappers. The
+      model chooses the parameter value, so a path such as `../../home/user/.ssh/id_rsa`
+      or an extra argument for a command reaches the call. The arXiv paper "My
+      Credentials, Please: Detecting Filesystem Capability Laundering in MCP Servers at
+      Scale" (arXiv:2610.22301) studies this class, where attacker-steered arguments cause
+      a tool to access host files outside its declared contract. This rule adds the
+      subprocess and git sinks to the path-parameter check CSDK-004 makes for Claude SDK
+      tools and does not replace it. The finding sits on the sink line and the
+      explanation names the parameter.
+      Limits of this check: just the tool's own function is read. A parameter passed to a
+      helper that makes the call is not found, and a sink inside a helper is not found.
+      Class attributes, module variables, closures, and an element read from a dict or
+      list the parameter was put into are not followed. A cast to int, float or bool, a
+      Literal or Enum annotation, a `.resolve()` or `realpath` call, `shlex.quote`, and an
+      `if` test on the parameter that raises or returns end the flow; the check does not
+      confirm that the test is a real allowlist or that a resolved path is then compared
+      with a root. A custom validator is credited when the call sits in such an `if`
+      test. A wrapper outside the function that validates arguments is not seen. A tool
+      that exists to run commands or read files is flagged and may be a false positive.
+    fix: >
+      Resolve the path with `Path(...).resolve()` and check with `is_relative_to` that it
+      sits under one allowed root before any read or write. Pass command arguments as a
+      list with a fixed executable, not through a shell string, and check each value
+      against an allowlist. Remove the tool if it does not need to reach the host.
+
+  - id: MCP-216
+    title: MCP tool parameter reaches eval, exec or compile
+    severity: critical
+    confidence: 0.55
+    language: python
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [code_exec]
+    explanation: >
+      A parameter of this MCP tool reaches the code argument of `eval`, `exec` or `compile`
+      inside the same function. The model chooses the parameter value, so text the model
+      wrote, or text an attacker placed in content the model read, runs as Python in the
+      server process. GitHub advisory GHSA-w7x8-q2gp-5cgg (CVE-2026-73487) describes
+      model-generated Python that reaches execution behind a regex blocklist and is
+      exploited by prompt injection; the pack cites it for the class of model-generated
+      code reaching an execution call and for nothing more. The finding sits on the call and
+      the explanation names the parameter.
+      Limits of this check: just the tool's own function is read. A parameter passed to a
+      helper that calls `eval` is not found. A cast, a Literal or Enum annotation, and an
+      `if` test on the parameter that raises or returns end the flow; the check does not
+      judge whether such a test is a sound allowlist, and a blocklist test counts as a
+      guard. `ast.literal_eval` and `json.loads` are not sinks. Attribute and container
+      flows are not followed.
+    fix: >
+      Do not execute model-supplied text. Parse the value with `ast.literal_eval` or
+      `json.loads` when the tool needs data, map a fixed set of operation names to
+      functions when it needs behavior, or run the code in a sandbox with no network and
+      no host files.
+
+  - id: MCP-217
+    title: MCP tool builds a memory scope key from parameters by concatenation
+    severity: high
+    confidence: 0.4
+    language: python
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [memory_scope_key]
+    explanation: >
+      A parameter of this MCP tool is joined with other text (an f-string, `+`, `.format` or
+      `.join`) and passed as `user_id`, `agent_id`, `run_id`, `app_id` or `namespace` to a
+      call on a mem0 memory client. A joined scope key is ambiguous when a value can carry
+      the delimiter. GitHub advisory GHSA-5324-3w58-qpp2 (CVE-2026-116575) describes a mem0
+      session scope key built by joining `user_id`, `agent_id` and `run_id` with unescaped
+      `&` and `=`, so a caller who set just `run_id` produced the scope string of another
+      tenant. The pack cites it for that mechanism and for nothing more; the fix it
+      describes is in the library. The finding sits on the call and the explanation names
+      the parameter.
+      Limits of this check: a client is recognized when it is bound in the same file to
+      `Memory(...)`, `MemoryClient(...)`, `AsyncMemory(...)` or their variants, or its
+      name contains `mem0` or `memory`. A parameter passed alone as `user_id=param` is not
+      flagged, because no join happens. A scope key built in a helper is not seen. The check
+      does not know the delimiter rules of the library version in use, so a version that
+      has the fix is still flagged.
+    fix: >
+      Keep each identifier in its own argument and do not join them into one string. When a
+      single key is unavoidable, build it from values the server has validated against an
+      allowlist or a format, and reject values that contain the delimiter. Update the
+      library to a release that has the fix.
+
+  - id: MCP-219
+    title: TypeScript MCP tool parameter reaches a child process or file call without normalization
+    severity: high
+    confidence: 0.45
+    language: typescript
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [shell, path_io, file_write]
+    explanation: >
+      A parameter of this TypeScript MCP tool reaches an argument of a `child_process`
+      call or a file system call (`readFile`, `writeFile`, `readdir`, `createReadStream`
+      and the related calls) inside the same handler, through assignments, template
+      literals, concatenation and a fixed list of string and path wrappers. The model
+      chooses the parameter value, so a path such as `../../home/user/.ssh/id_rsa` or an
+      extra command argument reaches the call. The arXiv paper "My Credentials, Please:
+      Detecting Filesystem Capability Laundering in MCP Servers at Scale" (arXiv:2610.22301)
+      studies this class, where attacker-steered arguments cause a tool to access host
+      files outside its declared contract; the pack cites it for that class and nothing
+      more. The finding sits on the sink line and the explanation names the parameter.
+      Limits of this check: just the handler body is read. A parameter passed to another
+      function that makes the call is not found. Object properties other than the tool's
+      declared parameters, class fields and module variables are not followed. A `Number()`
+      cast, a `z.number`, `z.boolean` or `z.enum` parameter, `path.resolve`, a schema
+      `.parse` call, and an `if` test on the parameter that throws or returns end the
+      flow; the check does not confirm that a resolved path is then compared with a root.
+      Bare names such as `open` and `access` are not read unless called on `fs`.
+    fix: >
+      Resolve the path with `path.resolve` and check that the result starts with one
+      allowed root plus a separator before any read or write. Use `execFile` with a fixed
+      executable and an argument array instead of a shell string, and check each value
+      against an allowlist.
+
+  - id: MCP-220
+    title: TypeScript MCP tool parameter reaches eval or new Function
+    severity: critical
+    confidence: 0.55
+    language: typescript
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [code_exec]
+    explanation: >
+      A parameter of this TypeScript MCP tool reaches `eval`, `new Function` or a `vm`
+      run call inside the same handler. The model chooses the parameter value, so text the
+      model wrote, or text an attacker placed in content the model read, runs as
+      JavaScript in the server process. GitHub advisory GHSA-w7x8-q2gp-5cgg
+      (CVE-2026-73487) describes model-generated code that reaches execution behind a regex
+      blocklist and is exploited by prompt injection; the pack cites it for the class of
+      model-generated code reaching an execution call and for nothing more.
+      Limits of this check: just the handler body is read. A parameter passed to another
+      function that calls `eval` is not found. A `Number()` cast, a `z.number`,
+      `z.boolean` or `z.enum` parameter, a schema `.parse` call, and an `if` test on the
+      parameter that throws or returns end the flow, and the check does not judge whether
+      the test is a sound allowlist. `JSON.parse` is not a sink.
+    fix: >
+      Do not execute model-supplied text. Parse data with `JSON.parse`, map a fixed set of
+      operation names to functions when the tool needs behavior, or run the code in a
+      sandbox with no network and no host files.

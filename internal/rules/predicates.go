@@ -85,8 +85,7 @@ func PredHasShellCall(t models.ToolDef, pf analysis.ParsedFile) bool {
 			return true
 		}
 		c := astutil.NodeText(fn, pf.Source)
-		if strings.HasPrefix(c, "subprocess.") || c == "os.system" || c == "os.popen" ||
-			strings.HasPrefix(c, "os.spawn") {
+		if analysis.IsPyShellCallee(c) || c == "os.popen" {
 			found = true
 			return false
 		}
@@ -125,8 +124,7 @@ func PredHasCodeExecCall(t models.ToolDef, pf analysis.ParsedFile) bool {
 		if fn == nil {
 			return true
 		}
-		switch astutil.NodeText(fn, pf.Source) {
-		case "eval", "exec", "compile":
+		if analysis.IsPyCodeExecCallee(astutil.NodeText(fn, pf.Source)) {
 			found = true
 			return false
 		}

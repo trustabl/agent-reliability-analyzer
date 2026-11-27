@@ -1148,8 +1148,8 @@ trustabl forge --policy google_adk --lang go
 | `claude_sdk` | Claude Agent SDK (Python + TypeScript) |
 | `openai_sdk` | OpenAI Agents SDK (Python + TypeScript) |
 | `google_adk` | Google Agent Development Kit (Python + TypeScript) |
-| `mcp` | Model Context Protocol servers, plus client launch, authentication and transport code patterns |
-| `langchain` | LangChain / LangGraph (Python + TypeScript) |
+| `mcp` | Model Context Protocol servers, plus client launch, authentication and transport code patterns, and a tool parameter that reaches a subprocess, file, `eval` or memory scope call in the same function (MCP-215, 216, 217, 219, 220) |
+| `langchain` | LangChain / LangGraph (Python + TypeScript), including a tool parameter built into a vector-store filter or a store namespace (LC-204, LC-205) |
 | `crewai` | CrewAI (Python) |
 | `pydantic_ai` | Pydantic AI (Python) |
 | `vercel_ai` | Vercel AI SDK (TypeScript) |

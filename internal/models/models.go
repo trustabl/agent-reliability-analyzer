@@ -225,6 +225,43 @@ type ToolDef struct {
 	InputKeys []string          `json:"input_keys,omitempty"`
 	Facts     map[string]string `json:"facts,omitempty"`
 	Config    map[string]string `json:"config,omitempty"` // decorator kwargs
+	// TaintFlows are the one-function flows from a tool parameter to a sink
+	// that the taint pass found in the handler body. Empty for a tool with no
+	// flow, so scan output for such tools is unchanged.
+	TaintFlows []TaintFlow `json:"taint_flows,omitempty"`
+}
+
+// SourceKind names where a tainted value came from. Version 1 has one kind;
+// the enum exists so later source kinds need no redesign of TaintFlow.
+type SourceKind string
+
+// SourceParam is a parameter of the tool function (or an input-schema key
+// read from a Claude Agent SDK handler's args dict).
+const SourceParam SourceKind = "param"
+
+// Sink classes a TaintFlow can end in.
+const (
+	SinkShell          = "shell"
+	SinkCodeExec       = "code_exec"
+	SinkFileWrite      = "file_write"
+	SinkPathIO         = "path_io"
+	SinkSQLExecute     = "sql_execute"
+	SinkVectorFilter   = "vector_filter"
+	SinkStoreNamespace = "store_namespace"
+	SinkMemoryScopeKey = "memory_scope_key"
+)
+
+// TaintFlow is one flow from a tool parameter to a sink call inside the tool's
+// own function. Via lists the source lines of the assignments the value passed
+// through, in order, capped at eight.
+type TaintFlow struct {
+	Param      string     `json:"param"`
+	SourceKind SourceKind `json:"source_kind"`
+	SourceLine int        `json:"source_line"`
+	SinkClass  string     `json:"sink_class"`
+	SinkCallee string     `json:"sink_callee"`
+	SinkLine   int        `json:"sink_line"`
+	Via        []int      `json:"via,omitempty"`
 }
 
 // FactClaimUse is the ToolDef.Facts key for how a tool uses its EBTE-style
