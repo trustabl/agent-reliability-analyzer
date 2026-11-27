@@ -53,7 +53,7 @@ var policySlashCommandRuleCases = []policySlashCommandCase{
 
 func loadSlashCommandRule(t *testing.T, ruleID string) detectors.SlashCommandDetector {
 	t.Helper()
-	policies, err := rules.Load(fixtureFS(t))
+	policies, err := loadFixturePolicies(t)
 	if err != nil {
 		t.Fatalf("load policies: %v", err)
 	}

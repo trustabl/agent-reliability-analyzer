@@ -242,6 +242,8 @@ func ciHitsFor(m MatchExpr, f models.CIWorkflowFacts) []models.CIHit {
 		return f.UnrestrictedShell
 	case on(m.RepoCIAgentNoEgressRestriction):
 		return f.NoEgressRestriction
+	case on(m.RepoCodeownersGap):
+		return f.CodeownersGap
 	}
 	return nil
 }
@@ -279,6 +281,8 @@ func configHitLocation(m MatchExpr, pc models.ProjectConfigFacts) (string, int) 
 		hits = pc.HiddenGuidanceText
 	case m.RepoGuidanceDirectsUnverifiedInstall != nil:
 		hits = pc.GuidanceInstall
+	case m.RepoAgentCodeApprovesPRs != nil:
+		hits = pc.AgentPRSelfApproval
 	case m.RepoSettingsPreapproveUserContentFetch != nil:
 		hits = pc.UserContentFetchAllow
 	case m.RepoSettingsAllowExecCapablePrefix != nil:

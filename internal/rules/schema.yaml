@@ -460,6 +460,19 @@ rules:
 #       and hyphens into underscore form and lowercased before the match. OAI-205, LC-203,
 #       CREW-203, ADK-203, PYD-203.
 #
+#   agent_consequential_tool_ungated: {effects: [...], tool_gate_kwargs: [...], tool_gate_calls: [...], agent_gate_kwargs: [...], agent_gate_text: [...]}
+#       Schema 52. True when the agent holds a resolved tool whose effects (ToolDef.Effects,
+#       set by AttachToolEffects) include one of `effects`: "named" (tool name starts with
+#       send_, notify_, refund_, charge_, pay_, payout_, transfer_, delete_, drop_, destroy_,
+#       deploy_, publish_, terminate_, revoke_ or truncate_ after camelCase and hyphen
+#       normalization), "shell", "code_exec" or "file_write" (the has_*_call tests), and no gate
+#       is shown: a tool decorator or wrapper kwarg in tool_gate_kwargs (present, value not False
+#       or None), a body call in tool_gate_calls (interrupt, request_confirmation, a raise of
+#       ApprovalRequired; Python only), an agent kwarg in agent_gate_kwargs (present, not None),
+#       or a name from agent_gate_text in the text of any agent kwarg. An agent with opaque
+#       construction is not judged; tools under a test path carry no effects.
+#       OAI-212, LC-206, ADK-204, PYD-204.
+#
 #   agent_hosted_tool_kwarg_present: {class: ToolClass, kwarg: name}
 #       Returns true if the agent wires a hosted tool of `class` whose `kwarg`
 #       is present (e.g. BashTool with a `policy=`). `kwarg` supports dotted
@@ -1041,6 +1054,21 @@ rules:
 #   repo_has_consequential_tool: true | false
 #       Schema 50. A discovered tool body shows a shell call, a code-execution call or a file
 #       write (RepoInventory.HasConsequentialTool). OBS-016.
+#   repo_agent_code_approves_prs: true | false
+#       Schema 52. Agent-invocable code runs `gh pr review` with --approve (or -a), or
+#       `gh pr merge` with --admin: a fenced code block in a SKILL.md or slash command, a
+#       bundled skill script, a command in a Claude Code settings hook, or a shell file under
+#       .claude/ (ProjectConfigFacts.AgentPRSelfApproval). The command word must start a shell
+#       segment; comment lines and prose are not read. Which identity the command runs as is not
+#       judged. CI-006.
+#   repo_codeowners_gap: true | false
+#       Schema 52. The repo has a workflow file with an agent step (the agents CI-001 reads) and
+#       no CODEOWNERS file (repo root, .github/ or docs/), or the CODEOWNERS file the repo uses
+#       gives no owner to that workflow file or to a present agent-config file: CLAUDE.md,
+#       AGENTS.md, GEMINI.md, .mcp.json, .claude/settings*.json. Patterns follow the GitHub
+#       CODEOWNERS syntax; the last matching pattern wins and a pattern with no owner clears
+#       ownership. Branch protection and "require review from Code Owners" are not visible
+#       (CIWorkflowFacts.CodeownersGap). CI-007.
 #   repo_settings_env_redirects_model_endpoint: true | false
 #       The env block of .claude/settings.json or settings.local.json sets
 #       ANTHROPIC_BASE_URL to a URL whose host is neither api.anthropic.com nor a

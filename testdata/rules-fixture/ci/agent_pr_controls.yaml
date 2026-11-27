@@ -1,0 +1,75 @@
+policy:
+  id: ci_agent_pr_controls
+  name: Agent-invocable pull request approval and code ownership
+  category: ci
+  description: >
+    Repo-scoped rules for the controls around a pull request when a coding agent works in the
+    repo. CI-006 reads agent-invocable code (skills, slash commands, hooks and shell files under
+    .claude/) for a command that approves a pull request or merges it with administrator
+    privileges. CI-007 reads CODEOWNERS against the workflow files that run a coding agent and
+    the agent-config files. The pack loads on each scan and each rule's predicate gates it.
+    Neither rule reads GitHub settings, branch protection or the identity a command runs as.
+
+rules:
+  - id: CI-006
+    title: Agent-invocable code approves a pull request or merges it with administrator privileges
+    severity: high
+    confidence: 0.5
+    applies_to:
+      - agent_config
+    scope: repo
+    match:
+      repo_agent_code_approves_prs: true
+    explanation: >
+      A skill, slash command, hook or shell file under .claude/ runs gh pr review with --approve
+      (or -a), or gh pr merge with --admin. The GitHub CLI manual describes --approve as
+      "Approve pull request" and --admin as "Use administrator privileges to merge a pull
+      request that does not meet requirements". The paper "Who Approved This? Coding Agents,
+      Human Accounts, and Merge-Gate Evidence at a Fintech Startup" (arXiv 2610.28683) reports a
+      startup whose merge gate required a non-author approval, and draws the lesson of "keeping
+      agents' credentials away from the controls they operate under". The paper does not study
+      this command pattern. Limits of this check: the command must start a shell segment inside
+      a fenced code block of a SKILL.md or slash command file, a script bundled in a skill, a
+      command of a Claude Code settings hook, or a .sh file under .claude/; prose, inline code
+      and comment lines are not read, and workflow run steps and ordinary repo scripts are not
+      read. The rule does not read which token or account the command runs as, so a command that
+      runs under a separate bot or App identity is reported as well. The gh api forms (a review
+      request with event APPROVE, a branch protection change) are not read. One finding is
+      reported for each scan, at the first file in path order.
+    fix: >
+      Remove the approve or administrator-merge command from the agent's skills, commands and
+      hooks. Leave approval to a person, and where an automated reviewer is needed, run it under
+      a bot or App identity that cannot satisfy the required human review and is not the account
+      of a maintainer.
+
+  - id: CI-007
+    title: Workflow that runs a coding agent, or an agent-config file, has no CODEOWNERS owner
+    severity: high
+    confidence: 0.4
+    applies_to:
+      - github_actions
+    scope: repo
+    match:
+      repo_codeowners_gap: true
+    explanation: >
+      The repo has a GitHub Actions workflow with a coding-agent step (the agents CI-001 reads),
+      and either no CODEOWNERS file exists or CODEOWNERS names no owner for that workflow file
+      or for an agent-config file (CLAUDE.md, AGENTS.md, GEMINI.md, .mcp.json,
+      .claude/settings.json). GitHub documents that people with admin or owner permissions "can
+      require that pull requests have to be approved by code owners before they can be merged",
+      so a path with no owner cannot be covered by that requirement. The paper "Co-Modifying
+      Application Code and Deployment Infrastructure" (arXiv 2610.12849) reports that agent
+      identity reduced the odds of human review of pull requests that change both application
+      code and deployment infrastructure, and calls for "strict path-based access controls". The
+      paper does not study CODEOWNERS. Limits of this check: it reads the repo, so it cannot see
+      whether branch protection or a ruleset requires code owner review; a repo that sets no
+      such requirement gains nothing from an owner entry, and a repo that sets it by another
+      route is reported when CODEOWNERS is silent. CODEOWNERS is read from .github/, the repo
+      root and docs/ in that order, the first found; patterns follow the GitHub syntax with the
+      last matching pattern winning, and a pattern with no owner clears ownership. Section
+      headers are skipped. A workflow reached through a reusable workflow call is not listed as
+      an agent workflow. One finding is reported for each scan.
+    fix: >
+      Add a CODEOWNERS entry that names a person or team for .github/workflows/ and for the
+      agent-config files, and require review from code owners in branch protection or a ruleset
+      for the default branch.

@@ -22,6 +22,13 @@ type CIWorkflowFacts struct {
 	CheckoutPersists    []CIHit `json:"checkout_persists,omitempty"`     // CI-003
 	UnrestrictedShell   []CIHit `json:"unrestricted_shell,omitempty"`    // CI-004
 	NoEgressRestriction []CIHit `json:"no_egress_restriction,omitempty"` // CI-005
+	// CodeownersGap is set when the repo has a workflow with an agent step and CODEOWNERS
+	// leaves that workflow file, or an agent-config file, with no owner (or the repo has no
+	// CODEOWNERS file). CI-007 reads it.
+	CodeownersGap []CIHit `json:"codeowners_gap,omitempty"`
+	// AgentWorkflowFiles are the workflow files with at least one agent step, sorted.
+	// In-memory input to CodeownersGap; not serialized.
+	AgentWorkflowFiles []string `json:"-"`
 	// Unparsed lists workflow files that could not be parsed (invalid YAML, not
 	// a mapping, or over the alias/node budget). They produce no finding.
 	Unparsed []string `json:"unparsed,omitempty"`

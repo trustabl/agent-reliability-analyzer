@@ -225,7 +225,7 @@ func TestTaintDeterministicAndFast(t *testing.T) {
 			best = d
 		}
 	}
-	if best > 50*time.Millisecond {
+	if !raceEnabled && best > 50*time.Millisecond {
 		t.Errorf("5000-line function took %v (best of 5)", best)
 	}
 	if classes(big.TaintFlows) != "p>shell" {

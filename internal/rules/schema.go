@@ -111,6 +111,9 @@ type MatchExpr struct {
 	AgentRunCallUsageLimitsMissing *bool                     `yaml:"agent_run_call_usage_limits_missing,omitempty"`
 	AgentMCPServerKwargMissing     *MCPServerKwargExpr       `yaml:"agent_mcp_server_kwarg_missing,omitempty"`
 	AgentFileURLForceDownload      *bool                     `yaml:"agent_file_url_force_download,omitempty"`
+	// AgentConsequentialToolUngated: the agent holds a tool with a listed effect and shows no
+	// listed approval gate; see PredAgentConsequentialToolUngated.
+	AgentConsequentialToolUngated *AgentConsequentialToolUngatedExpr `yaml:"agent_consequential_tool_ungated,omitempty"`
 	// AgentTransitiveCapabilityExceedsDirect names capabilities (only "shell" is defined)
 	// that an agent reaches through its resolved handoff chain and does not wield itself
 	// (OAI-210, OAI-211).
@@ -193,6 +196,9 @@ type MatchExpr struct {
 	RepoJudgeModelFloatingAlias *bool    `yaml:"repo_judge_model_floating_alias,omitempty"`
 	RepoOtelSpanAttrsMissing    []string `yaml:"repo_otel_span_attrs_missing,omitempty"`
 	RepoHasConsequentialTool    *bool    `yaml:"repo_has_consequential_tool,omitempty"`
+	// Agent-config PR approval and CODEOWNERS predicates (CI-006, CI-007).
+	RepoAgentCodeApprovesPRs *bool `yaml:"repo_agent_code_approves_prs,omitempty"`
+	RepoCodeownersGap        *bool `yaml:"repo_codeowners_gap,omitempty"`
 
 	// CI workflow predicates (category ci). Each is true when the corresponding
 	// CIWorkflowFacts slice is non-empty (one hit per agent step; per checkout step for CI-003).
@@ -421,4 +427,18 @@ type CallUsesUnnormalizedPathParamExpr struct {
 type AgentToolsMatchExpr struct {
 	ParamNames         []string `yaml:"param_names"`
 	OtherToolNameRegex string   `yaml:"other_tool_name_regex"`
+}
+
+// AgentConsequentialToolUngatedExpr fires when an agent holds a tool whose ToolDef.Effects
+// include one of Effects (named, shell, code_exec, file_write) and no gate is shown. A gate
+// is a tool decorator or wrapper kwarg in ToolGateKwargs (present, value not False or None),
+// a body call in ToolGateCalls (interrupt, request_confirmation, ApprovalRequired), an agent
+// kwarg in AgentGateKwargs (present, not None), or a name from AgentGateText in the text of
+// any agent kwarg.
+type AgentConsequentialToolUngatedExpr struct {
+	Effects         []string `yaml:"effects"`
+	ToolGateKwargs  []string `yaml:"tool_gate_kwargs,omitempty"`
+	ToolGateCalls   []string `yaml:"tool_gate_calls,omitempty"`
+	AgentGateKwargs []string `yaml:"agent_gate_kwargs,omitempty"`
+	AgentGateText   []string `yaml:"agent_gate_text,omitempty"`
 }

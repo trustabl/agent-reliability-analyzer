@@ -1,0 +1,52 @@
+policy:
+  id: google_adk_consequential_tool_gate
+  name: Google ADK agent with a side-effecting tool and no confirmation
+  category: google_adk
+  description: >
+    Agent-scoped rule for Google ADK that reads the LlmAgent constructor and its tools= list and
+    flags an agent holding a side-effecting tool with no require_confirmation, no
+    request_confirmation call and no before_tool_callback.
+
+rules:
+  - id: ADK-204
+    title: Agent holds a side-effecting tool with no confirmation or before_tool_callback
+    severity: high
+    confidence: 0.4
+    language: python
+    applies_to:
+      - adk_llm_agent
+    scope: agent
+    match:
+      agent_consequential_tool_ungated:
+        effects: [named, shell, code_exec, file_write]
+        tool_gate_kwargs: [require_confirmation]
+        tool_gate_calls: [request_confirmation]
+        agent_gate_kwargs: [before_tool_callback]
+    explanation: >
+      This agent holds a tool that sends, pays, deletes or deploys by name, or whose body runs a
+      subprocess, evaluates code or writes a file, and neither the tool nor the agent shows a
+      decision point before the call. Google ADK documents a Tool Confirmation feature that lets
+      a tool "pause its execution" for a confirmation from a user (a confirmation flag on
+      FunctionTool, and ToolContext.request_confirmation inside a tool) and an agent-level
+      before_tool_callback that runs before each tool; when it returns a dictionary, "the tool's
+      run_async method is skipped". The paper "Blocking at the Boundary" (arXiv 2610.05163)
+      reports staged prompt injection against Claude Code and Codex and states that "Stopping
+      such attacks requires a decision before each consequential action". The paper tests those
+      two agents; it does not test this SDK. Limits of this check: a tool counts when its name
+      starts with one of send_, notify_, refund_, charge_, pay_, payout_, transfer_, delete_,
+      drop_, destroy_, deploy_, publish_, terminate_, revoke_ and truncate_ (after camel case
+      and hyphens are split into underscore form), or its body shows a subprocess call, a bare
+      eval, exec or compile call, or a file-opening write. The pack sets these name words and
+      states no reasoning for them. A tool imported from a module other than the one that builds
+      the agent is not resolved. A before_tool_callback of any content counts as a gate; the
+      rule does not read what the callback decides. A plugin registered on the Runner, a
+      confirmation raised outside the tool, and a tool wrapped by code the scan cannot resolve
+      are not seen. ADK-020 and ADK-021 report a narrower case (an unbounded recipient or
+      amount); both can report the same agent. An agent built from unpacked or non-literal
+      arguments is not judged. A bare function in tools=[...] is not discovered as an ADK tool.
+      The rule reports one finding per agent.
+    fix: >
+      Pass require_confirmation=True to FunctionTool for each side-effecting tool, or call
+      tool_context.request_confirmation(...) in its body, or set a before_tool_callback on the
+      agent that checks the tool name and arguments against a policy and returns a result to
+      block the call.

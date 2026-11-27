@@ -1,0 +1,49 @@
+policy:
+  id: pydantic_ai_consequential_tool_gate
+  name: Pydantic AI agent with a side-effecting tool and no approval
+  category: pydantic_ai
+  description: >
+    Agent-scoped rule for Pydantic AI that reads the Agent(...) constructor and the tools
+    registered on it and flags an agent holding a side-effecting tool with no requires_approval
+    and no ApprovalRequired raise.
+
+rules:
+  - id: PYD-204
+    title: Agent holds a side-effecting tool with no requires_approval
+    severity: high
+    confidence: 0.4
+    language: python
+    applies_to:
+      - pydantic_ai_agent
+    scope: agent
+    match:
+      agent_consequential_tool_ungated:
+        effects: [named, shell, code_exec, file_write]
+        tool_gate_kwargs: [requires_approval]
+        tool_gate_calls: [ApprovalRequired]
+        agent_gate_text: [requires_approval]
+    explanation: >
+      This agent holds a tool that sends, pays, deletes or deploys by name, or whose body runs a
+      subprocess, evaluates code or writes a file, and neither the tool nor the agent shows a
+      decision point before the call. Pydantic AI documents requires_approval=True on the tool
+      decorators, the Tool class and toolsets, and raising ApprovalRequired inside a tool, as
+      the way to pause a run for a person to approve the call (deferred tools). The paper
+      "Blocking at the Boundary" (arXiv 2610.05163) reports staged prompt injection against
+      Claude Code and Codex and states that "Stopping such attacks requires a decision before
+      each consequential action". The paper tests those two agents; it does not test this SDK.
+      Limits of this check: a tool counts when its name starts with one of send_, notify_,
+      refund_, charge_, pay_, payout_, transfer_, delete_, drop_, destroy_, deploy_, publish_,
+      terminate_, revoke_ and truncate_ (after camel case and hyphens are split into underscore
+      form), or its body shows a subprocess call, a bare eval, exec or compile call, or a file-
+      opening write. The pack sets these name words and states no reasoning for them. A tool
+      imported from a module other than the one that builds the agent is not resolved. A
+      requires_approval kwarg with a value other than False, a raise of ApprovalRequired in the
+      tool body, or the name requires_approval in any agent kwarg counts as a gate. An approval
+      set on a toolset built outside the Agent(...) call, or by a wrapper the scan cannot
+      resolve, is not seen. PYD-003 and PYD-004 report the dangerous call in a tool body; this
+      rule reports the missing decision. An agent built from unpacked or non-literal arguments
+      is not judged. The rule reports one finding per agent.
+    fix: >
+      Pass requires_approval=True to the tool decorator of each side-effecting tool, or raise
+      ApprovalRequired in the tool when the arguments need review, and handle
+      DeferredToolRequests in the run loop.
