@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/trustabl/trustabl/internal/analysis"
@@ -23,10 +24,27 @@ func fixtureFS(t *testing.T) fs.FS {
 	return os.DirFS(root)
 }
 
+var (
+	fixturePoliciesOnce sync.Once
+	fixturePolicies     []rules.PolicyFile
+	fixturePoliciesErr  error
+)
+
+// loadFixturePolicies loads the fixture rule pack once and shares it across
+// every test; rules.Load over the whole pack is expensive (especially under
+// -race) and the result is only read.
+func loadFixturePolicies(t *testing.T) ([]rules.PolicyFile, error) {
+	t.Helper()
+	fixturePoliciesOnce.Do(func() {
+		fixturePolicies, fixturePoliciesErr = rules.Load(fixtureFS(t))
+	})
+	return fixturePolicies, fixturePoliciesErr
+}
+
 // loadToolRule fetches a tool-scoped rule from shipped policies as a ToolDetector.
 func loadToolRule(t *testing.T, ruleID string) detectors.ToolDetector {
 	t.Helper()
-	policies, err := rules.Load(fixtureFS(t))
+	policies, err := loadFixturePolicies(t)
 	if err != nil {
 		t.Fatalf("load policies: %v", err)
 	}
@@ -44,7 +62,7 @@ func loadToolRule(t *testing.T, ruleID string) detectors.ToolDetector {
 // loadAgentRule fetches an agent-scoped rule from shipped policies as an AgentDetector.
 func loadAgentRule(t *testing.T, ruleID string) detectors.AgentDetector {
 	t.Helper()
-	policies, err := rules.Load(fixtureFS(t))
+	policies, err := loadFixturePolicies(t)
 	if err != nil {
 		t.Fatalf("load policies: %v", err)
 	}
@@ -62,7 +80,7 @@ func loadAgentRule(t *testing.T, ruleID string) detectors.AgentDetector {
 // loadRepoRule fetches a repo-scoped rule from shipped policies as a RepoDetector.
 func loadRepoRule(t *testing.T, ruleID string) detectors.RepoDetector {
 	t.Helper()
-	policies, err := rules.Load(fixtureFS(t))
+	policies, err := loadFixturePolicies(t)
 	if err != nil {
 		t.Fatalf("load policies: %v", err)
 	}
@@ -80,7 +98,7 @@ func loadRepoRule(t *testing.T, ruleID string) detectors.RepoDetector {
 // loadSubagentRule fetches a subagent-scoped rule as a SubagentDetector.
 func loadSubagentRule(t *testing.T, ruleID string) detectors.SubagentDetector {
 	t.Helper()
-	policies, err := rules.Load(fixtureFS(t))
+	policies, err := loadFixturePolicies(t)
 	if err != nil {
 		t.Fatalf("load policies: %v", err)
 	}
@@ -98,7 +116,7 @@ func loadSubagentRule(t *testing.T, ruleID string) detectors.SubagentDetector {
 // loadSkillRule fetches a skill-scoped rule as a SkillDetector.
 func loadSkillRule(t *testing.T, ruleID string) detectors.SkillDetector {
 	t.Helper()
-	policies, err := rules.Load(fixtureFS(t))
+	policies, err := loadFixturePolicies(t)
 	if err != nil {
 		t.Fatalf("load policies: %v", err)
 	}
@@ -8674,7 +8692,7 @@ func TestPolicySkillRules(t *testing.T) {
 // the dead-predicate bugs this guard exists to catch. (Mirrors the sync
 // obligation in CLAUDE.md: "fire + silent cases".)
 func TestPolicyRules_AllRulesCovered(t *testing.T) {
-	policies, err := rules.Load(fixtureFS(t))
+	policies, err := loadFixturePolicies(t)
 	if err != nil {
 		t.Fatalf("load policies: %v", err)
 	}
