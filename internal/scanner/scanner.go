@@ -446,6 +446,8 @@ func Run(cfg Config) (models.ScanResult, error) {
 	inventory.MCPServerBinds = analysis.DiscoverMCPServerBinds(parsed, tsFiles)
 	// AGCFG-019..021: call-site keywords with a literal or whole-environment value.
 	inventory.CallKwargs = analysis.DiscoverCallKwargs(parsed, tsFiles)
+	// RAW-003, CSDK-209: model output or a function parameter reaching a sink (Python).
+	inventory.RepoFlows = analysis.DiscoverRepoFlows(parsed)
 	// MCP-204 to MCP-210: MCP server and client code patterns, and the run-level handoff filter
 	// credit for OAI-204.
 	inventory.MCPCode = analysis.DiscoverMCPCode(parsed, tsFiles)

@@ -181,3 +181,43 @@ rules:
       Do not execute model-supplied text. Parse data with `JSON.parse`, map a fixed set of
       operation names to functions when the tool needs behavior, or run the code in a
       sandbox with no network and no host files.
+
+  - id: MCP-218
+    title: MCP tool parameter is built into SQL text passed to execute
+    severity: high
+    confidence: 0.35
+    language: python
+    applies_to:
+      - mcp_tool
+    scope: tool
+    match:
+      tool_source_reaches_sink:
+        sources: [param]
+        sinks: [sql_execute]
+    explanation: >
+      A parameter of this MCP tool is joined into the text of a statement passed to
+      `execute`, `executemany`, `executescript`, `exec_driver_sql` or `sqlalchemy.text`
+      inside the same function, through assignments, f-strings, concatenation, `%` and
+      `.format`. The model chooses the parameter value, so a value that closes a quoted
+      name and appends a second statement runs as SQL. GitHub advisory GHSA-v867-6qx2-gwmg
+      (CVE-2026-118378) describes this in a database client's MCP server: a crafted
+      `table_name` given to a `describe_table` tool closed a quoted PRAGMA argument and ran
+      stacked statements, which bypassed the mode that blocks writes and the write approval, and the
+      advisory notes that agents steered by untrusted content can supply such a value. The
+      pack cites the advisory for the class of a tool parameter placed into SQL text and for
+      nothing more; the code it describes is not Python. The finding sits on the call and
+      the explanation names the parameter.
+      Limits of this check: just the tool's own function is read. A parameter passed to a
+      helper that builds or runs the statement is not found. A value passed in the bound
+      parameters argument, as in `execute("... WHERE id = ?", (param,))`, is not a flow. The
+      method name is matched on any receiver except one whose name contains sandbox,
+      interpreter, kernel, executor or runner, so a call to `execute` on another object that
+      is not a database cursor or connection is flagged. A cast, a Literal or Enum annotation,
+      and an `if` test on the parameter that raises or returns end the flow; the check does
+      not judge whether the test is a sound allowlist of table or column names.
+    fix: >
+      Pass values as bound parameters and keep the statement text fixed. Identifiers cannot
+      be bound, so check a table or column name against an allowlist read from the schema
+      before it is placed in the statement, or quote it with the driver's identifier
+      quoting function. Open the connection with a role that can read just the tables the tool
+      needs.

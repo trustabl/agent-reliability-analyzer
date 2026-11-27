@@ -285,6 +285,16 @@ func loadPolicies(fsys fs.FS, lenient bool) ([]PolicyFile, []string, error) {
 					errs = append(errs, fmt.Errorf("%s: %v", tag, err))
 				}
 			}
+			for _, x := range rule.Match.flowTaintExprs() {
+				if err := x.validate(); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %v", tag, err))
+				}
+			}
+			if x := rule.Match.RepoSourceReachesSink; x != nil {
+				if err := x.validate(); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %v", tag, err))
+				}
+			}
 			// repo_otel_span_attrs_missing names span attributes. A name the
 			// OpenTelemetry GenAI list in analysis.SpanAttrKeys or the
 			// agent-reliability-otel-labels spec does not define never matches what

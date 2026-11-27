@@ -305,4 +305,7 @@ func scriptFacts(bf *models.BundledFile, name string, content []byte) {
 	bf.DecodesAndExecutes = scriptDecodesAndExecutes(code)
 	bf.DestructiveCommand = scriptDestructiveCommand(code)
 	bf.UnpinnedInstall = textUnpinnedInstall(code, true)
+	if line := SkillScriptPrintsSecret(name, content); line > 0 {
+		bf.PrintsSecret, bf.PrintsSecretLine = true, line
+	}
 }

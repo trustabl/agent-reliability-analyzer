@@ -1,0 +1,41 @@
+policy:
+  id: claude_skill_script_output
+  name: Skill scripts that print a credential
+  category: claude_skill
+  description: >
+    Rules for a bundled skill script that passes a credential-named environment value to
+    print or a standard output write. The flow comes from the one-function taint pass over
+    Python scripts.
+
+rules:
+  - id: CSKILL-094
+    title: Bundled skill script prints a secret-named environment value
+    severity: medium
+    confidence: 0.4
+    applies_to:
+      - claude_skill
+    scope: skill
+    match:
+      skill_bundled_script_prints_secret: true
+    explanation: >
+      A Python script in this skill's directory reads an environment variable whose name
+      reads as a credential (a name with a KEY, TOKEN, SECRET, PASSWORD or similar word) and
+      passes the value, or text built from it, to `print` or `sys.stdout.write`. The
+      arXiv study "How Your Credentials Are Leaked by LLM Agent Skills" (arXiv:2604.03070)
+      reports that debug logging accounts for 73.5% of the vulnerabilities it found because
+      agent frameworks feed standard output into the model's context window. The pack cites
+      the study for that mechanism and for nothing more. A later census of a skill
+      registry (arXiv:2611.30932, retrieved 2026-11-27 through the sheet note, not read for
+      this rule) is said to report that a screen on printed output alone has a precision of
+      5.1%, which is why this rule requires a credential-named variable to reach the
+      call and does not match any printed environment value.
+      Limits of this check: Python scripts are the sole input, and each function or the module
+      body on its own. A module-level assignment is visible inside the functions of the
+      same file. A value passed to another function that prints it is not found. A slice
+      such as `key[:4]` ends the flow. Output through `logging` or to standard error is not
+      read. Shell, JavaScript and other scripts are not read. A variable name held in
+      another variable is not read. Files under test paths are not judged.
+    fix: >
+      Remove the print. If the script must confirm that a credential is configured, print
+      whether the variable is set, not its value, and keep debug output free of
+      environment values.

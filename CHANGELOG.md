@@ -14,6 +14,22 @@ upgraded.
 
 ### Added
 
+- **Static batch 7: secret, model-output and parameter sources for the taint pass (rule schema 51 → 53; +7 rules, four predicates).**
+  The taint pass gains the sources `secret_env` (an environment variable read by a literal name that passes
+  `analysis.IsSecretEnvName`), `llm_output` (the result of a fixed list of chat-model SDK calls) and `handler_param`
+  (any function parameter), and the sinks `return_value`, `log_print`, `memory_write` and `claude_resume`; the batch 6
+  predicate `tool_source_reaches_sink`, its value sets and every parameter-to-sink flow are unchanged. New predicates:
+  `tool_flow_reaches_sink` (tool scope: `secret_env` to `return_value`, `param` to `memory_write`),
+  `repo_source_reaches_sink` (repo scope, over `RepoInventory.RepoFlows` from `analysis.DiscoverRepoFlows`, Python) and
+  `skill_bundled_script_prints_secret` (skill scope, over `BundledFile.PrintsSecret`). Rules: **MCP-218** (high, 0.35: a
+  parameter built into SQL text, Python; the sink built in batch 6; a receiver named sandbox, interpreter, kernel,
+  executor or runner is not read as a database), **MCP-221** (Python) and **MCP-222** (TypeScript) (medium, 0.4:
+  a credential-named environment value returned), **MCP-223** (medium, 0.3: a credential-named parameter written to a
+  memory store) in `mcp/`; **RAW-003** (medium, 0.3: model output reaches a shell, `eval`, `exec` or `compile`);
+  **CSDK-209** (high, 0.35: a parameter reaches `ClaudeAgentOptions(resume=...)`); **CSKILL-094** (medium, 0.4: a skill
+  script prints a credential-named environment value). Not built: SCOPE-007 (one source paper), the log sink for MCP
+  tools (the cited skills study concerns script output), TypeScript for RAW-003, CSDK-209 and CSKILL-094. Engines without
+  schema 53 skip these rules with META-005; engines at 51 run MCP-218.
 - **Static batch 6: one-function taint pass and parameter-to-sink rules (rule schema 50 → 51; +7 rules, one predicate).**
   New tool-scope predicate `tool_source_reaches_sink` (sources `param`; sinks `shell`, `code_exec`, `file_write`, `path_io`,
   `sql_execute`, `vector_filter`, `store_namespace`, `memory_scope_key`) over the new `ToolDef.TaintFlows`

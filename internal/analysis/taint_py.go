@@ -155,7 +155,9 @@ func (fc *taintFileCtx) pyToolFlows(t models.ToolDef) []models.TaintFlow {
 			st[name] = []taintOrigin{{param: name, srcLine: line}}
 		}
 	}
-	if len(st) == 0 && e.dictName == "" {
+	e.envOK = bytes.Contains(e.src[body.StartByte():body.EndByte()], []byte("environ")) ||
+		bytes.Contains(e.src[body.StartByte():body.EndByte()], []byte("getenv"))
+	if len(st) == 0 && e.dictName == "" && !e.envOK {
 		return nil
 	}
 	e.pyBlock(body, st)
@@ -260,6 +262,15 @@ func (e *taintEngine) pyStmt(n *sitter.Node, st taintState) taintState {
 		return st
 	case "if_statement":
 		return e.pyIf(n, st)
+	case "return_statement":
+		e.scan(n, st)
+		if e.envOK && n.NamedChildCount() > 0 {
+			line := astutil.NodeLine(n)
+			for _, o := range e.expr(n.NamedChild(0), st) {
+				e.record(o, models.SinkReturnValue, "return", line)
+			}
+		}
+		return st
 	case "for_statement":
 		left, right := n.ChildByFieldName("left"), n.ChildByFieldName("right")
 		e.scan(right, st)
@@ -746,6 +757,13 @@ func (e *taintEngine) pyExpr(n *sitter.Node, st taintState, depth int) []taintOr
 		if e.dictName != "" && v != nil && v.Type() == "identifier" && astutil.NodeText(v, e.src) == e.dictName {
 			return e.dictKey(n.ChildByFieldName("subscript"))
 		}
+		if e.mode.readsEnvSecrets() && v != nil && e.canon(astutil.NodeText(v, e.src)) == "os.environ" {
+			return e.envSecret(n.ChildByFieldName("subscript"), n)
+		}
+		if sub := n.ChildByFieldName("subscript"); sub != nil && sub.Type() == "slice" {
+			// A slice of a secret is a part of it, as in key[:4]; the pass does not follow it.
+			return dropKind(dropElem(e.pyExpr(v, st, d)), models.SourceSecretEnv)
+		}
 		return dropElem(e.pyExpr(v, st, d))
 	case "call":
 		return e.pyCallExpr(n, st, d)
@@ -781,6 +799,14 @@ func (e *taintEngine) pyCallExpr(n *sitter.Node, st taintState, d int) []taintOr
 		return os
 	}
 	txt := astutil.NodeText(fn, e.src)
+	if e.mode.readsEnvSecrets() {
+		if c := e.canon(txt); (c == "os.environ.get" || c == "os.getenv") && args != nil && args.NamedChildCount() > 0 {
+			return e.envSecret(args.NamedChild(0), n)
+		}
+	}
+	if e.mode == modeRepoLLM && isPyLLMCall(e.canon(txt)) {
+		return []taintOrigin{{param: txt, kind: models.SourceLLMOutput, srcLine: astutil.NodeLine(n)}}
+	}
 	if fn.Type() == "attribute" {
 		recv := fn.ChildByFieldName("object")
 		meth := astutil.NodeText(fn.ChildByFieldName("attribute"), e.src)
@@ -878,4 +904,55 @@ func (e *taintEngine) mayNormalize(n *sitter.Node) bool {
 // statement can hold no call.
 func (e *taintEngine) hasParen(n *sitter.Node) bool {
 	return bytes.IndexByte(e.src[n.StartByte():n.EndByte()], '(') >= 0
+}
+
+// ---- batch 7 sources ----
+
+// envSecret returns the origin of a read of the environment variable named by the literal key
+// node, when the name passes the secret-name test; any other key, or a non-literal one, is not a source.
+func (e *taintEngine) envSecret(key, at *sitter.Node) []taintOrigin {
+	if key == nil || key.Type() != "string" {
+		return nil
+	}
+	name := strings.Trim(astutil.NodeText(key, e.src), "\"'")
+	if !IsSecretEnvName(name) {
+		return nil
+	}
+	return []taintOrigin{{param: name, kind: models.SourceSecretEnv, srcLine: astutil.NodeLine(at)}}
+}
+
+func dropKind(os []taintOrigin, kind models.SourceKind) []taintOrigin {
+	var out []taintOrigin
+	for _, o := range os {
+		if o.kind != kind {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+var pyLLMCallSuffixes = []string{".chat.completions.create", ".chat.completions.parse", ".completions.create",
+	".messages.create", ".responses.create", ".generate_content", ".generate_content_async"}
+
+var pyLLMCallExact = map[string]bool{"litellm.completion": true, "litellm.acompletion": true, "ollama.chat": true,
+	"ollama.generate": true, "openai.ChatCompletion.create": true}
+
+// isPyLLMCall reports whether a canonical callee text is one of the chat-model SDK calls whose
+// result is model output: the OpenAI chat, completions and responses calls, the Anthropic
+// messages call, Gemini generate_content, LiteLLM and Ollama, and invoke or ainvoke on a
+// receiver whose last name says it is a model (llm, model, chat_model).
+func isPyLLMCall(c string) bool {
+	if pyLLMCallExact[c] {
+		return true
+	}
+	for _, s := range pyLLMCallSuffixes {
+		if strings.HasSuffix(c, s) {
+			return true
+		}
+	}
+	if i := strings.LastIndex(c, "."); i > 0 && (c[i+1:] == "invoke" || c[i+1:] == "ainvoke") {
+		r := strings.ToLower(lastSegment(c[:i]))
+		return strings.Contains(r, "llm") || r == "model" || r == "chat_model" || r == "chatmodel" || r == "chat"
+	}
+	return false
 }

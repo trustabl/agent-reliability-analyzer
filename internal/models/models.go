@@ -231,13 +231,25 @@ type ToolDef struct {
 	TaintFlows []TaintFlow `json:"taint_flows,omitempty"`
 }
 
-// SourceKind names where a tainted value came from. Version 1 has one kind;
-// the enum exists so later source kinds need no redesign of TaintFlow.
+// SourceKind names where a tainted value came from. Batch 6 had one kind
+// (param); batch 7 adds three. The enum exists so a source kind needs no
+// redesign of TaintFlow.
 type SourceKind string
 
 // SourceParam is a parameter of the tool function (or an input-schema key
 // read from a Claude Agent SDK handler's args dict).
 const SourceParam SourceKind = "param"
+
+// Source kinds added by batch 7 (schema 53). SourceSecretEnv is an environment
+// variable whose literal name passes the secret-name test (analysis.IsSecretEnvName).
+// SourceLLMOutput is the result of a fixed list of chat-model SDK calls.
+// SourceHandlerParam is any parameter of a function, used by rules that name a
+// kwarg sink (CSDK-209) rather than a tool.
+const (
+	SourceSecretEnv    SourceKind = "secret_env"
+	SourceLLMOutput    SourceKind = "llm_output"
+	SourceHandlerParam SourceKind = "handler_param"
+)
 
 // Sink classes a TaintFlow can end in.
 const (
@@ -249,6 +261,14 @@ const (
 	SinkVectorFilter   = "vector_filter"
 	SinkStoreNamespace = "store_namespace"
 	SinkMemoryScopeKey = "memory_scope_key"
+	// Sink classes added by batch 7. SinkReturnValue is a return statement of the
+	// tool function, SinkLogPrint a print or stdout write, SinkMemoryWrite the
+	// value argument of a memory or store write, SinkClaudeResume the resume
+	// keyword of ClaudeAgentOptions.
+	SinkReturnValue  = "return_value"
+	SinkLogPrint     = "log_print"
+	SinkMemoryWrite  = "memory_write"
+	SinkClaudeResume = "claude_resume"
 )
 
 // TaintFlow is one flow from a tool parameter to a sink call inside the tool's
@@ -713,6 +733,7 @@ type RepoInventory struct {
 	Entrypoints        []EntrypointDef         `json:"entrypoints,omitempty"`
 	MCPServerBinds     []MCPServerBind         `json:"mcp_server_binds,omitempty"`
 	CallKwargs         []CallKwargHit          `json:"call_kwargs,omitempty"`
+	RepoFlows          []RepoFlow              `json:"repo_flows,omitempty"`
 	MCPCode            []MCPCodeFact           `json:"mcp_code,omitempty"`
 	// HandoffInputFilterConfigured is true when a RunConfig sets handoff_input_filter
 	// (handoffInputFilter in TypeScript) anywhere in the scanned code. OAI-204 reads it.

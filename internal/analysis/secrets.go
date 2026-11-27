@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/trustabl/trustabl/internal/models"
 )
@@ -86,4 +87,39 @@ func lineOf1(content []byte, pos int) int {
 		pos = len(content)
 	}
 	return bytes.Count(content[:pos], []byte("\n")) + 1
+}
+
+// secretNameTokens are the underscore-separated words of an environment variable name that mark
+// its value as a credential. The test reads the literal name only; the value is never seen.
+var secretNameTokens = map[string]bool{
+	"KEY": true, "TOKEN": true, "SECRET": true, "PASSWORD": true, "PASSWD": true, "PWD": true,
+	"CREDENTIAL": true, "CREDENTIALS": true, "APIKEY": true, "PAT": true, "BEARER": true,
+	"PASSPHRASE": true, "AUTH": true,
+}
+
+// secretNameExempt are words that name something other than the credential itself: a path, a
+// location, an identifier, a public half, a boolean switch or a lifetime.
+var secretNameExempt = map[string]bool{
+	"FILE": true, "PATH": true, "DIR": true, "URL": true, "URI": true, "HOST": true, "ID": true,
+	"NAME": true, "PUBLIC": true, "ENABLED": true, "DISABLE": true, "DISABLED": true, "TTL": true,
+	"EXPIRY": true, "EXPIRES": true, "PORT": true, "HEADER": true, "TYPE": true, "MODE": true,
+	"METHOD": true, "REGION": true, "ENDPOINT": true, "VERSION": true, "SCOPE": true,
+}
+
+// IsSecretEnvName reports whether an environment variable name reads as a credential: one of
+// its underscore-separated words is KEY, TOKEN, SECRET, PASSWORD and the like, and none of its
+// words says the value is a path, a location, an identifier or a public half. API_KEY,
+// GITHUB_TOKEN and DB_PASSWORD pass; API_KEY_FILE, PUBLIC_KEY, TOKEN_URL and KEY_ID do not.
+func IsSecretEnvName(name string) bool {
+	up := strings.ToUpper(name)
+	hit := false
+	for _, w := range strings.FieldsFunc(up, func(r rune) bool { return !(r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') }) {
+		if secretNameExempt[w] {
+			return false
+		}
+		if secretNameTokens[w] || strings.HasSuffix(w, "APIKEY") || strings.HasSuffix(w, "PASSWORD") || strings.HasSuffix(w, "SECRET") || strings.HasSuffix(w, "TOKEN") {
+			hit = true
+		}
+	}
+	return hit
 }

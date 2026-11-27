@@ -184,6 +184,15 @@ func (d repoRuleDetector) Detect(p models.RepoProfile, inv models.RepoInventory)
 		}
 		return out
 	}
+	// RAW-003 and CSDK-209 report one finding per flow, placed on the sink line.
+	if x := d.rule.Match.RepoSourceReachesSink; x != nil {
+		flows := x.RepoFlowsFor(inv)
+		out := make([]models.Finding, 0, len(flows))
+		for _, f := range flows {
+			out = append(out, findingFromRule(d.rule, models.ScopeRepo, f.FilePath, f.SinkLine, f.SinkLine, ""))
+		}
+		return out
+	}
 	// MCP-204 to MCP-210 report one finding per site.
 	for _, mc := range mcpCodePredicates(d.rule.Match) {
 		if mc.set == nil || !*mc.set {
