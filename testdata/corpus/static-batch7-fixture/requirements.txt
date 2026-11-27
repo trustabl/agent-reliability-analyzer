@@ -1,0 +1,4 @@
+mcp==1.2.0
+claude-agent-sdk==0.2.121
+openai==1.50.0
+mem0ai==0.1.0

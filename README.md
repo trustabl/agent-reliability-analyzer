@@ -1145,17 +1145,17 @@ trustabl forge --policy google_adk --lang go
 
 | Category | SDK / framework |
 |---|---|
-| `claude_sdk` | Claude Agent SDK (Python + TypeScript) |
+| `claude_sdk` | Claude Agent SDK (Python + TypeScript), including a function parameter passed to `ClaudeAgentOptions(resume=...)` (CSDK-209) |
 | `openai_sdk` | OpenAI Agents SDK (Python + TypeScript) |
 | `google_adk` | Google Agent Development Kit (Python + TypeScript) |
-| `mcp` | Model Context Protocol servers, plus client launch, authentication and transport code patterns, and a tool parameter that reaches a subprocess, file, `eval` or memory scope call in the same function (MCP-215, 216, 217, 219, 220) |
+| `mcp` | Model Context Protocol servers, plus client launch, authentication and transport code patterns, and a tool parameter that reaches a subprocess, file, `eval` or memory scope call in the same function (MCP-215, 216, 217, 219, 220), a parameter built into SQL (MCP-218), and a credential-named environment value returned (MCP-221, 222) |
 | `langchain` | LangChain / LangGraph (Python + TypeScript), including a tool parameter built into a vector-store filter or a store namespace (LC-204, LC-205) |
 | `crewai` | CrewAI (Python) |
 | `pydantic_ai` | Pydantic AI (Python) |
 | `vercel_ai` | Vercel AI SDK (TypeScript) |
 | `autogen` | AutoGen / AG2 (Python) |
-| `claude_skill` | Claude Code skills (`SKILL.md`) |
-| `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework) |
+| `claude_skill` | Claude Code skills (`SKILL.md`), including a Python script that prints a credential-named environment value (CSKILL-094) |
+| `raw_llm_sdk` | Bare `anthropic` / `openai` client tool loops (not an agent framework), and model output that reaches a shell or code-execution call (RAW-003) |
 | `agent_config` | Harness config committed to a repo that runs code or grants authority before the folder is trusted (`.claude/settings.json`, `.mcp.json`, `.gemini/.env`, `.vscode/settings.json`, `.codex/config.toml`), including interpreter and unscoped allow rules (AGCFG-017), a non-ignored `settings.local.json` (AGCFG-018), archived MCP reference servers (MCPCFG-006), risky instructions in agent guidance files (AGCFG-022) and installs the manifests do not declare (AGCFG-023); and call-site literals in application code: an MCP stdio server started with the whole parent environment (AGCFG-019), an SSRF guard in logging mode (AGCFG-020) and `trust_remote_code=True` (AGCFG-021) |
 | `agent_server` | Exposure of a server the repo runs for an agent: a `*` origin list on a Google ADK server (Spring `application*.properties` / `.yml`, `get_fast_api_app`, `AdkApiServer`, `adk web --allow_origins`) and an OpenHands agent server bound to a non-loopback `--host` and published in compose or `docker run` with no session API key name |
 | `ci` | Coding agents run from GitHub Actions workflows (`.github/workflows/*.yml`) on events any GitHub user can cause; agent-invocable pull request approval commands and CODEOWNERS coverage of the agent workflows |

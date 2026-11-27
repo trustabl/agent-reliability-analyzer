@@ -1,0 +1,47 @@
+policy:
+  id: raw_llm_sdk_model_output_sinks
+  name: Model output that reaches a shell or code execution call
+  category: raw_llm_sdk
+  description: >
+    Rules for Python code in which the result of a chat-model SDK call reaches a subprocess,
+    eval, exec or compile call in the same function. The pack loads for any scan, so the
+    rule's own predicate does the gating. The detection is a narrow same-function pass.
+
+rules:
+  - id: RAW-003
+    title: Model output reaches a shell, eval, exec or compile call
+    severity: medium
+    confidence: 0.3
+    language: python
+    applies_to:
+      - raw_llm_sdk
+    scope: repo
+    match:
+      repo_source_reaches_sink:
+        sources: [llm_output]
+        sinks: [shell, code_exec]
+    explanation: >
+      The result of a chat-model call (the OpenAI chat, completions and responses calls, the
+      Anthropic messages call, Gemini `generate_content`, LiteLLM, Ollama, or `invoke` on a
+      model object) reaches an argument of a subprocess call, `os.system`, `eval`, `exec`
+      or `compile` in the same function, through assignments, string wrappers, `json.loads`
+      and attribute or index reads. The arXiv study "When Code Becomes an LLM Call"
+      (arXiv:2610.24545) traced the outputs of 496 model call sites in 40 open-source
+      agentic systems and reports that 48% of the outputs reach control flow or execution
+      and that 73% of those do not reach a person. The pack cites it for that finding and for
+      nothing more; the study does not name this sink list. The finding sits on the sink
+      call. It does not overlap RAW-001 and RAW-002, which read tool output built into a
+      system prompt.
+      Limits of this check: a single function is read. A value passed to a helper that
+      runs it is not found, and a model call made in a helper is not found. Model calls are
+      matched by name from a fixed list, so a wrapper with another name is not a source.
+      An `if` test on the value that raises or returns ends the flow, and the check does not
+      judge whether the test is a sound allowlist. A tool that exists to run model-written
+      code in a sandbox is flagged and may be a false positive. Branches that act on model
+      output are not read; the sinks are the shell and code-execution calls. Files under test paths
+      are not judged.
+    fix: >
+      Do not run model text. Ask for structured output, validate it against a schema with
+      an enum of allowed operations, and map each operation to a fixed function. If the
+      code must run, run it in a sandbox with no network and no host files, and put a person
+      before any action that cannot be undone.

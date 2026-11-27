@@ -1,0 +1,4 @@
+{
+  "name": "static-batch7-fixture",
+  "dependencies": { "@modelcontextprotocol/sdk": "1.0.0", "zod": "3.23.0" }
+}

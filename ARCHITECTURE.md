@@ -714,6 +714,16 @@ For each language recon cleared, do the AST work and produce a `RepoInventory`:
   facts. Flows land in `ToolDef.TaintFlows`; the predicate `tool_source_reaches_sink` reads them and the rule
   detector places the finding on the sink line. Not followed: another function, class state, module globals,
   closures over outer variables, container element reads, attribute mutation.
+- **Taint sources of static batch 7** (`analysis/taint.go`, `taint_repo.go`, schema 53) — the pass has four modes
+  (`taintMode`), each with its own source and sink pairs (`taintMode.allowed`); the tool mode keeps every batch 6 flow
+  and adds `secret_env` to `return_value` (a `return` statement, or the expression body of a TypeScript arrow
+  function) and `param` to `memory_write`. `secret_env` is an `os.environ[...]`, `os.environ.get`, `os.getenv` or
+  `process.env` read by a literal name that passes `IsSecretEnvName` (`secrets.go`); a slice of the value ends the flow.
+  `DiscoverRepoFlows` walks every function of Python files outside test paths that pass a text prefilter and records
+  `RepoInventory.RepoFlows`: `llm_output` (a fixed list of chat-model calls) to `shell` or `code_exec`, and
+  `handler_param` to the `resume` keyword of `ClaudeAgentOptions`. `SkillScriptPrintsSecret` runs the pass over a Python
+  skill script (module-level assignments visible inside functions) and stamps `BundledFile.PrintsSecret`. Predicates:
+  `tool_flow_reaches_sink`, `repo_source_reaches_sink`, `skill_bundled_script_prints_secret`.
 - **TypeScript OpenAI tool claims** (`ts_claim_use.go`, schema 35) —
   `extractTSOpenAITool` calls `stampTSOpenAIClaim`, which stamps `claim_use`
   when the zod `parameters` declare `claim` and `execute` is an inline function

@@ -1,0 +1,45 @@
+policy:
+  id: claude_sdk_session_resume
+  name: Claude Agent SDK session resume
+  category: claude_sdk
+  description: >
+    Rules for repo code that resumes a Claude Agent SDK session from a value the function
+    received as a parameter. The flow comes from the one-function taint pass over Python
+    files.
+
+rules:
+  - id: CSDK-209
+    title: Python function passes a parameter to ClaudeAgentOptions resume
+    severity: high
+    confidence: 0.35
+    language: python
+    applies_to:
+      - claude_sdk
+    scope: repo
+    match:
+      repo_source_reaches_sink:
+        sources: [handler_param]
+        sinks: [claude_resume]
+    explanation: >
+      A parameter of this function reaches the `resume` keyword of `ClaudeAgentOptions`
+      inside the same function. GitHub advisory GHSA-h4mw-j7qp-8mwm (CVE-2026-96620)
+      describes the Claude Agent SDK for Python passing `resume` to the Claude CLI without
+      validation, so a value that began with `-` was read as a separate flag; an attacker who
+      controlled the value could inject `--mcp-config` with a stdio MCP server and run
+      commands at CLI startup, outside the SDK's permission controls. The advisory states
+      that exploitation needs an application that passes untrusted input as the session ID,
+      and lists versions below 0.2.121 as affected. The pack cites it for that mechanism
+      and for nothing more; the version check is left to dependency advisories. The finding
+      sits on the call.
+      Limits of this check: the rule cannot tell whether a caller passes untrusted input,
+      so any function parameter counts, including one set by trusted code. A value held
+      in a field or returned by another function is not followed. A call that converts the
+      value, such as `str(uuid.UUID(session_id))`, a lookup of a stored session, and an `if`
+      test on the parameter that raises or returns end the flow; the check does not judge
+      whether the test is sound. A parameter typed int, float, bool, Literal or Enum is
+      skipped. Python is read, and the TypeScript SDK is not. Files under test paths are
+      not judged.
+    fix: >
+      Check the session ID before it reaches `resume`: parse it with `uuid.UUID`, or look
+      it up in a store of sessions owned by the current user and pass the stored value.
+      Reject a value that begins with `-`. Use a release of the SDK at or above 0.2.121.

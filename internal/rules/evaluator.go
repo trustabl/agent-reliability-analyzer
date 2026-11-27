@@ -274,6 +274,9 @@ func (e MatchExpr) EvaluateRepo(p models.RepoProfile, inv models.RepoInventory) 
 	if len(e.RepoCallKwargMatches) > 0 && len(PredRepoCallKwargHits(e.RepoCallKwargMatches, inv)) == 0 {
 		return false
 	}
+	if e.RepoSourceReachesSink != nil && len(e.RepoSourceReachesSink.RepoFlowsFor(inv)) == 0 {
+		return false
+	}
 	if e.RepoMCPServerBindsAllInterfacesUnprotected != nil && (len(inv.MCPServerBinds) > 0) != *e.RepoMCPServerBindsAllInterfacesUnprotected {
 		return false
 	}
@@ -446,6 +449,9 @@ func (e MatchExpr) EvaluateSkill(s models.SkillDef, inv models.RepoInventory) bo
 		return false
 	}
 	if e.SkillBundledScriptDestructiveCommand != nil && PredSkillBundledScriptDestructiveCommand(s) != *e.SkillBundledScriptDestructiveCommand {
+		return false
+	}
+	if e.SkillBundledScriptPrintsSecret != nil && PredSkillBundledScriptPrintsSecret(s) != *e.SkillBundledScriptPrintsSecret {
 		return false
 	}
 	if e.SkillBundledFileIsOpaque != nil && PredSkillBundledFileIsOpaque(s) != *e.SkillBundledFileIsOpaque {
@@ -632,6 +638,9 @@ func (e MatchExpr) EvaluateTool(t models.ToolDef, pf analysis.ParsedFile) bool {
 	if e.ToolSourceReachesSink != nil && !PredToolSourceReachesSink(*e.ToolSourceReachesSink, t) {
 		return false
 	}
+	if e.ToolFlowReachesSink != nil && !PredToolFlowReachesSink(*e.ToolFlowReachesSink, t) {
+		return false
+	}
 	if e.ToolDecoratorKwargValue != nil && !PredToolDecoratorKwargValue(*e.ToolDecoratorKwargValue, t) {
 		return false
 	}
@@ -668,6 +677,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"tool_decorator_kwarg_value":        true, "tool_decorator_kwarg_present": true,
 		"tool_claim_use": true, "tool_description_has_hidden_text": true,
 		"tool_source_reaches_sink": true,
+		"tool_flow_reaches_sink":   true,
 	},
 	models.ScopeAgent: {
 		"agent_class": true, "agent_kwarg_present": true, "agent_kwarg_missing": true,
@@ -711,6 +721,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"skill_bundled_file_has_hardcoded_secret":       true,
 		"skill_bundled_script_decodes_and_executes":     true,
 		"skill_bundled_script_destructive_command":      true,
+		"skill_bundled_script_prints_secret":            true,
 		"skill_bundled_file_is_opaque":                  true,
 		"skill_unpinned_install":                        true,
 		"skill_description_tool_mismatch":               true,
@@ -798,6 +809,7 @@ var predicatesByScope = map[models.Scope]map[string]bool{
 		"repo_mcp_server_dns_rebinding_disabled":           true,
 		"repo_mcp_server_installs_package_from_input":      true,
 		"repo_call_kwarg_matches":                          true,
+		"repo_source_reaches_sink":                         true,
 	},
 }
 
@@ -834,6 +846,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.CallWithoutKwarg != nil, "call_without_kwarg")
 	add(e.CallUsesUnnormalizedPathParam != nil, "call_uses_unnormalized_path_param")
 	add(e.ToolSourceReachesSink != nil, "tool_source_reaches_sink")
+	add(e.ToolFlowReachesSink != nil, "tool_flow_reaches_sink")
 	add(e.ToolDecoratorKwargValue != nil, "tool_decorator_kwarg_value")
 	add(len(e.ToolDecoratorKwargPresent) > 0, "tool_decorator_kwarg_present")
 	add(len(e.ToolClaimUse) > 0, "tool_claim_use")
@@ -880,6 +893,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.SkillBundledFileHasHardcodedSecret != nil, "skill_bundled_file_has_hardcoded_secret")
 	add(e.SkillBundledScriptDecodesAndExecutes != nil, "skill_bundled_script_decodes_and_executes")
 	add(e.SkillBundledScriptDestructiveCommand != nil, "skill_bundled_script_destructive_command")
+	add(e.SkillBundledScriptPrintsSecret != nil, "skill_bundled_script_prints_secret")
 	add(e.SkillBundledFileIsOpaque != nil, "skill_bundled_file_is_opaque")
 	add(e.SkillUnpinnedInstall != nil, "skill_unpinned_install")
 	add(e.SkillDescriptionToolMismatch != nil, "skill_description_tool_mismatch")
@@ -946,6 +960,7 @@ func (e MatchExpr) setPredicateNames() []string {
 	add(e.RepoMCPServerDNSRebindingDisabled != nil, "repo_mcp_server_dns_rebinding_disabled")
 	add(e.RepoMCPServerInstallsPackageFromInput != nil, "repo_mcp_server_installs_package_from_input")
 	add(len(e.RepoCallKwargMatches) > 0, "repo_call_kwarg_matches")
+	add(e.RepoSourceReachesSink != nil, "repo_source_reaches_sink")
 	add(e.RepoHasObservability != nil, "repo_has_observability")
 	add(e.RepoObservabilityInspectable != nil, "repo_observability_inspectable")
 	add(e.RepoObservabilityInitialized != nil, "repo_observability_initialized")

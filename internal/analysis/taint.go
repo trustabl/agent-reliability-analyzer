@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"bytes"
 	"sort"
 
 	sitter "github.com/smacker/go-tree-sitter"
@@ -33,6 +34,7 @@ const (
 // taintOrigin is the provenance of one tainted value.
 type taintOrigin struct {
 	param     string
+	kind      models.SourceKind // empty means models.SourceParam
 	srcLine   int
 	via       []int
 	elem      bool // the value is a literal container holding the parameter
@@ -51,6 +53,9 @@ func (s taintState) clone() taintState {
 
 func originKey(o taintOrigin) string {
 	k := o.param
+	if o.kind != "" {
+		k = string(o.kind) + ":" + k
+	}
 	if o.elem {
 		k += "|e"
 	}
@@ -149,7 +154,44 @@ func dropElem(os []taintOrigin) []taintOrigin {
 
 type flowKey struct {
 	param, class, callee string
+	kind                 models.SourceKind
 	line                 int
+}
+
+// taintMode selects which sources are read and which flows are kept. The zero value is the
+// batch 6 tool pass; every other mode is a batch 7 addition and leaves it unchanged.
+type taintMode int
+
+const (
+	// modeTool: tool handlers. Parameters reach the batch 6 sinks and memory_write; a
+	// secret-named environment value reaches return_value.
+	modeTool taintMode = iota
+	// modeRepoLLM: any function; the result of a chat-model SDK call reaches shell or code_exec.
+	modeRepoLLM
+	// modeRepoResume: any function; a parameter reaches the resume keyword of ClaudeAgentOptions.
+	modeRepoResume
+	// modeSkill: a skill script; a secret-named environment value reaches print or a stdout write.
+	modeSkill
+)
+
+func (m taintMode) readsEnvSecrets() bool { return m == modeTool || m == modeSkill }
+
+// allowed reports whether a flow of this source kind into this sink class is kept in the mode.
+func (m taintMode) allowed(kind models.SourceKind, class string) bool {
+	switch kind {
+	case "", models.SourceParam:
+		if m != modeTool {
+			return false
+		}
+		return class != models.SinkReturnValue && class != models.SinkLogPrint && class != models.SinkClaudeResume
+	case models.SourceSecretEnv:
+		return (m == modeTool && class == models.SinkReturnValue) || (m == modeSkill && class == models.SinkLogPrint)
+	case models.SourceLLMOutput:
+		return m == modeRepoLLM && (class == models.SinkShell || class == models.SinkCodeExec)
+	case models.SourceHandlerParam:
+		return m == modeRepoResume && class == models.SinkClaudeResume
+	}
+	return false
 }
 
 // taintEngine holds the per-function walk state.
@@ -173,6 +215,9 @@ type taintEngine struct {
 	cb          map[uint32][]taintOrigin
 	killedKeys  map[string]bool // args.key reads ended by a guard
 	excludedSet map[string]bool
+	mode        taintMode
+	fnDepth     int  // nesting of function literals inside the handler (TypeScript)
+	envOK       bool // the function mentions the environment, so return_value is worth computing
 }
 
 func (e *taintEngine) over() bool {
@@ -181,7 +226,14 @@ func (e *taintEngine) over() bool {
 }
 
 func (e *taintEngine) record(o taintOrigin, class, callee string, line int) {
-	k := flowKey{o.param, class, callee, line}
+	kind := o.kind
+	if kind == "" {
+		kind = models.SourceParam
+	}
+	if !e.mode.allowed(kind, class) {
+		return
+	}
+	k := flowKey{o.param, class, callee, kind, line}
 	if _, ok := e.flows[k]; ok {
 		return
 	}
@@ -191,7 +243,7 @@ func (e *taintEngine) record(o taintOrigin, class, callee string, line int) {
 	}
 	e.flows[k] = models.TaintFlow{
 		Param:      o.param,
-		SourceKind: models.SourceParam,
+		SourceKind: kind,
 		SourceLine: o.srcLine,
 		SinkClass:  class,
 		SinkCallee: callee,
@@ -212,6 +264,9 @@ func (e *taintEngine) sortedFlows() []models.TaintFlow {
 		}
 		if a.Param != b.Param {
 			return a.Param < b.Param
+		}
+		if a.SourceKind != b.SourceKind {
+			return a.SourceKind < b.SourceKind
 		}
 		if a.SinkClass != b.SinkClass {
 			return a.SinkClass < b.SinkClass
@@ -241,11 +296,12 @@ func AttachTaintFlows(tools []models.ToolDef, files []ParsedFile) {
 	ctxs := map[string]*taintFileCtx{}
 	for i := range tools {
 		t := &tools[i]
-		if len(t.ParamNames) == 0 && len(t.InputKeys) == 0 {
-			continue
-		}
 		pf, ok := byPath[t.FilePath]
 		if !ok || pf.Tree == nil {
+			continue
+		}
+		if len(t.ParamNames) == 0 && len(t.InputKeys) == 0 && !bytes.Contains(pf.Source, []byte("environ")) &&
+			!bytes.Contains(pf.Source, []byte("getenv")) && !bytes.Contains(pf.Source, []byte("process.env")) {
 			continue
 		}
 		fc := ctxs[t.FilePath]

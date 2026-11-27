@@ -330,6 +330,45 @@ rules:
 #       memory_scope_key matches only a scope value built by joining the
 #       parameter with other text (f-string, +, format, join), not a bare pass-through.
 #
+#   tool_flow_reaches_sink:
+#       Fires when the one-function taint pass (internal/analysis/taint*.go) found a
+#       flow from a listed source to a listed sink inside the tool's own handler
+#       (schema 53). It is separate from tool_source_reaches_sink so that a build
+#       at schema 51 skips the rule with META-005. The finding is placed on the sink line.
+#
+#       sources:     [param, secret_env]   REQUIRED. param is a tool parameter (as in
+#                    tool_source_reaches_sink). secret_env is an environment variable whose
+#                    literal name reads as a credential: Python os.environ[...],
+#                    os.environ.get, os.getenv; TypeScript process.env.X, process.env["X"].
+#                    The name test (analysis.IsSecretEnvName) needs one underscore-separated
+#                    word from KEY, TOKEN, SECRET, PASSWORD, PASSWD, PWD, CREDENTIAL(S), PAT,
+#                    BEARER, PASSPHRASE or AUTH, and none from FILE, PATH, DIR, URL, URI, HOST,
+#                    ID, NAME, PUBLIC and the like. A non-literal key is not a source. A slice of
+#                    the value (key[:4], key.slice(0, 4)) and a call into another function end the flow.
+#       sinks:       [return_value, memory_write]   REQUIRED. return_value is a return statement of
+#                    the handler (or the expression body of a TypeScript arrow function).
+#                    memory_write is the value argument of a store put or aput, and the messages or
+#                    data argument of a mem0-style add or save_context, on a receiver whose name
+#                    says it is a store or a memory.
+#       param_names, param_regex: OPTIONAL. Restrict a param source by name, as in
+#                    tool_source_reaches_sink.
+#
+#   repo_source_reaches_sink:
+#       Fires when the one-function taint pass found a flow from a listed source to a
+#       listed sink in any function of repo code outside test paths (schema 53). Python
+#       only; no flow is followed into another function. One finding per flow, placed on
+#       the sink line.
+#
+#       sources:     [llm_output, handler_param]   REQUIRED. llm_output is the result of a
+#                    chat-model SDK call (OpenAI chat, completions and responses, Anthropic
+#                    messages, Gemini generate_content, LiteLLM, Ollama, invoke or ainvoke on
+#                    a receiver named llm, model or chat); handler_param is any parameter of
+#                    the function other than self, cls and a parameter typed int, float, bool,
+#                    Literal or an Enum.
+#       sinks:       [shell, code_exec, claude_resume]   REQUIRED. llm_output reaches shell or
+#                    code_exec; handler_param reaches claude_resume (the resume keyword of
+#                    ClaudeAgentOptions).
+#
 #
 #   tool_decorator_kwarg_value:
 #       Fires when the tool's decorator call has a specific kwarg equal to a
@@ -660,6 +699,11 @@ rules:
 #       result (b64decode, b32decode, b85decode, a85decode, decodebytes, decompress,
 #       fromhex, unhexlify, atob, codecs.decode, Buffer.from(..., 'base64'))
 #       (BundledFile.DecodesAndExecutes). CSKILL-088.
+#   skill_bundled_script_prints_secret: true | false
+#       A bundled Python script (outside test paths) passes a secret-named environment
+#       value to print or sys.stdout.write inside one function or the module body.
+#       Module-level assignments are visible inside the file's functions
+#       (BundledFile.PrintsSecret). CSKILL-094.
 #   skill_bundled_script_destructive_command: true | false
 #       A bundled script (outside test paths, comments removed) runs rm with a recursive
 #       flag whose target is exactly /, /*, ~, ~/, ~/*, $HOME or ${HOME}, mkfs, dd with

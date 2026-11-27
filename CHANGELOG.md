@@ -6,14 +6,30 @@ to follow Semantic Versioning once it reaches 1.0.
 
 ## [Unreleased]
 
-Rule schema 41 → 52 (`rules.SupportedSchemaVersion`; 42 to 51 are merged from main, 52 is provisional). The rules fixture
-goes from 389 to 451 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules and the four static batch 5 rules, the seven static batch 6 rules and the six static batch 8 rules below). `ScanID` changes, as with every
+Rule schema 41 → 53 (`rules.SupportedSchemaVersion`; 42 to 52 are merged from main, 53 is provisional). The rules fixture
+goes from 389 to 458 rules (OBS-013..014, AGSRV-001..002, LC-118, CCMD-001..003, MCP-036/037/203, the nine static batch 3 rules, the static batch 1 rules, the thirteen static batch 2 rules and the five static batch 4 rules and the four static batch 5 rules, the seven static batch 6 rules, the six static batch 8 rules and the seven static batch 7 rules below). `ScanID` changes, as with every
 schema bump, because it folds the engine's supported schema version. Engines without schema 46
 skip the new rules and report a degraded scan ("rules skipped", META-005) until they are
 upgraded.
 
 ### Added
 
+- **Static batch 7: secret, model-output and parameter sources for the taint pass (rule schema 51 → 53; +7 rules, four predicates).**
+  The taint pass gains the sources `secret_env` (an environment variable read by a literal name that passes
+  `analysis.IsSecretEnvName`), `llm_output` (the result of a fixed list of chat-model SDK calls) and `handler_param`
+  (any function parameter), and the sinks `return_value`, `log_print`, `memory_write` and `claude_resume`; the batch 6
+  predicate `tool_source_reaches_sink`, its value sets and every parameter-to-sink flow are unchanged. New predicates:
+  `tool_flow_reaches_sink` (tool scope: `secret_env` to `return_value`, `param` to `memory_write`),
+  `repo_source_reaches_sink` (repo scope, over `RepoInventory.RepoFlows` from `analysis.DiscoverRepoFlows`, Python) and
+  `skill_bundled_script_prints_secret` (skill scope, over `BundledFile.PrintsSecret`). Rules: **MCP-218** (high, 0.35: a
+  parameter built into SQL text, Python; the sink built in batch 6; a receiver named sandbox, interpreter, kernel,
+  executor or runner is not read as a database), **MCP-221** (Python) and **MCP-222** (TypeScript) (medium, 0.4:
+  a credential-named environment value returned), **MCP-223** (medium, 0.3: a credential-named parameter written to a
+  memory store) in `mcp/`; **RAW-003** (medium, 0.3: model output reaches a shell, `eval`, `exec` or `compile`);
+  **CSDK-209** (high, 0.35: a parameter reaches `ClaudeAgentOptions(resume=...)`); **CSKILL-094** (medium, 0.4: a skill
+  script prints a credential-named environment value). Not built: SCOPE-007 (one source paper), the log sink for MCP
+  tools (the cited skills study concerns script output), TypeScript for RAW-003, CSDK-209 and CSKILL-094. Engines without
+  schema 53 skip these rules with META-005; engines at 51 run MCP-218.
 - **Static batch 8: side-effecting tools with no approval, agent-invocable PR approval and CODEOWNERS (rule schema 51 → 52, provisional; +6 rules, three predicates).**
   Agent scope, one rule for each pack: **OAI-212** (high, 0.4, `openai_sdk/consequential_tool_gate.yaml`), **ADK-204**,
   **LC-206** and **PYD-204** (high, 0.4, same file name in `google_adk/`, `langchain/`, `pydantic_ai/`) over the predicate

@@ -319,6 +319,11 @@ type BundledFile struct {
 	DestructiveCommand bool   `json:"destructive_command,omitempty"`
 	UnpinnedInstall    bool   `json:"unpinned_install,omitempty"`
 	Opaque             string `json:"opaque,omitempty"`
+	// PrintsSecret is set for a Python script (outside test paths) in which a secret-named
+	// environment value reaches print or a stdout write inside one function or the module body
+	// (CSKILL-094); PrintsSecretLine is the 1-indexed line of that call.
+	PrintsSecret     bool `json:"prints_secret,omitempty"`
+	PrintsSecretLine int  `json:"prints_secret_line,omitempty"`
 }
 
 // SlashCommandDef is one parsed .claude/commands/*.md slash command. The command

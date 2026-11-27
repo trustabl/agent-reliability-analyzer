@@ -164,6 +164,19 @@ func (e *taintEngine) pySinks(call *sitter.Node, st taintState) {
 		recvText = astutil.NodeText(recvNode, e.src)
 	}
 	all := append(append([]*sitter.Node{}, pos...), kwNodes(kw, "args", "cwd", "executable", "env")...)
+	switch e.mode {
+	case modeSkill:
+		// stdout only: print() and sys.stdout.write(); a call routed to another stream is not one.
+		if (c == "print" && kw["file"] == nil) || c == "sys.stdout.write" || c == "sys.stdout.buffer.write" {
+			e.hit(models.SinkLogPrint, raw, pos, st, false, line)
+		}
+		return
+	case modeRepoResume:
+		if lastSegment(c) == "ClaudeAgentOptions" {
+			e.hit(models.SinkClaudeResume, raw, kwNodes(kw, "resume"), st, false, line)
+		}
+		return
+	}
 	first := func() []*sitter.Node {
 		if len(pos) > 0 {
 			return pos[:1]
@@ -178,7 +191,7 @@ func (e *taintEngine) pySinks(call *sitter.Node, st taintState) {
 	case c == "eval" || c == "exec" || c == "compile" || c == "builtins.eval" || c == "builtins.exec":
 		e.hit(models.SinkCodeExec, raw, append(first(), kwNodes(kw, "source", "expression", "object")...), st, false, line)
 		return
-	case c == "sqlalchemy.text" || c == "sqlalchemy.sql.text" || (recvNode != nil && sqlMethods[meth] && meth != "query" && meth != "raw" && meth != "unsafe"):
+	case c == "sqlalchemy.text" || c == "sqlalchemy.sql.text" || (recvNode != nil && sqlMethods[meth] && meth != "query" && meth != "raw" && meth != "unsafe" && !nonSQLReceiver(recvText)):
 		e.hit(models.SinkSQLExecute, raw, append(first(), kwNodes(kw, "sql", "query", "statement", "operation")...), st, false, line)
 		return
 	case c == "open" || c == "io.open" || c == "codecs.open":
@@ -224,6 +237,21 @@ func (e *taintEngine) pySinks(call *sitter.Node, st taintState) {
 		if storeMethods[meth] && e.receiverIsStore(recvText) {
 			e.hit(models.SinkStoreNamespace, raw, append(first(), kwNodes(kw, "namespace", "namespace_prefix", "prefix")...), st, false, line)
 		}
+		// memory_write: the value a store put or a mem0-style add records.
+		if (meth == "put" || meth == "aput") && e.receiverIsStore(recvText) {
+			var v []*sitter.Node
+			if len(pos) > 2 {
+				v = append(v, pos[2])
+			}
+			e.hit(models.SinkMemoryWrite, raw, append(v, kwNodes(kw, "value")...), st, false, line)
+		}
+		if (meth == "add" || meth == "aadd" || meth == "save_context" || meth == "asave_context") && e.receiverIsMemory(recvText) {
+			var v []*sitter.Node
+			if len(pos) > 0 {
+				v = append(v, pos...)
+			}
+			e.hit(models.SinkMemoryWrite, raw, append(v, kwNodes(kw, "messages", "data", "inputs", "outputs")...), st, false, line)
+		}
 		if memoryMethods[meth] && e.receiverIsMemory(recvText) {
 			var nodes []*sitter.Node
 			for k, v := range kw {
@@ -243,4 +271,16 @@ func sortNodes(ns []*sitter.Node) []*sitter.Node {
 		}
 	}
 	return ns
+}
+
+// nonSQLReceiver reports a receiver whose last name says it runs code, not SQL (sandbox, interpreter,
+// kernel, executor, runner): `sandbox.execute(code)` is not a statement passed to a database.
+func nonSQLReceiver(recv string) bool {
+	l := strings.ToLower(lastSegment(recv))
+	for _, w := range []string{"sandbox", "interpreter", "kernel", "executor", "runner"} {
+		if strings.Contains(l, w) {
+			return true
+		}
+	}
+	return false
 }

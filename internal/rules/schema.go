@@ -77,6 +77,8 @@ type MatchExpr struct {
 	CallUsesUnnormalizedPathParam *CallUsesUnnormalizedPathParamExpr `yaml:"call_uses_unnormalized_path_param,omitempty"`
 	// ToolSourceReachesSink: a one-function flow from a tool parameter to a sink; see ToolSourceReachesSinkExpr.
 	ToolSourceReachesSink *ToolSourceReachesSinkExpr `yaml:"tool_source_reaches_sink,omitempty"`
+	// ToolFlowReachesSink: a one-function flow with the batch 7 sources and sinks; see ToolFlowReachesSinkExpr.
+	ToolFlowReachesSink *ToolFlowReachesSinkExpr `yaml:"tool_flow_reaches_sink,omitempty"`
 
 	// Tool-scope decorator predicates
 	ToolDecoratorKwargValue   *ToolDecoratorKwargValueExpr `yaml:"tool_decorator_kwarg_value,omitempty"`
@@ -146,6 +148,7 @@ type MatchExpr struct {
 	SkillBundledFileHasHardcodedSecret      *bool               `yaml:"skill_bundled_file_has_hardcoded_secret,omitempty"`
 	SkillBundledScriptDecodesAndExecutes    *bool               `yaml:"skill_bundled_script_decodes_and_executes,omitempty"`
 	SkillBundledScriptDestructiveCommand    *bool               `yaml:"skill_bundled_script_destructive_command,omitempty"`
+	SkillBundledScriptPrintsSecret          *bool               `yaml:"skill_bundled_script_prints_secret,omitempty"`
 	SkillBundledFileIsOpaque                *bool               `yaml:"skill_bundled_file_is_opaque,omitempty"`
 	SkillUnpinnedInstall                    *bool               `yaml:"skill_unpinned_install,omitempty"`
 	SkillDescriptionToolMismatch            *bool               `yaml:"skill_description_tool_mismatch,omitempty"`
@@ -220,6 +223,10 @@ type MatchExpr struct {
 	// has a call that matches any one of them (AGCFG-019, 020, 021). It reads
 	// RepoInventory.CallKwargs.
 	RepoCallKwargMatches []CallKwargSpec `yaml:"repo_call_kwarg_matches,omitempty"`
+
+	// RepoSourceReachesSink: a one-function flow from model output or a function parameter to a
+	// shell, code-execution or resume sink in repo code (RAW-003, CSDK-209); see RepoSourceReachesSinkExpr.
+	RepoSourceReachesSink *RepoSourceReachesSinkExpr `yaml:"repo_source_reaches_sink,omitempty"`
 
 	// RepoMCPServerBindsAllInterfacesUnprotected is true when MCP server code starts an HTTP
 	// transport on a literal wildcard host with no auth or allow-list in the file (MCP-203).

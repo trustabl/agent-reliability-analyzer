@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"bytes"
 	"strings"
 
 	sitter "github.com/smacker/go-tree-sitter"
@@ -113,17 +114,24 @@ func (fc *taintFileCtx) tsToolFlows(t models.ToolDef) []models.TaintFlow {
 	for _, h := range handlers {
 		e := &taintEngine{src: fc.pf.Source, file: fc, flows: map[flowKey]models.TaintFlow{}, excludedSet: excluded}
 		st := e.tsSources(h, declared)
-		if len(st) == 0 && e.tsArgs == "" {
-			continue
-		}
 		body := h.ChildByFieldName("body")
 		if body == nil {
+			continue
+		}
+		e.envOK = bytes.Contains(e.src[body.StartByte():body.EndByte()], []byte("process.env"))
+		if len(st) == 0 && e.tsArgs == "" && !e.envOK {
 			continue
 		}
 		if body.Type() == "statement_block" {
 			e.tsBlock(body, st)
 		} else {
 			e.scan2(body, st)
+			if e.envOK {
+				// an arrow function with an expression body returns that expression
+				for _, o := range e.expr(body, st) {
+					e.record(o, models.SinkReturnValue, "return", astutil.NodeLine(body))
+				}
+			}
 		}
 		for k, v := range e.flows {
 			merged[k] = v
@@ -313,6 +321,14 @@ func (e *taintEngine) tsStmt(n *sitter.Node, st taintState) taintState {
 						st[nm] = mergeOrigins(st[nm], withVia(asComposite(os), line, false))
 					}
 				}
+			}
+		}
+		return st
+	case "return_statement":
+		e.scan2(n, st)
+		if e.envOK && e.fnDepth == 0 && n.NamedChildCount() > 0 {
+			for _, o := range e.expr(n.NamedChild(0), st) {
+				e.record(o, models.SinkReturnValue, "return", line)
 			}
 		}
 		return st
@@ -628,12 +644,21 @@ func (e *taintEngine) tsExpr(n *sitter.Node, st taintState, depth int) []taintOr
 		return asElem(os)
 	case "member_expression":
 		obj := n.ChildByFieldName("object")
+		if e.mode.readsEnvSecrets() && obj != nil && astutil.NodeText(obj, e.src) == "process.env" {
+			return e.tsEnvSecret(astutil.NodeText(n.ChildByFieldName("property"), e.src), n)
+		}
 		if e.tsArgs != "" && obj != nil && obj.Type() == "identifier" && astutil.NodeText(obj, e.src) == e.tsArgs {
 			return e.tsArgOrigin(astutil.NodeText(n.ChildByFieldName("property"), e.src), n)
 		}
 		return dropElem(e.tsExpr(obj, st, d))
 	case "subscript_expression":
 		obj := n.ChildByFieldName("object")
+		if e.mode.readsEnvSecrets() && obj != nil && astutil.NodeText(obj, e.src) == "process.env" {
+			if idx := n.ChildByFieldName("index"); idx != nil && idx.Type() == "string" {
+				return e.tsEnvSecret(tsKeyText(idx, e.src), n)
+			}
+			return nil
+		}
 		if e.tsArgs != "" && obj != nil && obj.Type() == "identifier" && astutil.NodeText(obj, e.src) == e.tsArgs {
 			if idx := n.ChildByFieldName("index"); idx != nil && idx.Type() == "string" {
 				return e.tsArgOrigin(tsKeyText(idx, e.src), n)
@@ -645,6 +670,14 @@ func (e *taintEngine) tsExpr(n *sitter.Node, st taintState, depth int) []taintOr
 		return e.tsCallExpr(n, st, d)
 	}
 	return nil
+}
+
+// tsEnvSecret returns the origin of a process.env read when the variable name passes the secret-name test.
+func (e *taintEngine) tsEnvSecret(name string, at *sitter.Node) []taintOrigin {
+	if !IsSecretEnvName(name) {
+		return nil
+	}
+	return []taintOrigin{{param: name, kind: models.SourceSecretEnv, srcLine: astutil.NodeLine(at)}}
 }
 
 func (e *taintEngine) tsArgOrigin(key string, n *sitter.Node) []taintOrigin {
@@ -684,6 +717,10 @@ func (e *taintEngine) tsCallExpr(n *sitter.Node, st taintState, d int) []taintOr
 			}
 			return os
 		case tsMethodRecv[meth]:
+			if meth == "slice" || meth == "substring" || meth == "substr" || meth == "at" || meth == "charAt" {
+				// a part of a secret, as in key.slice(0, 4), is not followed
+				return dropKind(dropElem(e.tsExpr(recv, st, d)), models.SourceSecretEnv)
+			}
 			return dropElem(e.tsExpr(recv, st, d))
 		}
 	}
@@ -731,11 +768,13 @@ func (e *taintEngine) scan2(n *sitter.Node, st taintState) {
 			}
 		}
 		body := n.ChildByFieldName("body")
+		e.fnDepth++
 		if body != nil && body.Type() == "statement_block" {
 			e.tsBlock(body, s2)
 		} else {
 			e.scan2(body, s2)
 		}
+		e.fnDepth--
 		return
 	case n.Type() == "class_declaration" || n.Type() == "class":
 		return

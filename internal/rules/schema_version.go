@@ -116,4 +116,10 @@ package rules
 // Schema 52 adds agent_consequential_tool_ungated (agent scope), repo_agent_code_approves_prs and
 // repo_codeowners_gap (repo scope). Static batch 8 holds 52 on top of batch 6's 51 (merged).
 // A binary below 52 skips the rules that use them with META-005.
-const SupportedSchemaVersion = 52
+//
+// Schema 53 adds three predicates: tool_flow_reaches_sink (tool scope), repo_source_reaches_sink
+// (repo scope) and skill_bundled_script_prints_secret (skill scope). They read the secret_env,
+// llm_output and handler_param sources the taint pass gained in static batch 7, and tool_flow_reaches_sink
+// also reads the memory_write sink. tool_source_reaches_sink is unchanged. A binary below 53 skips
+// the rules that use them with META-005.
+const SupportedSchemaVersion = 53
